@@ -1,0 +1,71 @@
+// ============================================================
+// Texturas inline (SVG data URIs)
+// ============================================================
+// Las texturas se cargan sin request HTTP. La intensidad es
+// deliberadamente baja — la idea es atmósfera, no decoración.
+
+// Grano de papel: turbulencia gausiana fina con oclusión opaca.
+// Use con `mix-blend-mode: multiply` (light) o `screen` (dark).
+$noise-paper:
+  "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.10 0 0 0 0 0.08 0 0 0 0 0.06 0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
+
+// Grano más grueso para superficies elevadas (cards de detalle).
+$noise-card:
+  "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.10 0 0 0 0 0.08 0 0 0 0 0.06 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E";
+
+// Reglas horizontales tipo cuaderno (líneas sutiles cada 24px).
+// Usar como background-image + background-size: 100% 24px en body
+// de artículos para sensación de "ruled paper".
+$ruled-paper:
+  "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='24' viewBox='0 0 1 24'%3E%3Cline x1='0' y1='23.5' x2='1' y2='23.5' stroke='%23a8987b' stroke-opacity='0.16' stroke-width='1'/%3E%3C/svg%3E";
+
+// Mixin de aplicación rápida del grano.
+@mixin paper-grain($opacity: 0.45) {
+  position: relative;
+  isolation: isolate;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url($noise-paper);
+    background-size: 200px 200px;
+    opacity: $opacity;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+@mixin paper-grain-dark($opacity: 0.55) {
+  position: relative;
+  isolation: isolate;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url($noise-paper);
+    background-size: 200px 200px;
+    opacity: $opacity;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+@mixin ruled-paper {
+  background-image: url($ruled-paper);
+  background-size: 100% 24px;
+  background-repeat: repeat-y;
+}

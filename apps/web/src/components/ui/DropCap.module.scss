@@ -1,0 +1,32 @@
+@use '@/styles/tokens' as t;
+
+.wrap {
+  > p:first-of-type::first-letter,
+  > :first-child::first-letter {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 700;
+    font-size: 4.5em;
+    line-height: 0.82;
+    float: left;
+    padding: 0.06em 0.1em 0 0;
+    margin-top: 0.04em;
+    color: var(--accent-ink);
+    font-variation-settings:
+      'opsz' 144,
+      'SOFT' 20,
+      'WONK' 1;
+  }
+}
+
+.standalone {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 700;
+  font-size: 6rem;
+  line-height: 0.82;
+  color: var(--accent-ink);
+  display: inline-block;
+  font-variation-settings:
+    'opsz' 144,
+    'SOFT' 20,
+    'WONK' 1;
+}

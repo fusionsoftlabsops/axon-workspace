@@ -1,0 +1,162 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.shell {
+  min-height: calc(100dvh - 80px);
+  padding: t.$space-3xl t.$space-xl;
+  display: flex;
+  justify-content: center;
+}
+
+.inner {
+  width: 100%;
+  max-width: t.$max-content-width;
+}
+
+.eyebrow {
+  margin-bottom: t.$space-md;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+// ---------- Title bars (en lugar de h1) ----------
+.title {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  margin-bottom: t.$space-lg;
+}
+
+.bar {
+  display: block;
+  height: 2.5rem;
+  background: linear-gradient(
+    90deg,
+    var(--paper-elev) 0%,
+    var(--paper-deep) 40%,
+    var(--paper-elev) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+.bar1 { width: 70%; }
+.bar2 { width: 45%; }
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+// ---------- Rule + tick ----------
+.rule {
+  height: 2px;
+  background: var(--rule);
+  margin: t.$space-md 0 t.$space-2xl;
+  position: relative;
+  overflow: hidden;
+}
+
+.ruleFill {
+  position: absolute;
+  inset: 0;
+  background: var(--ink);
+  transform-origin: left;
+  animation: rule-grow 0.9s t.$ease-editorial both;
+}
+
+.ruleTick {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 48px;
+  height: 4px;
+  background: var(--accent-ink);
+  transform-origin: left;
+  animation: rule-grow 0.6s t.$ease-editorial 0.45s both;
+}
+
+// ---------- Filas (placeholder de cards de cerebro) ----------
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 160px 1fr 100px;
+  gap: t.$space-xl;
+  padding: t.$space-xl 0;
+  border-top: 1px solid var(--rule);
+  align-items: center;
+  opacity: 0;
+  animation: reveal-up 0.55s t.$ease-editorial backwards;
+  animation-delay: calc(0.3s + var(--index, 0) * 0.08s);
+}
+
+.rowMeta,
+.rowTitle,
+.rowAction {
+  display: block;
+  height: 1rem;
+  background: linear-gradient(
+    90deg,
+    var(--paper-elev) 0%,
+    var(--paper-deep) 40%,
+    var(--paper-elev) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+.rowMeta {
+  width: 80px;
+  height: 1.2rem;
+}
+
+.rowTitle {
+  width: 80%;
+  height: 1.4rem;
+}
+
+.rowAction {
+  width: 60%;
+  height: 0.8rem;
+  justify-self: end;
+}
+
+// ---------- Footnote ----------
+.footnote {
+  @include ty.caption;
+  font-style: italic;
+  margin-top: t.$space-2xl;
+  display: flex;
+  align-items: baseline;
+  gap: t.$space-xs;
+  color: var(--ink-muted);
+  font-family: var(--font-editorial);
+  font-size: 0.95rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-ink);
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
+.ellipsis {
+  color: var(--accent-ink);
+  font-size: 1.4em;
+  line-height: 0.5;
+  display: inline-block;
+  animation: pulse 1.6s ease-in-out infinite;
+  font-variation-settings: 'opsz' 144, 'WONK' 1;
+}

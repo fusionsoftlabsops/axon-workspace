@@ -1,0 +1,86 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  background: var(--paper);
+
+  @media (max-width: t.$bp-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cover {
+  background: var(--paper-deep);
+  padding: t.$space-3xl t.$space-2xl;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--rule);
+
+  @media (max-width: t.$bp-md) {
+    display: none;
+  }
+
+  &::before {
+    content: '⁂';
+    position: absolute;
+    bottom: -8rem;
+    left: -3rem;
+    font-family: var(--font-display);
+    font-size: 32rem;
+    color: var(--accent-ink);
+    opacity: 0.06;
+    line-height: 1;
+    font-variation-settings: 'opsz' 144, 'WONK' 1;
+    pointer-events: none;
+  }
+}
+
+.coverHeader {
+  position: relative;
+  z-index: 1;
+}
+
+.brand {
+  @include ty.eyebrow;
+  color: var(--ink);
+  font-size: 0.78rem;
+  margin-bottom: t.$space-md;
+  display: block;
+}
+
+.coverTitle {
+  @include ty.masthead(4.5rem);
+  margin: 0 0 t.$space-md;
+}
+
+.coverDeck {
+  @include ty.deck(1.1rem);
+}
+
+.coverFooter {
+  position: relative;
+  z-index: 1;
+  @include ty.caption;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.card {
+  padding: t.$space-3xl t.$space-2xl;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  align-self: center;
+}
+
+.footer {
+  display: none; // No se usa más, el footer está dentro del cover
+}

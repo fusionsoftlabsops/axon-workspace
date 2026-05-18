@@ -1,0 +1,202 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: t.$space-3xl t.$space-xl;
+  background: var(--paper);
+  position: relative;
+  overflow: hidden;
+
+  // Ornamento gigante en fondo (asterisco con opacity baja).
+  &::before {
+    content: '※';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-display);
+    font-size: 60rem;
+    line-height: 1;
+    color: var(--accent-ink);
+    opacity: 0.03;
+    pointer-events: none;
+    font-variation-settings: 'opsz' 144, 'WONK' 1;
+  }
+}
+
+.composition {
+  width: 100%;
+  max-width: 1080px;
+  display: grid;
+  grid-template-columns: 220px auto minmax(0, 1fr);
+  gap: t.$space-2xl;
+  align-items: start;
+  position: relative;
+  z-index: 1;
+
+  @media (max-width: t.$bp-lg) {
+    grid-template-columns: 1fr;
+    gap: t.$space-xl;
+  }
+}
+
+// ---------- Aside izquierdo ----------
+.aside {
+  border-top: 2px solid var(--ink);
+  padding-top: t.$space-md;
+  position: relative;
+  animation: reveal-up 0.7s t.$ease-editorial backwards;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 32px;
+    height: 4px;
+    background: var(--accent-ink);
+  }
+}
+
+.kicker {
+  @include ty.deck(0.95rem);
+  margin: t.$space-md 0 0;
+  color: var(--ink-muted);
+  max-width: 26ch;
+}
+
+// ---------- Dropcap "404" estilizado ----------
+.dropcap {
+  display: flex;
+  align-items: flex-end;
+  line-height: 0.85;
+  font-family: var(--font-display);
+  color: var(--accent-ink);
+  font-variation-settings: 'opsz' 144, 'SOFT' 30, 'WONK' 1;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  user-select: none;
+  animation: ink-bleed 1s t.$ease-editorial backwards;
+  animation-delay: 0.15s;
+
+  @media (max-width: t.$bp-lg) {
+    justify-content: flex-start;
+    margin-bottom: t.$space-md;
+  }
+}
+
+.zero,
+.crossbar,
+.terminal {
+  font-size: clamp(8rem, 18vw, 14rem);
+  display: inline-block;
+}
+
+.crossbar {
+  font-style: italic;
+  margin: 0 -0.05em;
+  color: var(--ink);
+  position: relative;
+
+  // Tachadura editorial corrediza
+  &::before {
+    content: '';
+    position: absolute;
+    left: -0.05em;
+    right: -0.05em;
+    top: 50%;
+    height: 0.12em;
+    background: var(--accent-ink);
+    transform: translateY(-50%) scaleX(0);
+    transform-origin: left;
+    animation: rule-grow 0.9s t.$ease-editorial 0.6s both;
+  }
+}
+
+.terminal {
+  color: var(--accent-stamp);
+}
+
+// ---------- Cuerpo derecho ----------
+.body {
+  padding-top: t.$space-md;
+  animation: reveal-up 0.7s t.$ease-editorial backwards;
+  animation-delay: 0.25s;
+}
+
+.title {
+  @include ty.masthead(2.75rem);
+  margin: 0 0 t.$space-md;
+  text-wrap: balance;
+
+  em {
+    color: var(--accent-ink);
+    font-family: var(--font-editorial);
+    font-style: italic;
+    font-weight: 500;
+  }
+}
+
+.lead {
+  @include ty.deck(1.05rem);
+  color: var(--ink);
+  margin: 0 0 t.$space-md;
+  max-width: 50ch;
+}
+
+.options {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+
+  li {
+    display: grid;
+    grid-template-columns: 2.5rem 1fr;
+    gap: t.$space-md;
+    align-items: baseline;
+    font-family: var(--font-editorial);
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+
+  strong {
+    font-family: var(--font-sans);
+    font-weight: 600;
+  }
+
+  a {
+    color: var(--accent-ink);
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+
+    &:hover {
+      color: var(--ink);
+    }
+  }
+}
+
+.num {
+  @include ty.section-title(1.3rem);
+  color: var(--accent-ink);
+  font-style: italic;
+  font-variation-settings: 'opsz' 96, 'WONK' 1;
+}
+
+.footnote {
+  @include ty.caption;
+  font-family: var(--font-editorial);
+  font-style: italic;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  max-width: 56ch;
+  margin: 0;
+}

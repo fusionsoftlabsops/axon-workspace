@@ -1,0 +1,25 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.eyebrow {
+  @include ty.eyebrow;
+  display: inline-flex;
+  align-items: baseline;
+  gap: t.$space-sm;
+}
+
+.muted { color: var(--ink-muted); }
+.ink { color: var(--ink); }
+.accent { color: var(--accent-ink); }
+
+.ornament {
+  font-style: normal;
+  font-feature-settings: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.2em;
+  line-height: 0;
+  color: var(--ink-subtle);
+  display: inline-block;
+  transform: translateY(-0.05em);
+}

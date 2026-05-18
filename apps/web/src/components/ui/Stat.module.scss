@@ -1,0 +1,64 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-2xs;
+  align-items: flex-start;
+  padding: t.$space-sm t.$space-md;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  text-align: left;
+  font-family: inherit;
+  color: var(--ink);
+  position: relative;
+  transition: all t.$dur-quick t.$ease-editorial;
+
+  // Botón clickable variants
+  &:is(button) {
+    cursor: pointer;
+
+    &:hover {
+      border-top-color: var(--accent-ink);
+      .value { color: var(--accent-ink); }
+    }
+  }
+}
+
+.active {
+  border-top-color: var(--accent-ink);
+  border-top-width: 2px;
+  padding-top: calc(#{t.$space-sm} - 1px);
+
+  .value { color: var(--accent-ink); }
+}
+
+.value {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 600;
+  font-size: 2.25rem;
+  line-height: 0.95;
+  font-variation-settings: 'opsz' 96, 'SOFT' 40;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  transition: color t.$dur-quick t.$ease-editorial;
+}
+
+.label {
+  @include ty.ui-label;
+  margin-top: t.$space-2xs;
+}
+
+.hint {
+  @include ty.caption;
+  font-size: 0.7rem;
+  color: var(--ink-subtle);
+}
+
+// Trend modifiers
+.trend-up .value { color: var(--accent-correction); }
+.trend-down .value,
+.trend-warn .value { color: var(--accent-stamp); }

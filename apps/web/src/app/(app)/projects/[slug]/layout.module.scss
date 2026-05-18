@@ -1,0 +1,66 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.project {
+  display: flex;
+  flex-direction: column;
+}
+
+.subnav {
+  padding: t.$space-lg t.$space-xl t.$space-md;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: t.$space-md;
+  margin-bottom: t.$space-md;
+}
+
+.back {
+  @include ty.ui-label;
+  font-size: 0.62rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  align-self: center;
+
+  &:hover {
+    color: var(--accent-ink);
+    border-bottom-color: currentColor;
+  }
+}
+
+.heading {
+  @include ty.section-title(1.6rem);
+  margin: 0;
+}
+
+.slug {
+  font-family: var(--font-mono);
+  color: var(--ink-subtle);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.tabs {
+  display: flex;
+  gap: t.$space-xl;
+}
+
+.tabs a {
+  @include ty.eyebrow;
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  padding: t.$space-xs 0;
+  border-bottom: 1.5px solid transparent;
+  transition: all t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    color: var(--ink);
+    border-bottom-color: var(--rule-strong);
+  }
+}

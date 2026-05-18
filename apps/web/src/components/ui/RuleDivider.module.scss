@@ -1,0 +1,44 @@
+@use '@/styles/tokens' as t;
+
+.divider {
+  width: 100%;
+  border: 0;
+}
+
+.single {
+  height: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.double {
+  height: 0;
+  border-top: 3px double var(--rule-strong);
+}
+
+.ornament {
+  display: flex;
+  align-items: center;
+  gap: t.$space-md;
+  color: var(--ink-subtle);
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--rule);
+  }
+}
+
+.glyph {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 0;
+  color: var(--accent-ink);
+  letter-spacing: 0.2em;
+  font-variation-settings: 'opsz' 144, 'WONK' 1;
+}
+
+.spacing-sm { margin: t.$space-md 0; }
+.spacing-md { margin: t.$space-lg 0; }
+.spacing-lg { margin: t.$space-xl 0; }
+.spacing-xl { margin: t.$space-2xl 0; }

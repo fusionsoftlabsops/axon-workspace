@@ -1,0 +1,641 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+@use '@/styles/motion' as m;
+
+// ============================================================
+// El cerebro · diccionario técnico
+// ============================================================
+
+.page {
+  max-width: t.$max-content-width;
+  margin: 0 auto;
+  padding: t.$space-2xl t.$space-xl t.$space-3xl;
+}
+
+// ---------- Header masthead ----------
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: t.$space-md;
+  gap: t.$space-lg;
+}
+
+.title {
+  @include ty.masthead(3rem);
+  margin: 0;
+  animation: ink-bleed t.$dur-slow t.$ease-editorial backwards;
+}
+
+.eyebrow {
+  margin-bottom: t.$space-xs;
+}
+
+.subtitle {
+  @include ty.deck(1rem);
+  margin: t.$space-sm 0 0;
+}
+
+.newBtn {
+  @include ty.ui-label;
+  font-size: 0.72rem;
+  padding: t.$space-sm t.$space-md;
+  background: var(--ink);
+  color: var(--paper);
+  border: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  transition: background t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    background: var(--accent-ink);
+  }
+}
+
+// ---------- Rule editorial (después del masthead) ----------
+.masthead-rule {
+  border-top: 2px solid var(--ink);
+  margin: t.$space-sm 0 t.$space-xl;
+  position: relative;
+  height: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -3px;
+    width: 48px;
+    height: 4px;
+    background: var(--accent-ink);
+  }
+}
+
+// ---------- Stats strip ----------
+.statsStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: t.$space-xl;
+
+  > * {
+    border-left: 1px solid var(--rule);
+    padding: t.$space-md t.$space-lg;
+
+    &:first-child {
+      border-left: 0;
+    }
+  }
+}
+
+// Stats que vienen de los <Stat> primitivos: anulamos su border-top
+// porque ya está provisto por el contenedor. Trabajamos por clase.
+.statsStrip > div,
+.statsStrip > button {
+  border-top: 0;
+  background: transparent;
+}
+
+.topCited {
+  grid-column: 1 / -1;
+  padding: t.$space-md t.$space-lg;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  gap: t.$space-md;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.topCitedLabel {
+  @include ty.ui-label;
+}
+
+.topCitedItem {
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule-strong);
+
+  &:hover {
+    color: var(--accent-ink);
+    border-bottom-color: currentColor;
+  }
+
+  span {
+    color: var(--ink-subtle);
+    font-style: normal;
+    margin-left: 0.25em;
+    @include ty.tabular;
+    font-size: 0.85em;
+  }
+}
+
+// ---------- New form ----------
+.newForm {
+  padding: t.$space-xl;
+  margin-bottom: t.$space-xl;
+  background: var(--paper-elev);
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+
+  h3 {
+    @include ty.section-title(1.25rem);
+    margin: 0;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: t.$space-xs;
+
+    > span {
+      @include ty.ui-label;
+    }
+  }
+
+  input,
+  select,
+  textarea {
+    padding: t.$space-sm t.$space-md;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    border-radius: 0;
+    transition: border-color t.$dur-quick t.$ease-editorial;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-ink);
+    }
+  }
+
+  textarea {
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    resize: vertical;
+  }
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: t.$space-md;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+
+  button {
+    padding: t.$space-sm t.$space-lg;
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    @include ty.ui-label;
+    cursor: pointer;
+    transition: background t.$dur-quick t.$ease-editorial;
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    &:not(:disabled):hover {
+      background: var(--accent-ink);
+    }
+  }
+}
+
+// ---------- Tabs ----------
+.tabs {
+  display: flex;
+  gap: t.$space-xl;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: t.$space-lg;
+  padding-bottom: 0;
+}
+
+.tab {
+  padding: t.$space-sm 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.05rem;
+  font-variation-settings: 'opsz' 36;
+  transition: all t.$dur-quick t.$ease-editorial;
+  margin-bottom: -1px;
+
+  &:hover {
+    color: var(--ink);
+  }
+}
+
+.tabActive {
+  color: var(--ink);
+  border-bottom-color: var(--accent-ink);
+  font-weight: 600;
+  font-style: normal;
+}
+
+// ---------- Audit table (OWNER) ----------
+.auditTable {
+  margin-bottom: t.$space-xl;
+  padding: t.$space-lg t.$space-xl;
+  background: var(--paper-elev);
+  border-top: 1px solid var(--ink);
+
+  h3 {
+    @include ty.ui-label;
+    margin: 0 0 t.$space-md;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    @include ty.ui-label;
+    text-align: left;
+    padding: t.$space-sm t.$space-md;
+    border-bottom: 1px solid var(--ink);
+  }
+
+  tbody td {
+    padding: t.$space-md;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: middle;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+.auditEmail {
+  display: block;
+  @include ty.caption;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.roleBadge {
+  @include ty.stamp(var(--ink));
+}
+
+.numCell {
+  @include ty.tabular;
+  font-weight: 500;
+  font-size: 1.1rem;
+  width: 80px;
+  text-align: right;
+}
+
+.numStale {
+  color: var(--accent-stamp);
+  font-weight: 600;
+}
+
+// ---------- Filters ----------
+.filters {
+  display: flex;
+  gap: t.$space-sm;
+  align-items: center;
+  margin-bottom: t.$space-xl;
+  flex-wrap: wrap;
+}
+
+.search,
+.select {
+  padding: t.$space-sm t.$space-md;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  border-radius: 0;
+  transition: border-color t.$dur-quick t.$ease-editorial;
+
+  &:focus {
+    outline: none;
+    border-bottom-color: var(--accent-ink);
+  }
+}
+
+.search {
+  flex: 1;
+  min-width: 240px;
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 1.05rem;
+
+  &::placeholder {
+    color: var(--ink-subtle);
+    font-style: italic;
+  }
+}
+
+.select {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tagFilter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  @include ty.ui-label;
+  color: var(--accent-ink);
+  font-style: italic;
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  button {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0;
+  }
+}
+
+.searchBtn {
+  padding: t.$space-sm t.$space-lg;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  @include ty.ui-label;
+  cursor: pointer;
+  transition: all t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+// ---------- Results / Memory cards ----------
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.empty {
+  padding: t.$space-3xl;
+  text-align: center;
+  color: var(--ink-muted);
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 1.05rem;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+// Memory card — entrada de diccionario
+.card {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  gap: t.$space-xl;
+  padding: t.$space-xl 0;
+  border-top: 1px solid var(--rule);
+  position: relative;
+  transition: border-top-color t.$dur-quick t.$ease-editorial;
+  @include m.staggered-reveal($step: 60ms);
+
+  // Marca roja que sube desde el borde al hacer hover.
+  &::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--accent-ink);
+    transition: width t.$dur-page t.$ease-editorial;
+  }
+
+  &:hover {
+    border-top-color: transparent;
+
+    &::before {
+      width: 64px;
+    }
+  }
+
+  &:last-child {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  @media (max-width: t.$bp-md) {
+    grid-template-columns: 1fr;
+    gap: t.$space-sm;
+    padding: t.$space-lg 0;
+  }
+}
+
+.cardDimmed {
+  opacity: 0.55;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+// Columna izquierda: meta type + scope + author
+.cardAside {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-xs;
+  align-items: flex-start;
+
+  @media (max-width: t.$bp-md) {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+}
+
+.typeEyebrow {
+  margin-bottom: t.$space-2xs;
+}
+
+.scopeStamp {
+  @include ty.stamp;
+}
+
+.scopeStampProject {
+  @include ty.stamp(var(--accent-ink));
+}
+
+.scopeStampLocal {
+  @include ty.stamp(var(--accent-marginalia));
+}
+
+.statusStamp {
+  @include ty.stamp(var(--ink-subtle));
+}
+
+.staleStamp {
+  @include ty.stamp(var(--accent-stamp));
+}
+
+.metaLine {
+  @include ty.caption;
+  font-size: 0.78rem;
+  color: var(--ink-subtle);
+  margin-top: t.$space-sm;
+
+  a {
+    font-family: var(--font-mono);
+    color: var(--ink-muted);
+    border-bottom: 1px dotted transparent;
+
+    &:hover {
+      border-bottom-color: currentColor;
+      color: var(--accent-ink);
+    }
+  }
+}
+
+// Columna central: título + preview + tags
+.cardMain {
+  min-width: 0;
+}
+
+.cardTitleLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.cardTitle {
+  @include ty.section-title(1.35rem);
+  margin: 0 0 t.$space-sm;
+  text-wrap: balance;
+  transition: color t.$dur-quick t.$ease-editorial;
+
+  .cardTitleLink:hover & {
+    color: var(--accent-ink);
+  }
+}
+
+.cardBody {
+  @include ty.article-body;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--ink-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0 0 t.$space-md;
+  font-family: var(--font-editorial);
+
+  p {
+    margin: 0;
+  }
+}
+
+.tags {
+  display: flex;
+  gap: t.$space-md;
+  flex-wrap: wrap;
+  margin-top: t.$space-sm;
+}
+
+// Columna derecha: acciones inline
+.cardActions {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  align-items: flex-end;
+
+  @media (max-width: t.$bp-md) {
+    flex-direction: row;
+    align-items: center;
+    margin-top: t.$space-sm;
+    justify-content: flex-start;
+  }
+}
+
+.detailLink {
+  @include ty.eyebrow;
+  color: var(--accent-ink);
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--ink);
+    text-decoration: underline;
+  }
+}
+
+.publishBtn,
+.deprecateBtn {
+  @include ty.ui-label;
+  padding: t.$space-xs t.$space-sm;
+  background: transparent;
+  cursor: pointer;
+  transition: all t.$dur-quick t.$ease-editorial;
+  border: 1px solid;
+  font-size: 0.65rem;
+}
+
+.publishBtn {
+  border-color: var(--accent-correction);
+  color: var(--accent-correction);
+
+  &:hover {
+    background: var(--accent-correction);
+    color: var(--paper);
+  }
+}
+
+.deprecateBtn {
+  border-color: var(--rule-strong);
+  color: var(--ink-muted);
+
+  &:hover {
+    border-color: var(--accent-stamp);
+    color: var(--accent-stamp);
+  }
+}
+
+.error {
+  color: var(--accent-stamp);
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 0.9rem;
+  margin: 0;
+}

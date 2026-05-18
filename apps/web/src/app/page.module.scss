@@ -1,0 +1,157 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+@use '@/styles/motion' as m;
+
+.main {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: t.$space-xl;
+  position: relative;
+  overflow: hidden;
+
+  // Ornamento gigante de fondo (un asterismo bajo opacidad)
+  &::before {
+    content: '⁂';
+    position: absolute;
+    top: 50%;
+    right: -10%;
+    transform: translateY(-50%);
+    font-family: var(--font-display);
+    font-size: 50rem;
+    line-height: 1;
+    color: var(--accent-ink);
+    opacity: 0.04;
+    pointer-events: none;
+    font-variation-settings: 'opsz' 144, 'WONK' 1;
+  }
+}
+
+.hero {
+  max-width: 720px;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow {
+  margin-bottom: t.$space-md;
+}
+
+.title {
+  @include ty.masthead(clamp(3.5rem, 8vw, 7rem));
+  margin: 0 0 t.$space-md;
+  color: var(--ink);
+  letter-spacing: -0.035em;
+  animation: ink-bleed t.$dur-slow t.$ease-editorial backwards;
+}
+
+.titleAccent {
+  color: var(--accent-ink);
+  font-style: italic;
+}
+
+.tagline {
+  @include ty.deck(1.25rem);
+  max-width: 520px;
+  margin: 0 0 t.$space-2xl;
+}
+
+.rule {
+  height: 0;
+  border-top: 2px solid var(--ink);
+  margin: t.$space-md 0 t.$space-2xl;
+  width: 240px;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 48px;
+    height: 4px;
+    background: var(--accent-ink);
+  }
+}
+
+.actions {
+  display: flex;
+  gap: t.$space-md;
+  margin-bottom: t.$space-3xl;
+}
+
+.primary,
+.secondary {
+  @include ty.ui-label;
+  padding: t.$space-md t.$space-lg;
+  font-size: 0.72rem;
+  text-decoration: none;
+  transition: all t.$dur-quick t.$ease-editorial;
+}
+
+.primary {
+  background: var(--ink);
+  color: var(--paper);
+
+  &:hover {
+    background: var(--accent-ink);
+  }
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+
+  &:hover {
+    border-color: var(--ink);
+    color: var(--accent-ink);
+  }
+}
+
+// Pilares como TOC editorial
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--ink);
+
+  @media (max-width: t.$bp-md) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pillar {
+  padding: t.$space-lg t.$space-md t.$space-md;
+  border-right: 1px solid var(--rule);
+  @include m.staggered-reveal($step: 120ms);
+  animation-delay: calc(300ms + var(--index, 0) * 120ms);
+
+  &:last-child {
+    border-right: 0;
+  }
+
+  @media (max-width: t.$bp-md) {
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  h3 {
+    @include ty.section-title(1.05rem);
+    margin: t.$space-xs 0 t.$space-xs;
+  }
+
+  p {
+    @include ty.caption;
+    margin: 0;
+    line-height: 1.5;
+    font-family: var(--font-editorial);
+    color: var(--ink-muted);
+  }
+}
+
+.pillarNum {
+  @include ty.eyebrow;
+  color: var(--accent-ink);
+}

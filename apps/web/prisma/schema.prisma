@@ -1,0 +1,589 @@
+// admin_data_project — Prisma schema
+// See plan: ~/.claude/plans/trabajo-en-m-ltiples-proyectos-*.md
+
+generator client {
+  provider      = "prisma-client-js"
+  // "native" cubre tu dev local (Windows / macOS).
+  // "linux-musl-openssl-3.0.x" cubre el runtime de Docker (node:22-alpine 3.20+).
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum StateCategory {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  REVIEW
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CredType {
+  EMAIL_LOGIN
+  PASSWORD
+  API_KEY
+  SSH_KEY
+  NOTE
+  CERT
+}
+
+enum TaskKind {
+  TASK
+  STORY
+  EPIC
+  BUG
+  SPIKE
+}
+
+enum LlmProvider {
+  ANTHROPIC
+  OPENAI
+  GOOGLE
+  MOONSHOT
+}
+
+enum StoryDraftStatus {
+  GENERATING
+  READY
+  ERRORED
+  PUBLISHED
+}
+
+enum TaskActivityType {
+  CREATED
+  STATE_CHANGED
+  ASSIGNED
+  UNASSIGNED
+  PRIORITY_CHANGED
+  TITLE_CHANGED
+  DESCRIPTION_CHANGED
+  DUE_DATE_CHANGED
+  COMMENTED
+  SUBTASK_ADDED
+  DEPENDENCY_ADDED
+  MEMORY_CITED
+  MEMORY_CAPTURED
+}
+
+enum BrainScope {
+  LOCAL
+  PROJECT
+}
+
+enum MemoryType {
+  DECISION
+  GOTCHA
+  PATTERN
+  ANTIPATTERN
+  RUNBOOK
+  GLOSSARY
+  NOTE
+}
+
+enum MemoryStatus {
+  ACTIVE
+  DEPRECATED
+  SUPERSEDED
+}
+
+enum DependencyKind {
+  BLOCKS
+  BLOCKED_BY
+  RELATES_TO
+}
+
+// ============================================================
+// Identity & access
+// ============================================================
+
+model User {
+  id                  String  @id @default(cuid())
+  email               String  @unique
+  name                String
+  passwordHash        String  // argon2id, solo para login (no se reusa como KEK)
+  publicKey           Bytes   // X25519 (32 bytes)
+  encryptedPrivateKey Bytes   // sk_user envuelto con KEK derivado de passphrase
+  encryptedPrivKeyNonce Bytes // nonce del XSalsa20-Poly1305
+  kdfSalt             Bytes   // salt para argon2id (derivación del KEK)
+  recoveryHash        String? // hash del recovery code (24 words), opcional
+  totpSecretEncrypted Bytes?  // TOTP secret envuelto con KEK
+  totpNonce           Bytes?
+  isMasterUser        Boolean @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  memberships     ProjectMember[]
+  ownedProjects   Project[]          @relation("ProjectOwner")
+  apiTokens       ApiToken[]
+  auditEntries    AuditLog[]
+  assignedTasks   Task[]             @relation("TaskAssignee")
+  reportedTasks   Task[]             @relation("TaskReporter")
+  taskComments    TaskComment[]
+  taskActivities  TaskActivity[]
+  createdCreds    Credential[]       @relation("CredentialCreator")
+  grantedCredAccs CredentialAccess[] @relation("CredentialAccessGrantor")
+  credAccesses    CredentialAccess[] @relation("CredentialAccessUser")
+  aiInteractions  AiInteraction[]
+  authoredMemories BrainMemory[]    @relation("MemoryAuthor")
+  localMemories    BrainMemory[]    @relation("MemoryLocalOwner")
+  memoryCitations  MemoryCitation[] @relation("MemoryCitedBy")
+  brainSyncStates  BrainSyncState[]
+  llmCredentials   LlmCredential[]
+  storyDrafts      StoryDraft[]
+
+  @@index([email])
+}
+
+// Auth.js v5 session storage (when using DB strategy).
+// Kept minimal — only what Auth.js needs.
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  expires      DateTime
+
+  @@index([userId])
+}
+
+// ============================================================
+// Projects
+// ============================================================
+
+model Project {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  ownerId     String
+
+  // Repositorio asociado (lectura desde el filesystem del server)
+  repoPath           String?
+  repoUrl            String?
+  repoDefaultBranch  String?  @default("main")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User               @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members     ProjectMember[]
+  workflows   Workflow[]
+  tasks       Task[]
+  credentials Credential[]
+  taskCounter ProjectTaskCounter?
+  brainMemories BrainMemory[]
+  brainSyncStates BrainSyncState[]
+  llmCredentials LlmCredential[]
+  storyDrafts    StoryDraft[]
+
+  @@index([ownerId])
+}
+
+// Tracks the next task number per project (for sequential PROJ-N numbering).
+model ProjectTaskCounter {
+  projectId String @id
+  next      Int    @default(1)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectMember {
+  id        String     @id @default(cuid())
+  projectId String
+  userId    String
+  role      MemberRole
+  joinedAt  DateTime   @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+// ============================================================
+// Workflows & tasks
+// ============================================================
+
+model Workflow {
+  id        String @id @default(cuid())
+  projectId String
+  name      String
+  isDefault Boolean @default(false)
+
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  states  WorkflowState[]
+
+  @@unique([projectId, name])
+}
+
+model WorkflowState {
+  id         String        @id @default(cuid())
+  workflowId String
+  name       String
+  color      String
+  order      Int
+  category   StateCategory
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tasks    Task[]
+
+  @@unique([workflowId, name])
+  @@index([workflowId, order])
+}
+
+model Task {
+  id           String   @id @default(cuid())
+  projectId    String
+  parentTaskId String?
+  stateId      String
+  taskNumber   Int      // secuencial por proyecto (PROJ-N)
+  title        String
+  description  String?  @db.Text // markdown
+  priority     Priority @default(MEDIUM)
+  assigneeId   String?
+  reporterId   String
+  dueDate      DateTime?
+  positionInState Int   @default(0) // para preservar orden manual dentro de una columna
+  kind         TaskKind @default(TASK)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent      Task?            @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks    Task[]           @relation("Subtasks")
+  state       WorkflowState    @relation(fields: [stateId], references: [id])
+  assignee    User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  reporter    User             @relation("TaskReporter", fields: [reporterId], references: [id])
+  comments    TaskComment[]
+  activity    TaskActivity[]
+  dependsOn   TaskDependency[] @relation("DependsOnSource")
+  dependents  TaskDependency[] @relation("DependsOnTarget")
+  sourceForMemories BrainMemory[]    @relation("MemorySourceTask")
+  memoryCitations   MemoryCitation[] @relation("MemoryCitedInTask")
+  publishedFromDraft StoryDraft?     @relation("PublishedFrom")
+
+  @@unique([projectId, taskNumber])
+  @@index([projectId, stateId])
+  @@index([assigneeId])
+  @@index([parentTaskId])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+}
+
+model TaskActivity {
+  id        String           @id @default(cuid())
+  taskId    String
+  actorId   String
+  type      TaskActivityType
+  payload   Json?
+  createdAt DateTime         @default(now())
+
+  task  Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([taskId, createdAt])
+}
+
+model TaskDependency {
+  id           String         @id @default(cuid())
+  sourceTaskId String
+  targetTaskId String
+  kind         DependencyKind
+  createdAt    DateTime       @default(now())
+
+  source Task @relation("DependsOnSource", fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  target Task @relation("DependsOnTarget", fields: [targetTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceTaskId, targetTaskId, kind])
+}
+
+// ============================================================
+// Vault E2E (zero-knowledge)
+// ============================================================
+
+model Credential {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String
+  type           CredType
+  ciphertext     Bytes    // secreto encriptado con DEK (XSalsa20-Poly1305)
+  nonce          Bytes
+  metadataPublic Json?    // metadata no sensible (username, URL) opt-in
+  createdById    String
+  rotatedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User               @relation("CredentialCreator", fields: [createdById], references: [id])
+  access    CredentialAccess[]
+
+  @@index([projectId])
+}
+
+model CredentialAccess {
+  id           String   @id @default(cuid())
+  credentialId String
+  userId       String
+  wrappedDek   Bytes    // DEK envuelto con pk_user (sealed box)
+  grantedAt    DateTime @default(now())
+  grantedById  String
+
+  credential Credential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  user       User       @relation("CredentialAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy  User       @relation("CredentialAccessGrantor", fields: [grantedById], references: [id])
+
+  @@unique([credentialId, userId])
+  @@index([userId])
+}
+
+// ============================================================
+// API tokens (para MCP server y otros clientes)
+// ============================================================
+
+model ApiToken {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  tokenHash     String    @unique // sha256 hex del token plano
+  prefix        String    // primeros 8 chars del token para mostrar al user
+  scopes        String[]
+  projectSlugs  String[]  // si está vacío, aplica a todos los proyectos del user
+  lastUsedAt    DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  revokedAt     DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+// ============================================================
+// Observability
+// ============================================================
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String?
+  action       String   // p.ej. "credential.read", "task.update"
+  resourceType String
+  resourceId   String
+  projectId    String?
+  ip           String?
+  userAgent    String?
+  payload      Json?
+  createdAt    DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([actorId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model AiInteraction {
+  id              String   @id @default(cuid())
+  userId          String
+  projectId       String?
+  taskId          String?
+  model           String
+  purpose         String
+  inputTokens     Int
+  outputTokens    Int
+  cacheReadTokens Int      @default(0)
+  estimatedCostUsd Decimal @db.Decimal(10, 6)
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+// ============================================================
+// Brain system
+// ============================================================
+// Each project has a shared "main brain" (scope=PROJECT) and a private "local
+// brain" per dev (scope=LOCAL, ownerUserId=devId). On task close the AI
+// extracts memories into the dev's local brain; publishing promotes them to
+// PROJECT. See plan section "Sistema de cerebros por proyecto".
+
+model BrainMemory {
+  id             String       @id @default(cuid())
+  projectId      String
+  scope          BrainScope
+  ownerUserId    String?      // required if scope=LOCAL
+  authorId       String       // original creator
+  type           MemoryType
+  title          String
+  body           String       @db.Text  // markdown
+  tags           String[]
+  sourceTaskId   String?
+  status         MemoryStatus @default(ACTIVE)
+  supersededById String?
+  lastCitedAt    DateTime?
+  citationCount  Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Postgres `search_vector tsvector` mantenido por un trigger declarado
+  // en la migración brain_system. Lo declaramos aquí como Unsupported
+  // para que Prisma no intente dropearlo en migraciones futuras.
+  search_vector  Unsupported("tsvector")?
+
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author         User          @relation("MemoryAuthor", fields: [authorId], references: [id])
+  ownerUser      User?         @relation("MemoryLocalOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sourceTask     Task?         @relation("MemorySourceTask", fields: [sourceTaskId], references: [id], onDelete: SetNull)
+  supersededBy   BrainMemory?  @relation("Supersedure", fields: [supersededById], references: [id])
+  supersedes     BrainMemory[] @relation("Supersedure")
+  citations      MemoryCitation[]
+
+  @@index([projectId, scope, status])
+  @@index([ownerUserId, scope])
+  @@index([sourceTaskId])
+}
+
+model MemoryCitation {
+  id            String   @id @default(cuid())
+  memoryId      String
+  citedInTaskId String
+  citedByUserId String
+  context       String?
+  createdAt     DateTime @default(now())
+
+  memory      BrainMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  citedInTask Task        @relation("MemoryCitedInTask", fields: [citedInTaskId], references: [id], onDelete: Cascade)
+  citedByUser User        @relation("MemoryCitedBy", fields: [citedByUserId], references: [id])
+
+  @@index([memoryId, createdAt])
+  @@index([citedInTaskId])
+}
+
+// Tracks per (user, project) the last time the user pulled, so pulls can be
+// incremental rather than dumping the whole project brain every time.
+model BrainSyncState {
+  id           String    @id @default(cuid())
+  userId       String
+  projectId    String
+  lastPulledAt DateTime?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+}
+
+// ============================================================
+// HU generator · LLM credentials + drafts
+// ============================================================
+// Credenciales LLM por usuario (opcionalmente scoped a un proyecto).
+// La key se sella server-side con AUTH_TOTP_KEY (XSalsa20-Poly1305) —
+// el server puede descifrarla cuando invoca el LLM. Trade-off narrow
+// zero-knowledge para que las llamadas a OpenAI/Gemini/etc funcionen
+// desde server actions.
+
+model LlmCredential {
+  id            String       @id @default(cuid())
+  userId        String
+  projectId     String?
+  provider      LlmProvider
+  label         String
+  encryptedKey  Bytes
+  nonce         Bytes
+  keyPrefix     String       // primeros 8 chars del key plano, solo para display
+  modelDefault  String?      // modelo preferido al usar esta credencial
+  lastUsedAt    DateTime?
+  createdAt     DateTime     @default(now())
+  revokedAt     DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+  @@index([projectId, provider])
+}
+
+// Borrador de HU generado por un LLM partiendo de:
+//   - rawInput (necesidad del usuario)
+//   - selectedPaths (archivos del repo incluidos como contexto)
+//   - citedMemoryIds (memorias del cerebro inyectadas como contexto)
+// Las secciones del output se llenan incrementalmente durante el stream.
+
+model StoryDraft {
+  id              String           @id @default(cuid())
+  projectId       String
+  authorId        String
+  parentDraftId   String?          // para regeneraciones
+  taskId          String?          @unique // si se publicó como Task
+
+  // Input
+  rawInput        String           @db.Text
+  provider        LlmProvider
+  model           String
+  selectedPaths   String[]
+  citedMemoryIds  String[]
+
+  // Output (sección por sección)
+  summary             String?  @db.Text
+  acceptanceCriteria  String?  @db.Text
+  technicalContext    String?  @db.Text
+  subtaskBreakdown    Json?    // [{ title, description, priority }]
+  filesToTouch        Json?    // [{ path, reason }]
+  risks               String?  @db.Text
+
+  // Telemetría
+  inputTokens         Int      @default(0)
+  outputTokens        Int      @default(0)
+  estimatedCostUsd    Decimal  @default(0) @db.Decimal(10, 6)
+  durationMs          Int      @default(0)
+
+  // Lifecycle
+  status              StoryDraftStatus @default(GENERATING)
+  errorMessage        String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id])
+  parent  StoryDraft?   @relation("DraftLineage", fields: [parentDraftId], references: [id])
+  forks   StoryDraft[]  @relation("DraftLineage")
+  task    Task?         @relation("PublishedFrom", fields: [taskId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([authorId, createdAt])
+}

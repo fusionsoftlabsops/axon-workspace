@@ -1,0 +1,302 @@
+@use '@/styles/tokens' as t;
+@use '@/styles/textures' as tx;
+// Importa motion para que sus keyframes (reveal-up, ink-bleed, stamp-press,
+// ticker, reveal-line, reveal-fade) queden disponibles globalmente para
+// todos los .module.scss del proyecto.
+@use '@/styles/motion';
+
+// ============================================================
+// Paleta · tinta sobre papel envejecido
+// ============================================================
+
+:root {
+  // ---------- Editorial (nombres canónicos) ----------
+  --paper: #f4efe6;
+  --paper-elev: #faf6ec;
+  --paper-deep: #ede5d3;
+
+  --ink: #1a1612;
+  --ink-muted: #5e564c;
+  --ink-subtle: #8a7e6e;
+
+  --rule: #d4c9b3;
+  --rule-strong: #a8987b;
+
+  --accent-ink: #b8302b;        // corrector rojo editorial
+  --accent-marginalia: #2c4a6e; // azul pluma fuente
+  --accent-correction: #476246; // verde tinta correctora (success)
+  --accent-amber: #c47922;      // sello amber (warning)
+  --accent-stamp: #a31e2f;      // rojo sello (danger / superseded)
+
+  // Capas tonales útiles para hovers y wash backgrounds.
+  --ink-wash-8: rgba(26, 22, 18, 0.08);
+  --ink-wash-4: rgba(26, 22, 18, 0.04);
+  --accent-ink-wash: rgba(184, 48, 43, 0.08);
+  --accent-marginalia-wash: rgba(44, 74, 110, 0.08);
+
+  // ---------- Compatibilidad con los módulos existentes ----------
+  // Los .module.scss legacy aún usan --color-* — los alias evitan
+  // tener que reescribir cada hoja hoy. Las re-skin específicas
+  // por sección dejarán de usar estos y pasarán a los canónicos.
+  --color-bg: var(--paper);
+  --color-surface: var(--paper-elev);
+  --color-surface-elevated: var(--paper-deep);
+  --color-fg: var(--ink);
+  --color-fg-muted: var(--ink-muted);
+  --color-fg-subtle: var(--ink-subtle);
+  --color-border: var(--rule);
+  --color-border-strong: var(--rule-strong);
+  --color-accent: var(--accent-ink);
+  --color-accent-hover: #8e231e;
+  --color-accent-fg: var(--paper);
+  --color-success: var(--accent-correction);
+  --color-warning: var(--accent-amber);
+  --color-danger: var(--accent-stamp);
+  --color-info: var(--accent-marginalia);
+
+  // ---------- Fuentes ----------
+  // Las variables --font-* las inyecta `next/font/google` desde
+  // src/app/layout.tsx. Aquí solo definimos los stacks completos
+  // con fallbacks decentes.
+  --font-display: var(--font-display, 'Fraunces'), Georgia, 'Times New Roman', serif;
+  --font-editorial: var(--font-editorial, 'Newsreader'), Georgia, serif;
+  --font-sans: var(--font-sans, 'IBM Plex Sans'), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-mono, 'JetBrains Mono'), 'SF Mono', Consolas, monospace;
+}
+
+// ============================================================
+// Dark theme · tinta sobre cuero envejecido
+// ============================================================
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15110d;
+    --paper-elev: #1c1812;
+    --paper-deep: #231e16;
+
+    --ink: #e8dfc8;
+    --ink-muted: #a89881;
+    --ink-subtle: #7a6c5a;
+
+    --rule: #2e2922;
+    --rule-strong: #4d4538;
+
+    --accent-ink: #d44a44;
+    --accent-marginalia: #5e88b8;
+    --accent-correction: #5a8a59;
+    --accent-amber: #d8923a;
+    --accent-stamp: #c54450;
+
+    --ink-wash-8: rgba(232, 223, 200, 0.08);
+    --ink-wash-4: rgba(232, 223, 200, 0.04);
+    --accent-ink-wash: rgba(212, 74, 68, 0.10);
+    --accent-marginalia-wash: rgba(94, 136, 184, 0.10);
+
+    --color-accent-hover: #e76863;
+  }
+}
+
+// ============================================================
+// Reset + bases
+// ============================================================
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background-color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+// Grano global del cuaderno. fixed para que no scroll-jank.
+body {
+  min-height: 100dvh;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url(tx.$noise-paper);
+    background-size: 200px 200px;
+    opacity: 0.38;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    z-index: 9999;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body::before {
+    mix-blend-mode: screen;
+    opacity: 0.42;
+  }
+}
+
+a {
+  color: var(--accent-ink);
+  text-decoration: none;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+  transition: color t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    text-decoration: underline;
+    color: var(--ink);
+  }
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  font-family: var(--font-sans);
+  color: var(--ink);
+}
+
+textarea {
+  font-family: var(--font-mono);
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+  font-feature-settings: 'zero' on, 'ss01' on;
+}
+
+// Selección: tinta correctora.
+::selection {
+  background: var(--accent-ink);
+  color: var(--paper);
+}
+
+// Headings — defaults razonables (los componentes editoriales
+// pueden override con @include masthead / section-title).
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+h1 { font-size: 2rem; line-height: 1.1; }
+h2 { font-size: 1.5rem; line-height: 1.2; }
+h3 { font-size: 1.2rem; line-height: 1.25; }
+
+// Articles get the editorial body by default.
+article p {
+  text-wrap: pretty;
+}
+
+// Focus visible — sello, no halo.
+:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+  border-radius: t.$radius-sm;
+}
+
+// ============================================================
+// Keyframes globales
+// ============================================================
+// Necesitan estar fuera de cualquier .module.scss porque Next.js
+// hashea los nombres de animation dentro de los CSS modules. Aquí
+// quedan accesibles para todos los módulos vía `animation: <name>`.
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes reveal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes reveal-line {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+
+@keyframes stamp-press {
+  0%   { opacity: 0; transform: scale(0.85) rotate(-2deg); }
+  60%  { opacity: 1; transform: scale(1.04) rotate(0.5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes ticker {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ink-bleed {
+  from { letter-spacing: 0.1em; opacity: 0; }
+  to   { letter-spacing: -0.025em; opacity: 1; }
+}
+
+@keyframes rule-grow {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+
+// ============================================================
+// View transitions API
+// ============================================================
+// next.config.ts activa `experimental.viewTransition` para envolver
+// cada navegación cliente-side en startViewTransition(). Aquí
+// solo definimos el "tone" del cross-fade — calmado y editorial.
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: t.$dur-page;
+  animation-timing-function: t.$ease-editorial;
+}
+
+::view-transition-old(root) {
+  animation-name: reveal-fade;
+  animation-direction: reverse;
+}
+
+::view-transition-new(root) {
+  animation-name: reveal-fade;
+}
+
+// ============================================================
+// Reduce motion respect
+// ============================================================
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

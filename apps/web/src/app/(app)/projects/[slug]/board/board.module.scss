@@ -1,0 +1,297 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+// ============================================================
+// Tablero · production schedule de imprenta
+// ============================================================
+
+// ---------- Banner de memorias pendientes ----------
+.banner {
+  display: flex;
+  align-items: center;
+  gap: t.$space-md;
+  margin: t.$space-lg t.$space-xl 0;
+  padding: t.$space-md t.$space-lg;
+  background: var(--paper-elev);
+  border-top: 2px solid var(--accent-ink);
+  border-bottom: 1px solid var(--rule);
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 0.95rem;
+  position: relative;
+  transition: background t.$dur-quick t.$ease-editorial;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 32px;
+    height: 4px;
+    background: var(--accent-ink);
+  }
+
+  &:hover {
+    background: var(--paper-deep);
+  }
+
+  strong {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--accent-ink);
+    font-style: normal;
+    font-size: 1.1em;
+    font-variation-settings: 'opsz' 72;
+  }
+}
+
+.bannerIcon {
+  font-size: 1.4rem;
+  font-style: normal;
+}
+
+.bannerCta {
+  @include ty.ui-label;
+  margin-left: auto;
+  color: var(--accent-ink);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+// ---------- Board grid ----------
+.board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 320px);
+  gap: 0;
+  padding: t.$space-xl;
+  overflow-x: auto;
+  min-height: calc(100dvh - 200px);
+  align-items: start;
+}
+
+.column {
+  background: var(--paper-elev);
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  border-top: 3px solid;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 220px);
+  transition: border-color t.$dur-quick t.$ease-editorial;
+  position: relative;
+
+  // Asterismo del column header acompaña al hover
+  &:not(:last-child) {
+    margin-right: -1px;
+  }
+}
+
+.columnOver {
+  background: var(--paper-deep);
+  border-top-color: var(--ink) !important;
+}
+
+.columnHeader {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  padding: t.$space-md t.$space-md t.$space-sm;
+  border-bottom: 1px solid var(--rule);
+  gap: t.$space-sm;
+}
+
+.columnTitle {
+  @include ty.eyebrow;
+  color: var(--ink);
+  font-size: 0.78rem;
+  letter-spacing: 0.15em;
+  margin: 0;
+  font-style: italic;
+  display: flex;
+  align-items: baseline;
+  gap: t.$space-xs;
+}
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.count {
+  @include ty.tabular;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.columnBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: t.$space-sm;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+}
+
+// ---------- Task cards ----------
+.card {
+  padding: t.$space-md;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-bottom-width: 3px;
+  cursor: grab;
+  transition: all t.$dur-quick t.$ease-editorial;
+  position: relative;
+
+  &:hover {
+    border-color: var(--rule-strong);
+    border-bottom-color: var(--accent-ink);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.cardOverlay {
+  box-shadow: t.$shadow-drop;
+  cursor: grabbing;
+  border-bottom-color: var(--accent-ink);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: t.$space-xs;
+}
+
+.taskNum {
+  @include ty.tabular;
+  font-size: 0.72rem;
+  color: var(--ink-subtle);
+  font-weight: 500;
+}
+
+.priority {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.cardTitle {
+  font-family: var(--font-editorial);
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  margin-top: t.$space-sm;
+  @include ty.caption;
+  font-size: 0.72rem;
+}
+
+.assignee {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-variation-settings: 'opsz' 14;
+  letter-spacing: 0.02em;
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+
+// ---------- Add task affordance ----------
+.addBtn {
+  @include ty.eyebrow;
+  margin: t.$space-sm;
+  padding: t.$space-sm t.$space-md;
+  border: 1px dashed var(--rule-strong);
+  background: transparent;
+  color: var(--ink-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: all t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    border-color: var(--accent-ink);
+    border-style: solid;
+    color: var(--accent-ink);
+  }
+}
+
+.addForm {
+  padding: t.$space-sm;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+
+  textarea {
+    padding: t.$space-sm;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    font-family: var(--font-editorial);
+    font-size: 0.92rem;
+    resize: vertical;
+    border-radius: 0;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-ink);
+    }
+  }
+
+  button {
+    @include ty.ui-label;
+    padding: t.$space-xs t.$space-sm;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.62rem;
+    cursor: pointer;
+    transition: all t.$dur-quick t.$ease-editorial;
+
+    &:disabled {
+      opacity: 0.5;
+    }
+
+    &[type='button'] {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--rule-strong);
+
+      &:hover {
+        border-color: var(--ink);
+      }
+    }
+  }
+}

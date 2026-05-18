@@ -1,0 +1,69 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.shell {
+  max-width: t.$max-article-width + 200;
+  margin: 0 auto;
+  padding: t.$space-3xl t.$space-xl t.$space-5xl;
+}
+
+.section {
+  margin: t.$space-2xl 0;
+}
+
+.h2 {
+  @include ty.section-title(1.6rem);
+  margin: t.$space-sm 0 t.$space-lg;
+}
+
+.row {
+  display: flex;
+  gap: t.$space-md;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: t.$space-sm;
+  border-top: 0;
+}
+
+.article {
+  @include ty.article-body;
+  max-width: t.$max-prose-width;
+
+  code {
+    background: var(--ink-wash-8);
+    padding: 0.05em 0.35em;
+    font-size: 0.88em;
+    border-radius: 2px;
+  }
+}
+
+.marginaliaWrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: t.$space-md;
+  margin-top: t.$space-xl;
+}
+
+.typeScale {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+
+  > p {
+    margin: 0;
+  }
+}
+
+.t5 { @include ty.masthead(5rem); margin: 0 !important; }
+.t4 { @include ty.masthead(3.5rem); margin: 0 !important; }
+.t3 { @include ty.section-title(2.5rem); margin: 0 !important; }
+.t2 { @include ty.section-title(1.875rem); margin: 0 !important; }
+.t1 { @include ty.section-title(1.5rem); margin: 0 !important; }
+.tBody { @include ty.article-body; max-width: t.$max-prose-width; }
+.tUi { @include ty.ui-body; color: var(--ink-muted); }
+.tMono code { @include ty.tabular; font-size: 0.9rem; color: var(--ink-muted); }

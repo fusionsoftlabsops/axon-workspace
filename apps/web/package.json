@@ -1,0 +1,55 @@
+{
+  "name": "@admin/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "prisma generate && next build",
+    "start": "next start --port 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@admin/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@google/genai": "^2.4.0",
+    "@hookform/resolvers": "^3.9.1",
+    "@noble/hashes": "^1.6.1",
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "^5.22.0",
+    "@tanstack/react-query": "^5.59.20",
+    "@tanstack/react-query-devtools": "^5.59.20",
+    "next": "^15.0.3",
+    "next-auth": "5.0.0-beta.25",
+    "openai": "^6.38.0",
+    "otplib": "^12.0.1",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.53.2",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "sass": "^1.81.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-sealedbox-js": "^1.2.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

@@ -1,0 +1,407 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+@use '@/styles/motion' as m;
+
+.page {
+  max-width: t.$max-content-width;
+  margin: 0 auto;
+  padding: t.$space-2xl t.$space-xl t.$space-3xl;
+}
+
+// ---------- Stats strip ----------
+.statsStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  margin: t.$space-lg 0 t.$space-xl;
+
+  > * {
+    border-left: 1px solid var(--rule);
+    padding: t.$space-md t.$space-lg;
+
+    &:first-child {
+      border-left: 0;
+    }
+  }
+}
+
+// ---------- Setup banner ----------
+.setup {
+  border-left: 3px solid var(--accent-ink);
+  background: color-mix(in oklab, var(--accent-ink) 6%, transparent);
+  padding: t.$space-md t.$space-lg;
+  margin-bottom: t.$space-xl;
+
+  ul {
+    margin: t.$space-xs 0 0;
+    padding-left: t.$space-lg;
+    @include ty.ui-body;
+  }
+
+  a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+}
+
+// ---------- Toolbar ----------
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: t.$space-lg;
+}
+
+.newBtn {
+  @include ty.ui-label;
+  font-size: 0.72rem;
+  padding: t.$space-sm t.$space-md;
+  background: var(--ink);
+  color: var(--paper);
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  letter-spacing: 0.14em;
+  transition: background t.$dur-quick t.$ease-editorial;
+
+  &:hover { background: var(--accent-ink); }
+
+  &.disabled {
+    background: var(--rule);
+    color: var(--paper);
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+}
+
+// ---------- Draft list ----------
+.draftList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.draftItem {
+  border-top: 1px solid var(--rule);
+
+  &:last-child { border-bottom: 1px solid var(--rule); }
+
+  a {
+    display: block;
+    padding: t.$space-md 0;
+    text-decoration: none;
+    color: inherit;
+    transition: background t.$dur-quick t.$ease-editorial;
+  }
+
+  a:hover { background: color-mix(in oklab, var(--ink) 3%, transparent); padding-left: t.$space-sm; padding-right: t.$space-sm; }
+}
+
+.draftHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: t.$space-xs;
+}
+
+.draftSummary {
+  @include ty.ui-body(0.95rem);
+  margin: 0 0 t.$space-xs;
+  color: var(--ink);
+}
+
+.draftMeta {
+  @include ty.ui-label;
+  font-size: 0.7rem;
+  color: var(--color-fg-muted);
+  display: flex;
+  gap: t.$space-md;
+}
+
+.published {
+  color: var(--accent-ink);
+}
+
+.empty {
+  @include ty.ui-body;
+  color: var(--color-fg-muted);
+  font-style: italic;
+  padding: t.$space-xl 0;
+}
+
+// ============================================================
+// Composer (new HU)
+// ============================================================
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: t.$space-2xl;
+
+  @media (max-width: 920px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.composerMain { min-width: 0; }
+
+.composerSide {
+  border-left: 1px solid var(--rule);
+  padding-left: t.$space-lg;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-lg;
+
+  @media (max-width: 920px) {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--rule);
+    padding-top: t.$space-lg;
+  }
+}
+
+.field { margin-bottom: t.$space-lg; }
+
+.fieldLabel {
+  @include ty.ui-label;
+  display: block;
+  margin-bottom: t.$space-xs;
+  color: var(--color-fg-muted);
+}
+
+.rawInput {
+  @include ty.ui-body(1.05rem);
+  font-family: var(--font-editorial);
+  font-style: italic;
+  width: 100%;
+  min-height: 160px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  padding: t.$space-sm 0;
+  resize: vertical;
+  color: var(--ink);
+
+  &:focus {
+    outline: 0;
+    border-bottom-color: var(--accent-ink);
+  }
+
+  &::placeholder { color: var(--color-fg-muted); font-style: italic; }
+}
+
+.select {
+  @include ty.ui-label;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: t.$space-xs 0;
+  color: var(--ink);
+  cursor: pointer;
+  text-transform: none;
+
+  &:focus { outline: 0; border-bottom-color: var(--ink); }
+}
+
+.costEstimate {
+  @include ty.ui-label;
+  font-size: 0.72rem;
+  padding: t.$space-sm t.$space-md;
+  background: var(--paper-warm);
+  border: 1px dashed var(--rule);
+  text-align: center;
+  color: var(--ink);
+
+  strong {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 0.95rem;
+    color: var(--accent-ink);
+    text-transform: none;
+    letter-spacing: -0.01em;
+  }
+}
+
+.generateBtn {
+  @include ty.ui-label;
+  font-size: 0.78rem;
+  padding: t.$space-md;
+  background: var(--ink);
+  color: var(--paper);
+  border: 0;
+  cursor: pointer;
+  letter-spacing: 0.16em;
+  width: 100%;
+  transition: background t.$dur-quick t.$ease-editorial;
+
+  &:hover:not(:disabled) { background: var(--accent-ink); }
+  &:disabled { background: var(--rule); cursor: not-allowed; }
+}
+
+.fileList, .memoryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--rule);
+  background: var(--paper-warm);
+
+  li {
+    @include ty.tabular;
+    font-size: 0.75rem;
+    padding: t.$space-2xs t.$space-sm;
+    border-bottom: 1px dotted var(--rule);
+    display: flex;
+    align-items: center;
+    gap: t.$space-xs;
+    cursor: pointer;
+
+    &:last-child { border-bottom: 0; }
+    &:hover { background: color-mix(in oklab, var(--ink) 4%, transparent); }
+
+    input[type="checkbox"] { accent-color: var(--accent-ink); }
+  }
+}
+
+// ============================================================
+// Draft viewer (drafts/[id])
+// ============================================================
+
+.viewer {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: t.$space-2xl;
+
+  @media (max-width: 920px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.viewerMain { min-width: 0; }
+
+.viewerSide {
+  border-left: 1px solid var(--rule);
+  padding-left: t.$space-lg;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+
+  @media (max-width: 920px) {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--rule);
+    padding-top: t.$space-lg;
+  }
+}
+
+.section {
+  margin: t.$space-xl 0;
+  animation: reveal-up t.$dur-slow t.$ease-editorial backwards;
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.sectionTitle {
+  @include ty.ui-label;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  color: var(--color-fg-muted);
+  margin-bottom: t.$space-sm;
+  padding-bottom: t.$space-2xs;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sectionBody {
+  @include ty.ui-body;
+
+  ul, ol {
+    margin: t.$space-sm 0;
+    padding-left: t.$space-lg;
+  }
+
+  li { margin-bottom: t.$space-2xs; }
+
+  code {
+    @include ty.tabular;
+    font-size: 0.85em;
+    background: var(--paper-warm);
+    padding: 0.05em 0.3em;
+    border-radius: 2px;
+  }
+}
+
+.subtaskList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.subtask {
+  border-top: 1px solid var(--rule);
+  padding: t.$space-sm 0;
+
+  &:last-child { border-bottom: 1px solid var(--rule); }
+
+  label {
+    display: flex;
+    gap: t.$space-sm;
+    align-items: flex-start;
+    cursor: pointer;
+  }
+
+  input[type="checkbox"] {
+    accent-color: var(--accent-ink);
+    margin-top: 4px;
+  }
+
+  .subTitle {
+    @include ty.ui-body(1rem);
+    font-weight: 500;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .subDesc {
+    @include ty.ui-body(0.9rem);
+    color: var(--color-fg-muted);
+    margin: t.$space-2xs 0 0;
+  }
+}
+
+.streamStatus {
+  @include ty.ui-label;
+  font-size: 0.72rem;
+  padding: t.$space-sm;
+  border: 1px solid var(--rule);
+  background: var(--paper-warm);
+  text-align: center;
+  color: var(--color-fg-muted);
+
+  &.live {
+    border-color: var(--accent-ink);
+    color: var(--accent-ink);
+  }
+}
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ink-bleed {
+  from { opacity: 0.4; letter-spacing: 0.02em; }
+  to   { opacity: 1; letter-spacing: -0.02em; }
+}

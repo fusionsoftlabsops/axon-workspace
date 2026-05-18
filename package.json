@@ -1,0 +1,47 @@
+{
+  "name": "admin-data-project",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma self-hosted multi-proyecto con vault E2E e integracion Claude Code",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter=@admin/web dev",
+    "build": "pnpm --filter=@admin/web build",
+    "start": "pnpm --filter=@admin/web start",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter=@admin/web prisma migrate dev",
+    "db:generate": "pnpm --filter=@admin/web prisma generate",
+    "db:seed": "pnpm --filter=@admin/web prisma db seed",
+    "db:seed:demo": "node scripts/seed-demo-project.mjs",
+    "db:studio": "pnpm --filter=@admin/web prisma studio",
+    "mcp:dev": "pnpm --filter=@admin/mcp-server dev",
+    "mcp:build": "pnpm --filter=@admin/mcp-server build",
+    "mcp:docker:build": "docker compose --profile mcp-build build mcp",
+    "mcp:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-mcp.ps1",
+    "mcp:remove": "claude mcp remove admin-data --scope user",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.0",
+    "prettier": "^3.3.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "@parcel/watcher",
+      "sharp",
+      "@node-rs/argon2"
+    ]
+  }
+}

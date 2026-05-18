@@ -1,0 +1,247 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
+import { useVaultUnlock } from '@/components/vault/UnlockContext';
+import {
+  decryptCredentialText,
+  fromBase64,
+  toBase64,
+  unwrapDek,
+  wrapDekForRecipient,
+} from '@/lib/crypto';
+import {
+  deleteCredentialAction,
+  getCredentialAction,
+  getProjectMemberKeys,
+  revokeCredentialAccessAction,
+  shareCredentialAction,
+} from '@/lib/actions/credentials';
+import type { CredentialMeta } from './VaultClient';
+import styles from './vault.module.scss';
+
+export function CredentialRow({
+  projectSlug,
+  credential,
+  currentUserId,
+  isAdmin,
+}: {
+  projectSlug: string;
+  credential: CredentialMeta;
+  currentUserId: string;
+  isAdmin: boolean;
+}) {
+  const router = useRouter();
+  const { vault } = useVaultUnlock();
+  const [pending, startTransition] = useTransition();
+  const [plaintext, setPlaintext] = useState<string | null>(null);
+  const [showShare, setShowShare] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function reveal() {
+    if (!vault) return;
+    setError(null);
+    const fetched = await getCredentialAction(projectSlug, credential.id);
+    if (!fetched.ok) {
+      setError(fetched.error);
+      return;
+    }
+    try {
+      const dek = unwrapDek(
+        fromBase64(fetched.data.wrappedDek),
+        vault.publicKey,
+        vault.privateKey,
+      );
+      const text = decryptCredentialText(
+        fromBase64(fetched.data.ciphertext),
+        fromBase64(fetched.data.nonce),
+        dek,
+      );
+      setPlaintext(text);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo desencriptar');
+    }
+  }
+
+  function hide() {
+    setPlaintext(null);
+  }
+
+  async function copyToClipboard() {
+    if (plaintext == null) return;
+    await navigator.clipboard.writeText(plaintext);
+  }
+
+  async function share(toUserId: string, publicKeyB64: string) {
+    if (!vault) return;
+    setError(null);
+    const fetched = await getCredentialAction(projectSlug, credential.id);
+    if (!fetched.ok) {
+      setError(fetched.error);
+      return;
+    }
+    try {
+      const dek = unwrapDek(
+        fromBase64(fetched.data.wrappedDek),
+        vault.publicKey,
+        vault.privateKey,
+      );
+      const wrapped = wrapDekForRecipient(dek, fromBase64(publicKeyB64));
+      startTransition(async () => {
+        const r = await shareCredentialAction(projectSlug, credential.id, toUserId, toBase64(wrapped));
+        if (!r.ok) setError(r.error);
+        else router.refresh();
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo compartir');
+    }
+  }
+
+  function revoke(userId: string) {
+    if (!confirm('Revocar acceso. Recuerda rotar la credencial real después.')) return;
+    startTransition(async () => {
+      const r = await revokeCredentialAccessAction(projectSlug, credential.id, userId);
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  function remove() {
+    if (!confirm(`Eliminar la credencial "${credential.name}"? Esta acción no se puede deshacer.`)) return;
+    startTransition(async () => {
+      const r = await deleteCredentialAction(projectSlug, credential.id);
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  return (
+    <li className={styles.row}>
+      <header className={styles.rowHeader}>
+        <div>
+          <span className={styles.type}>{credential.type}</span>
+          <h4>{credential.name}</h4>
+          {credential.metadataPublic?.username && (
+            <p className={styles.meta}>{credential.metadataPublic.username}</p>
+          )}
+        </div>
+        <div className={styles.rowActions}>
+          {!vault && <span className={styles.locked}>🔒 desbloquea el vault</span>}
+          {vault && plaintext === null && (
+            <button onClick={reveal} disabled={pending}>
+              Ver secreto
+            </button>
+          )}
+          {vault && plaintext !== null && (
+            <>
+              <code className={styles.secret}>{plaintext}</code>
+              <button onClick={copyToClipboard}>Copiar</button>
+              <button onClick={hide}>Ocultar</button>
+            </>
+          )}
+          {vault && (
+            <button onClick={() => setShowShare((v) => !v)}>
+              {showShare ? 'Cerrar' : 'Compartir'}
+            </button>
+          )}
+          {isAdmin && (
+            <button className={styles.danger} onClick={remove} disabled={pending}>
+              Eliminar
+            </button>
+          )}
+        </div>
+      </header>
+
+      {error && <p className={styles.error}>{error}</p>}
+
+      {showShare && (
+        <ShareControls
+          projectSlug={projectSlug}
+          access={credential.access}
+          currentUserId={currentUserId}
+          createdById={credential.createdById}
+          isAdmin={isAdmin}
+          onShare={share}
+          onRevoke={revoke}
+        />
+      )}
+    </li>
+  );
+}
+
+function ShareControls({
+  projectSlug,
+  access,
+  currentUserId,
+  createdById,
+  isAdmin,
+  onShare,
+  onRevoke,
+}: {
+  projectSlug: string;
+  access: CredentialMeta['access'];
+  currentUserId: string;
+  createdById: string;
+  isAdmin: boolean;
+  onShare: (userId: string, publicKey: string) => void;
+  onRevoke: (userId: string) => void;
+}) {
+  const [members, setMembers] = useState<
+    Array<{ userId: string; name: string; email: string; publicKey: string }> | null
+  >(null);
+
+  if (members === null) {
+    void getProjectMemberKeys(projectSlug).then((r) => {
+      if (r.ok) setMembers(r.data);
+    });
+    return <p style={{ marginTop: '0.5rem' }}>Cargando miembros…</p>;
+  }
+
+  const accessByUser = new Map(access.map((a) => [a.userId, a]));
+  const others = members.filter((m) => !accessByUser.has(m.userId));
+
+  return (
+    <div className={styles.share}>
+      <div>
+        <strong>Con acceso:</strong>
+        <ul>
+          {access.map((a) => (
+            <li key={a.userId}>
+              {a.name} <small>· {a.email}</small>
+              {a.userId === createdById && <small> · creador</small>}
+              {a.userId !== currentUserId &&
+                a.userId !== createdById &&
+                isAdmin && (
+                  <button
+                    onClick={() => onRevoke(a.userId)}
+                    className={styles.danger}
+                    style={{ marginLeft: '0.5rem' }}
+                  >
+                    Revocar
+                  </button>
+                )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {others.length > 0 && (
+        <div>
+          <strong>Compartir con:</strong>
+          <ul>
+            {others.map((m) => (
+              <li key={m.userId}>
+                {m.name} <small>· {m.email}</small>
+                <button
+                  onClick={() => onShare(m.userId, m.publicKey)}
+                  style={{ marginLeft: '0.5rem' }}
+                >
+                  + acceso
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

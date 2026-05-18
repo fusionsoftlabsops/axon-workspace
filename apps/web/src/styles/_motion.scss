@@ -1,0 +1,54 @@
+// ============================================================
+// Motion · vocabulario editorial (mixins reusables)
+// ============================================================
+// Los @keyframes que estos mixins referencian están declarados
+// globalmente en globals.scss para evitar que CSS modules de
+// Next.js les ponga hash y los haga inalcanzables desde los
+// .module.scss. Todas las animaciones respetan
+// prefers-reduced-motion (apagado globalmente en globals.scss).
+
+@use './tokens' as t;
+
+// ---------- Mixins ----------
+
+/// Aplica un reveal con delay calculado desde --index.
+/// El padre debe setear `--index: N` en cada hijo.
+@mixin staggered-reveal($base: t.$dur-page, $step: 50ms, $name: reveal-up) {
+  animation: $name $base t.$ease-editorial backwards;
+  animation-delay: calc(var(--index, 0) * #{$step});
+}
+
+/// Reveal con starting-style. Se ejecuta cuando el elemento
+/// entra en el DOM (no en cada re-render).
+@mixin enter-reveal {
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  transition:
+    opacity t.$dur-page t.$ease-editorial,
+    transform t.$dur-page t.$ease-editorial;
+}
+
+/// Underline que crece de izquierda a derecha (hover de link).
+@mixin underline-grow {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  transition: background-size t.$dur-page t.$ease-editorial;
+
+  &:hover {
+    background-size: 100% 1px;
+  }
+}
+
+/// Scroll-driven entrance — el elemento se revela mientras
+/// entra al viewport. Fallback: estático.
+@mixin scroll-reveal {
+  @supports (animation-timeline: view()) {
+    animation: reveal-up t.$dur-page t.$ease-editorial backwards;
+    animation-timeline: view();
+    animation-range: entry 0% cover 30%;
+  }
+}

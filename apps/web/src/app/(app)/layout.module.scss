@@ -1,0 +1,111 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+.header {
+  padding: t.$space-md t.$space-xl;
+  background: var(--paper-elev);
+  border-bottom: 1px solid var(--ink);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: t.$space-xl;
+
+  // Tick accent del masthead
+  position: sticky;
+  &::after {
+    content: '';
+    position: absolute;
+    left: t.$space-xl;
+    bottom: -3px;
+    width: 32px;
+    height: 4px;
+    background: var(--accent-ink);
+  }
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.4rem;
+  font-style: italic;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+  font-variation-settings: 'opsz' 96, 'SOFT' 30, 'WONK' 1;
+  line-height: 1;
+
+  &:hover {
+    color: var(--accent-ink);
+  }
+}
+
+.brandPrefix {
+  color: var(--ink-subtle);
+  font-weight: 400;
+  margin-right: 0.1em;
+}
+
+.nav {
+  display: flex;
+  gap: t.$space-xl;
+  justify-content: center;
+
+  a {
+    @include ty.eyebrow;
+    color: var(--ink-muted);
+    text-decoration: none;
+    padding: t.$space-xs 0;
+    border-bottom: 1.5px solid transparent;
+    transition: all t.$dur-quick t.$ease-editorial;
+
+    &:hover {
+      color: var(--ink);
+      border-bottom-color: var(--rule-strong);
+    }
+  }
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: t.$space-md;
+}
+
+.userEmail {
+  @include ty.caption;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.logout {
+  @include ty.ui-label;
+  padding: t.$space-xs t.$space-sm;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--rule-strong);
+  cursor: pointer;
+  font-size: 0.62rem;
+  transition: all t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    border-color: var(--accent-ink);
+    color: var(--accent-ink);
+  }
+}
+
+.main {
+  flex: 1;
+  position: relative;
+}

@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: admin_data_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-admin_data}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-admin_data}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: admin_data_web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-changeme_local_only}@db:5432/${POSTGRES_DB:-admin_data}?schema=public
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: "true"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      AI_MODEL_FAST: ${AI_MODEL_FAST:-claude-haiku-4-5-20251001}
+      AI_MODEL_BALANCED: ${AI_MODEL_BALANCED:-claude-sonnet-4-6}
+      AI_MODEL_DEEP: ${AI_MODEL_DEEP:-claude-opus-4-7}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    profiles:
+      - prod
+
+  # MCP server image — not a long-running service; this entry exists only so
+  # `docker compose --profile mcp-build build mcp` produces a tagged image
+  # that Claude Code can invoke via `docker run -i --rm admin-data-mcp:latest`.
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp-server/Dockerfile
+    image: admin-data-mcp:latest
+    profiles:
+      - mcp-build
+
+volumes:
+  postgres-data:
+    driver: local

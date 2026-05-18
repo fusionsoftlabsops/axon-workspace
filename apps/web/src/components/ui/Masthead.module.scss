@@ -1,0 +1,61 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.masthead {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  margin-bottom: t.$space-xl;
+
+  &.center {
+    align-items: center;
+    text-align: center;
+  }
+}
+
+.eyebrow {
+  margin-bottom: t.$space-xs;
+}
+
+.title {
+  margin: 0;
+  text-wrap: balance;
+}
+
+.sm .title { @include ty.masthead(2.25rem); }
+.md .title { @include ty.masthead(3rem); }
+.lg .title { @include ty.masthead(4.5rem); }
+.xl .title { @include ty.masthead(6rem); }
+
+.deck {
+  @include ty.deck;
+  margin: t.$space-xs 0 0;
+}
+
+.rule {
+  margin-top: t.$space-md;
+  height: 0;
+  border-top: 2px solid var(--ink);
+  position: relative;
+
+  // Pequeño remate a la izquierda (estilo capitular)
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -3px;
+    width: 32px;
+    height: 4px;
+    background: var(--accent-ink);
+  }
+}
+
+.center .rule {
+  width: 64px;
+  align-self: center;
+
+  &::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}

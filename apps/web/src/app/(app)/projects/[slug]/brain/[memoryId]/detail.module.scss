@@ -1,0 +1,515 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+// ============================================================
+// Detalle de memoria · Article layout
+// ============================================================
+
+.page {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) 220px;
+  gap: t.$space-2xl;
+  max-width: t.$max-content-width;
+  margin: 0 auto;
+  padding: t.$space-2xl t.$space-xl t.$space-5xl;
+
+  @media (max-width: t.$bp-lg) {
+    grid-template-columns: 1fr;
+    gap: t.$space-lg;
+  }
+}
+
+// ---------- Columna izquierda (back link + stamps) ----------
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+  align-items: flex-start;
+
+  @media (max-width: t.$bp-lg) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
+
+.back {
+  @include ty.ui-label;
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--rule-strong);
+  padding-bottom: 0.15em;
+
+  &:hover {
+    color: var(--accent-ink);
+    border-bottom-color: currentColor;
+  }
+}
+
+.stamps {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  align-items: flex-start;
+  margin-top: t.$space-lg;
+
+  @media (max-width: t.$bp-lg) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 0;
+  }
+}
+
+.typeStamp { @include ty.stamp(var(--accent-ink)); }
+.scopeStampProject { @include ty.stamp(var(--accent-ink)); }
+.scopeStampLocal { @include ty.stamp(var(--accent-marginalia)); }
+.statusStamp { @include ty.stamp(var(--ink-subtle)); }
+
+// ---------- Columna central (article) ----------
+.main {
+  min-width: 0;
+  max-width: t.$max-prose-width;
+}
+
+.eyebrowLine {
+  margin-bottom: t.$space-sm;
+}
+
+.title {
+  @include ty.masthead(3.25rem);
+  margin: 0 0 t.$space-md;
+  text-wrap: balance;
+}
+
+.deck {
+  @include ty.deck(1rem);
+  margin: 0 0 t.$space-lg;
+  color: var(--ink-muted);
+}
+
+.metaLine {
+  @include ty.caption;
+  margin-bottom: t.$space-xl;
+  padding-bottom: t.$space-md;
+  border-bottom: 1px solid var(--rule);
+
+  a {
+    color: var(--ink-muted);
+    border-bottom: 1px dotted transparent;
+
+    &:hover {
+      color: var(--accent-ink);
+      border-bottom-color: currentColor;
+    }
+  }
+
+  strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+}
+
+.tagLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-md;
+  margin: t.$space-md 0 t.$space-xl;
+}
+
+// ---------- Notice (superseded by) ----------
+.notice {
+  padding: t.$space-md t.$space-lg;
+  background: var(--paper-deep);
+  border-left: 3px solid var(--accent-amber);
+  margin-bottom: t.$space-xl;
+  font-family: var(--font-editorial);
+  font-style: italic;
+  color: var(--ink);
+  font-size: 0.95rem;
+
+  a {
+    color: var(--accent-ink);
+    font-style: normal;
+    font-weight: 500;
+  }
+}
+
+// ---------- Article body ----------
+.body {
+  @include ty.article-body;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+
+  // Drop cap automático en el primer párrafo
+  > p:first-of-type::first-letter,
+  > :first-child::first-letter {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 4.5em;
+    line-height: 0.82;
+    float: left;
+    padding: 0.06em 0.1em 0 0;
+    margin-top: 0.04em;
+    color: var(--accent-ink);
+    font-variation-settings: 'opsz' 144, 'SOFT' 20, 'WONK' 1;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    margin: t.$space-xl 0 t.$space-sm;
+    line-height: 1.2;
+    color: var(--ink);
+  }
+
+  h2 { font-size: 1.5rem; font-variation-settings: 'opsz' 72; }
+  h3 { font-size: 1.2rem; font-variation-settings: 'opsz' 48; }
+
+  p {
+    margin: 0 0 1em;
+  }
+
+  p + p {
+    text-indent: 1.5em;
+  }
+
+  // Quita el indent si el párrafo anterior es un heading o code block
+  h1 + p, h2 + p, h3 + p, h4 + p, pre + p, ul + p, ol + p, blockquote + p {
+    text-indent: 0;
+  }
+
+  strong, b {
+    font-weight: 600;
+  }
+
+  em, i {
+    font-style: italic;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    background: var(--ink-wash-8);
+    padding: 0.08em 0.4em;
+    font-size: 0.88em;
+    border-radius: 2px;
+    color: var(--ink);
+  }
+
+  pre {
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    padding: t.$space-md t.$space-lg;
+    border-radius: 2px;
+    overflow-x: auto;
+    margin: t.$space-lg 0;
+    line-height: 1.55;
+    font-size: 0.88rem;
+
+    code {
+      background: transparent;
+      padding: 0;
+      font-size: 1em;
+    }
+  }
+
+  ul, ol {
+    margin: t.$space-md 0;
+    padding-left: t.$space-lg;
+
+    li {
+      margin: t.$space-xs 0;
+    }
+  }
+
+  blockquote {
+    @include ty.pull-quote;
+  }
+
+  a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+
+    &:hover {
+      color: var(--ink);
+    }
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: t.$space-xl 0;
+  }
+}
+
+// ---------- Columna derecha (marginalia + acciones) ----------
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-xl;
+
+  @media (max-width: t.$bp-lg) {
+    border-top: 1px solid var(--rule);
+    padding-top: t.$space-xl;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  padding: t.$space-md t.$space-lg;
+  border-top: 2px solid var(--ink);
+  background: var(--paper-elev);
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 24px;
+    height: 4px;
+    background: var(--accent-ink);
+  }
+}
+
+.actionsLabel {
+  @include ty.ui-label;
+  font-size: 0.62rem;
+  margin-bottom: t.$space-xs;
+}
+
+.btnPrimary,
+.btnSecondary,
+.btnDanger {
+  @include ty.ui-label;
+  font-size: 0.7rem;
+  padding: t.$space-sm t.$space-md;
+  border: 1px solid;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all t.$dur-quick t.$ease-editorial;
+  text-align: left;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.btnPrimary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+
+  &:not(:disabled):hover {
+    background: var(--accent-ink);
+    border-color: var(--accent-ink);
+  }
+}
+
+.btnSecondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--rule-strong);
+
+  &:not(:disabled):hover {
+    border-color: var(--ink);
+  }
+}
+
+.btnDanger {
+  background: transparent;
+  color: var(--accent-stamp);
+  border-color: var(--accent-stamp);
+
+  &:not(:disabled):hover {
+    background: var(--accent-stamp);
+    color: var(--paper);
+  }
+}
+
+.supersedeForm {
+  margin-top: t.$space-md;
+  padding-top: t.$space-md;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: t.$space-2xs;
+
+    > span {
+      @include ty.ui-label;
+      font-size: 0.62rem;
+    }
+  }
+
+  input,
+  select,
+  textarea {
+    padding: t.$space-xs t.$space-sm;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.85rem;
+    border-radius: 0;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-ink);
+    }
+  }
+
+  textarea {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    resize: vertical;
+  }
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: t.$space-sm;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: t.$space-xs;
+}
+
+// ---------- Marginalia panel ----------
+.marginaliaPanel {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+}
+
+.marginaliaItem {
+  border-left: 1px solid var(--accent-marginalia);
+  padding-left: t.$space-md;
+}
+
+.marginaliaLabel {
+  @include ty.ui-label;
+  color: var(--accent-marginalia);
+  font-size: 0.62rem;
+  display: block;
+  margin-bottom: t.$space-2xs;
+}
+
+.marginaliaValue {
+  @include ty.caption;
+  color: var(--ink);
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 0.92rem;
+
+  a {
+    color: var(--ink);
+    border-bottom: 1px dotted var(--rule-strong);
+
+    &:hover {
+      color: var(--accent-ink);
+      border-bottom-color: currentColor;
+    }
+  }
+}
+
+// ---------- Bottom sections ----------
+.section {
+  margin: t.$space-3xl 0 0;
+  grid-column: 2;
+
+  @media (max-width: t.$bp-lg) {
+    grid-column: 1;
+  }
+
+  h2 {
+    @include ty.eyebrow;
+    color: var(--ink);
+    font-size: 0.82rem;
+    margin: 0 0 t.$space-md;
+    padding-bottom: t.$space-sm;
+    border-bottom: 1px solid var(--rule);
+  }
+}
+
+.dim {
+  @include ty.caption;
+  font-style: italic;
+  color: var(--ink-subtle);
+  font-family: var(--font-editorial);
+  font-size: 0.95rem;
+}
+
+.lineageList,
+.citationList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    padding: t.$space-md 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  li:last-child {
+    border-bottom: 0;
+  }
+}
+
+.citationLink {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+
+  &:hover {
+    color: var(--accent-ink);
+  }
+}
+
+.citationMeta {
+  display: block;
+  margin-top: t.$space-2xs;
+  @include ty.caption;
+  font-size: 0.78rem;
+}
+
+.citationContext {
+  margin: t.$space-xs 0 0 0;
+  padding: t.$space-sm t.$space-md;
+  background: var(--ink-wash-4);
+  border-left: 2px solid var(--accent-ink);
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.lineageMeta {
+  @include ty.caption;
+  font-size: 0.78rem;
+  margin-left: t.$space-sm;
+}
+
+.error {
+  color: var(--accent-stamp);
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: 0.88rem;
+  margin: t.$space-sm 0 0;
+}

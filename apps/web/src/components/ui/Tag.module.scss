@@ -1,0 +1,43 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15em;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: inherit;
+  color: inherit;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 0.25em;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-color t.$dur-quick t.$ease-editorial,
+    color t.$dur-quick t.$ease-editorial;
+}
+
+button.tag {
+  cursor: pointer;
+
+  &:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+.prefix {
+  opacity: 0.55;
+  margin-right: 0.05em;
+  font-feature-settings: 'tnum' on;
+}
+
+.size-sm { font-size: 0.72rem; }
+.size-md { font-size: 0.78rem; }
+
+.tone-ink { color: var(--ink); }
+.tone-accent { color: var(--accent-ink); }
+.tone-marginalia { color: var(--accent-marginalia); }
+.tone-subtle { color: var(--ink-subtle); }

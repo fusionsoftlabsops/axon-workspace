@@ -1,0 +1,46 @@
+@use '@/styles/typography' as ty;
+@use '@/styles/tokens' as t;
+
+.marginalia {
+  color: var(--ink-muted);
+  font-family: var(--font-editorial), Georgia, serif;
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.block {
+  display: block;
+  padding-left: t.$space-md;
+  border-left: 1px solid var(--accent-marginalia);
+}
+
+.inline {
+  display: inline;
+
+  &::before {
+    content: '— ';
+    color: var(--accent-marginalia);
+  }
+}
+
+.label {
+  @include ty.ui-label;
+  color: var(--accent-marginalia);
+  display: block;
+  margin-bottom: t.$space-2xs;
+
+  .inline & {
+    display: inline;
+    margin: 0 t.$space-xs 0 0;
+  }
+}
+
+.body {
+  display: block;
+
+  .inline & {
+    display: inline;
+  }
+}

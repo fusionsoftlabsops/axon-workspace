@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Env files — ignorar todos los .env* excepto los .example (templates)
+.env*
+!.env*.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor / OS / agent tooling — local config y artifacts de sesión
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.claude/
+.cursor/
+.playwright-mcp/
+
+# Test / coverage
+coverage/
+.nyc_output/
+
+# Next.js
+.next/
+next-env.d.ts
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Docker volumes
+postgres-data/
