@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Placeholder env so `env()` validation passes during typecheck/build/test.
+    # These are NOT real secrets — CI never connects to a real DB.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      AUTH_SECRET: ci_only_dummy_secret_at_least_32_chars_long
+      AUTH_TOTP_KEY: dG90cDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA
+      AUTH_LLM_KEY: bGxtITAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @admin/web exec prisma generate
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Lint is intentionally omitted: the repo has no ESLint config yet, so
+      # `next lint` prompts interactively. Add an eslint config and re-enable
+      # `pnpm lint` here once configured.
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
