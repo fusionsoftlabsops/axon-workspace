@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/auth/password';
 import { fromBase64 } from '@/lib/crypto';
+import { hashInviteToken } from '@/lib/invite-token';
 import { signupSchema, type SignupInput } from '@admin/shared/schemas';
 import { signIn } from '@/auth';
 
@@ -30,33 +31,56 @@ export async function signupAction(input: SignupInput): Promise<SignupActionResu
   }
 
   const data = parsed.data;
-  const existing = await prisma.user.count();
-  const isFirstUser = existing === 0;
+
+  // Registration is invite-only: require a valid, unexpired, unaccepted invite.
+  // The account email is taken from the invitation (authoritative), not the
+  // client-provided email.
+  const invitation = await prisma.invitation.findUnique({
+    where: { tokenHash: hashInviteToken(data.token) },
+    select: { id: true, email: true, acceptedAt: true, expiresAt: true },
+  });
+  if (!invitation || invitation.acceptedAt || invitation.expiresAt.getTime() < Date.now()) {
+    return { ok: false, error: 'Invitación inválida, expirada o ya usada' };
+  }
+  const email = invitation.email.toLowerCase().trim();
 
   try {
     const passwordHash = await hashPassword(data.password);
 
-    await prisma.user.create({
-      data: {
-        email: data.email.toLowerCase().trim(),
-        name: data.name.trim(),
-        passwordHash,
-        publicKey: Buffer.from(fromBase64(data.publicKey)),
-        encryptedPrivateKey: Buffer.from(fromBase64(data.encryptedPrivateKey)),
-        encryptedPrivKeyNonce: Buffer.from(fromBase64(data.encryptedPrivKeyNonce)),
-        kdfSalt: Buffer.from(fromBase64(data.kdfSalt)),
-        recoveryHash: data.recoveryHash,
-        encryptedPrivKeyRecovery: Buffer.from(fromBase64(data.encryptedPrivKeyRecovery)),
-        recoveryPrivKeyNonce: Buffer.from(fromBase64(data.recoveryPrivKeyNonce)),
-        recoveryKdfSalt: Buffer.from(fromBase64(data.recoveryKdfSalt)),
-        isMasterUser: isFirstUser,
-      },
+    // Create the user and consume the invitation atomically. Invited users are
+    // regular members (never master — the super-admin is seeded separately).
+    await prisma.$transaction(async (tx) => {
+      await tx.user.create({
+        data: {
+          email,
+          name: data.name.trim(),
+          passwordHash,
+          publicKey: Buffer.from(fromBase64(data.publicKey)),
+          encryptedPrivateKey: Buffer.from(fromBase64(data.encryptedPrivateKey)),
+          encryptedPrivKeyNonce: Buffer.from(fromBase64(data.encryptedPrivKeyNonce)),
+          kdfSalt: Buffer.from(fromBase64(data.kdfSalt)),
+          recoveryHash: data.recoveryHash,
+          encryptedPrivKeyRecovery: Buffer.from(fromBase64(data.encryptedPrivKeyRecovery)),
+          recoveryPrivKeyNonce: Buffer.from(fromBase64(data.recoveryPrivKeyNonce)),
+          recoveryKdfSalt: Buffer.from(fromBase64(data.recoveryKdfSalt)),
+          isMasterUser: false,
+        },
+      });
+      // Guard against a race: only consume if still unaccepted.
+      const consumed = await tx.invitation.updateMany({
+        where: { id: invitation.id, acceptedAt: null },
+        data: { acceptedAt: new Date() },
+      });
+      if (consumed.count === 0) throw new Error('INVITE_ALREADY_USED');
     });
 
     return { ok: true };
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return { ok: false, error: 'Ya existe una cuenta con ese email' };
+    }
+    if (err instanceof Error && err.message === 'INVITE_ALREADY_USED') {
+      return { ok: false, error: 'Esta invitación ya fue usada' };
     }
     throw err;
   }

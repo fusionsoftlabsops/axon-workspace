@@ -31,7 +31,7 @@ describe('llm-credentials store', () => {
     const serverKey = fromBase64(process.env.AUTH_LLM_KEY as string);
     const nonce = randomBytes(SECRETBOX_NONCE_BYTES);
     const ciphertext = secretboxSeal(textToBytes('secret'), nonce, serverKey);
-    ciphertext[0] ^= 0xff; // tamper
+    ciphertext[0] = (ciphertext[0] ?? 0) ^ 0xff; // tamper
 
     expect(() =>
       decryptLlmCredentialKey({ encryptedKey: Buffer.from(ciphertext), nonce: Buffer.from(nonce) }),

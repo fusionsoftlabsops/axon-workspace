@@ -21,6 +21,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <Link href="/settings/recovery">Recuperación</Link>
           <Link href="/settings/tokens">API tokens</Link>
           <Link href="/settings/llm-credentials">LLM keys</Link>
+          {session.user.isMasterUser && <Link href="/settings/invitations">Invitaciones</Link>}
         </nav>
         <div className={styles.user}>
           <span className={styles.userEmail}>{session.user.email}</span>

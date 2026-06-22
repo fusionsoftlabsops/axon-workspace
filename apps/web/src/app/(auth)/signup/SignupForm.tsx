@@ -14,14 +14,14 @@ interface FormState {
   passphraseConfirm: string;
 }
 
-export function SignupForm() {
+export function SignupForm({ token, invitedEmail }: { token: string; invitedEmail: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({
-    email: '',
+    email: invitedEmail,
     name: '',
     password: '',
     passphrase: '',
@@ -64,6 +64,7 @@ export function SignupForm() {
 
         setProgress('Registrando cuenta…');
         const result = await signupAction({
+          token,
           email: form.email,
           name: form.name,
           password: form.password,
@@ -124,14 +125,8 @@ export function SignupForm() {
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       <label>
-        <span>Email</span>
-        <input
-          type="email"
-          required
-          autoComplete="email"
-          value={form.email}
-          onChange={update('email')}
-        />
+        <span>Email (de la invitación)</span>
+        <input type="email" value={form.email} readOnly disabled autoComplete="email" />
       </label>
 
       <label>

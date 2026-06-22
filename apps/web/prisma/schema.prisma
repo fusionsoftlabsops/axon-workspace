@@ -154,6 +154,24 @@ model User {
   brainSyncStates  BrainSyncState[]
   llmCredentials   LlmCredential[]
   storyDrafts      StoryDraft[]
+  invitesSent      Invitation[]     @relation("InvitedBy")
+
+  @@index([email])
+}
+
+// Invite-only onboarding: a master user invites an email; the recipient
+// registers by presenting the token (only its sha256 is stored). Public
+// self-signup is disabled — a valid, unexpired, unaccepted invite is required.
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  tokenHash   String    @unique // sha256 hex of the plaintext token
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  invitedBy   User @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([email])
 }

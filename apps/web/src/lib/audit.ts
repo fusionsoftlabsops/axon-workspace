@@ -24,6 +24,8 @@ export type AuditAction =
   | 'auth.totp_disable'
   | 'vault.passphrase_reset'
   | 'vault.recovery_code_regenerated'
+  | 'invitation.create'
+  | 'invitation.revoke'
   | 'api_token.create'
   | 'api_token.revoke'
   | 'ai.invoke'

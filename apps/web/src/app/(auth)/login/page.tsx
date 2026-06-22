@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { LoginForm } from './LoginForm';
 
@@ -14,8 +13,9 @@ export default function LoginPage({
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>
-      <p style={{ marginTop: '1.5rem', fontSize: '0.9rem' }}>
-        ¿No tienes cuenta? <Link href="/signup">Regístrate</Link>
+      <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: 'var(--color-fg-muted)' }}>
+        El acceso es solo por invitación. Si recibiste un enlace de invitación, abrilo para
+        crear tu cuenta.
       </p>
     </>
   );

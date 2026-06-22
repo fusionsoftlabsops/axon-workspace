@@ -3,6 +3,9 @@ import { z } from 'zod';
 // ---------- Auth ----------
 
 export const signupSchema = z.object({
+  // Invite token (registration is invite-only). Validated server-side; the
+  // account email is taken from the invitation, not trusted from the client.
+  token: z.string().min(1),
   email: z.string().email(),
   name: z.string().min(1).max(120),
   password: z.string().min(12, 'Mínimo 12 caracteres'),
@@ -39,6 +42,12 @@ export const setRecoveryCodeSchema = z.object({
   recoveryKdfSalt: z.string().min(1),
 });
 export type SetRecoveryCodeInput = z.infer<typeof setRecoveryCodeSchema>;
+
+// Master-user creates an invitation for an email (registration is invite-only).
+export const createInvitationSchema = z.object({
+  email: z.string().email(),
+});
+export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
 
 export const loginSchema = z.object({
   email: z.string().email(),
