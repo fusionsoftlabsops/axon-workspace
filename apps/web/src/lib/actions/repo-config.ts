@@ -6,7 +6,9 @@ import path from 'node:path';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { env } from '@/lib/env';
 import { assertProjectMember } from '@/lib/auth/membership';
+import { isPathWithinRoot } from '@/lib/repo/reader';
 
 const schema = z.object({
   repoPath: z.string().max(500).optional().nullable(),
@@ -41,6 +43,12 @@ export async function setProjectRepoConfigAction(
   if (repoPath) {
     if (!path.isAbsolute(repoPath)) {
       return { ok: false, error: 'repoPath debe ser absoluto' };
+    }
+    // Confinar a REPOS_ROOT si está configurado: impide apuntar a rutas
+    // sensibles del server (/etc, ~/.ssh, .env de otros servicios, etc.).
+    const reposRoot = env().REPOS_ROOT;
+    if (reposRoot && !isPathWithinRoot(reposRoot, repoPath)) {
+      return { ok: false, error: `repoPath debe estar dentro de ${reposRoot}` };
     }
     const stat = await fs.stat(repoPath).catch(() => null);
     if (!stat) return { ok: false, error: `la ruta no existe: ${repoPath}` };

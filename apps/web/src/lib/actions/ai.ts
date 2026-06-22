@@ -1,8 +1,7 @@
 'use server';
 
-import { auth } from '@/auth';
-import { prisma } from '@/lib/db';
 import { audit } from '@/lib/audit';
+import { assertProjectMember } from '@/lib/auth/membership';
 import { invokeAi } from '@/lib/ai/router';
 import { aiInvokeSchema, type AiInvokeInput } from '@admin/shared/schemas';
 
@@ -17,35 +16,26 @@ export async function invokeAiAction(
   projectSlug: string,
   input: AiInvokeInput,
 ): Promise<AiResult | { ok: false; error: string }> {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return { ok: false, error: 'No autenticado' };
-
   const parsed = aiInvokeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' };
 
-  const project = await prisma.project.findUnique({
-    where: { slug: projectSlug },
-    select: { id: true, members: { where: { userId }, select: { role: true } } },
-  });
-  if (!project || project.members.length === 0) {
-    return { ok: false, error: 'Sin acceso al proyecto' };
-  }
+  const ctx = await assertProjectMember(projectSlug);
+  if (!ctx.ok) return { ok: false, error: ctx.error };
 
   try {
     const result = await invokeAi({
       purpose: parsed.data.purpose,
       context: parsed.data.context,
-      userId,
-      projectId: project.id,
+      userId: ctx.userId,
+      projectId: ctx.projectId,
     });
 
     await audit({
-      actorId: userId,
+      actorId: ctx.userId,
       action: 'ai.invoke',
       resourceType: 'ai',
       resourceId: parsed.data.purpose,
-      projectId: project.id,
+      projectId: ctx.projectId,
       payload: { model: result.model, cost: result.estimatedCostUsd },
     });
 

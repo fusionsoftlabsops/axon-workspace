@@ -18,6 +18,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         <nav className={styles.nav}>
           <Link href="/projects">Proyectos</Link>
           <Link href="/settings/2fa">2FA</Link>
+          <Link href="/settings/recovery">Recuperación</Link>
           <Link href="/settings/tokens">API tokens</Link>
           <Link href="/settings/llm-credentials">LLM keys</Link>
         </nav>

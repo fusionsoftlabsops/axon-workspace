@@ -14,6 +14,7 @@ export interface CredentialMeta {
   metadataPublic: Record<string, string> | null;
   createdAt: string;
   createdById: string;
+  needsRotation: boolean;
   access: Array<{ userId: string; name: string; email: string }>;
 }
 

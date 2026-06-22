@@ -39,7 +39,8 @@ export function UnlockPrompt() {
         {pending ? 'Desbloqueando…' : 'Desbloquear'}
       </button>
       <small>
-        La passphrase nunca sale del navegador. Si la pierdes, no puedes recuperar el vault.
+        La passphrase nunca sale del navegador. Si la olvidaste, usa tu código de recuperación
+        en <a href="/settings/recovery">Ajustes → Recuperación</a>.
       </small>
     </form>
   );

@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { useVaultUnlock } from '@/components/vault/UnlockContext';
 import {
   decryptCredentialText,
+  encryptCredentialText,
   fromBase64,
   toBase64,
   unwrapDek,
@@ -15,6 +16,7 @@ import {
   getCredentialAction,
   getProjectMemberKeys,
   revokeCredentialAccessAction,
+  rotateCredentialAction,
   shareCredentialAction,
 } from '@/lib/actions/credentials';
 import type { CredentialMeta } from './VaultClient';
@@ -106,6 +108,60 @@ export function CredentialRow({
     });
   }
 
+  // Re-cifra la credencial con un DEK nuevo y la re-envuelve solo para los
+  // miembros con acceso actual: invalida cualquier DEK que un revocado cacheó.
+  async function rotate() {
+    if (!vault) return;
+    if (
+      !confirm(
+        'Rotar re-cifra la credencial con una clave nueva e invalida cualquier copia ' +
+          'que tuvieran miembros revocados. ¿Continuar?',
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    const fetched = await getCredentialAction(projectSlug, credential.id);
+    if (!fetched.ok) {
+      setError(fetched.error);
+      return;
+    }
+    const keysRes = await getProjectMemberKeys(projectSlug);
+    if (!keysRes.ok) {
+      setError(keysRes.error);
+      return;
+    }
+    try {
+      const dek = unwrapDek(fromBase64(fetched.data.wrappedDek), vault.publicKey, vault.privateKey);
+      const text = decryptCredentialText(
+        fromBase64(fetched.data.ciphertext),
+        fromBase64(fetched.data.nonce),
+        dek,
+      );
+      const enc = encryptCredentialText(text);
+      const keyByUser = new Map(keysRes.data.map((m) => [m.userId, m.publicKey]));
+      const access = credential.access
+        .map((a) => {
+          const pk = keyByUser.get(a.userId);
+          return pk
+            ? { userId: a.userId, wrappedDek: toBase64(wrapDekForRecipient(enc.dek, fromBase64(pk))) }
+            : null;
+        })
+        .filter((x): x is { userId: string; wrappedDek: string } => x !== null);
+      startTransition(async () => {
+        const r = await rotateCredentialAction(projectSlug, credential.id, {
+          ciphertext: toBase64(enc.ciphertext),
+          nonce: toBase64(enc.nonce),
+          access,
+        });
+        if (!r.ok) setError(r.error);
+        else router.refresh();
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo rotar');
+    }
+  }
+
   function remove() {
     if (!confirm(`Eliminar la credencial "${credential.name}"? Esta acción no se puede deshacer.`)) return;
     startTransition(async () => {
@@ -121,6 +177,9 @@ export function CredentialRow({
         <div>
           <span className={styles.type}>{credential.type}</span>
           <h4>{credential.name}</h4>
+          {credential.needsRotation && (
+            <p className={styles.rotateWarning}>⚠ Rotación pendiente — se revocó acceso a un miembro</p>
+          )}
           {credential.metadataPublic?.username && (
             <p className={styles.meta}>{credential.metadataPublic.username}</p>
           )}
@@ -142,6 +201,11 @@ export function CredentialRow({
           {vault && (
             <button onClick={() => setShowShare((v) => !v)}>
               {showShare ? 'Cerrar' : 'Compartir'}
+            </button>
+          )}
+          {vault && credential.needsRotation && (
+            <button onClick={rotate} disabled={pending}>
+              Rotar ahora
             </button>
           )}
           {isAdmin && (

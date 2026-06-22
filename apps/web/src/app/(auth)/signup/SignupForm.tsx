@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { signupAction } from '@/lib/actions/auth';
-import { generateProtectedKeypair, toBase64 } from '@/lib/crypto';
+import { generateProtectedKeypairWithRecovery, toBase64 } from '@/lib/crypto';
 import styles from './SignupForm.module.scss';
 
 interface FormState {
@@ -19,6 +19,7 @@ export function SignupForm() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>({
     email: '',
     name: '',
@@ -59,7 +60,7 @@ export function SignupForm() {
         // Yield to the browser so the progress message renders before we
         // start the CPU-heavy argon2id derivation.
         await new Promise((r) => setTimeout(r, 50));
-        const protected_ = generateProtectedKeypair(form.passphrase);
+        const protected_ = generateProtectedKeypairWithRecovery(form.passphrase);
 
         setProgress('Registrando cuenta…');
         const result = await signupAction({
@@ -70,6 +71,10 @@ export function SignupForm() {
           encryptedPrivateKey: toBase64(protected_.encryptedPrivateKey),
           encryptedPrivKeyNonce: toBase64(protected_.encryptedPrivKeyNonce),
           kdfSalt: toBase64(protected_.kdfSalt),
+          recoveryHash: protected_.recoveryProof,
+          encryptedPrivKeyRecovery: toBase64(protected_.encryptedPrivKeyRecovery),
+          recoveryPrivKeyNonce: toBase64(protected_.recoveryPrivKeyNonce),
+          recoveryKdfSalt: toBase64(protected_.recoveryKdfSalt),
         });
 
         if (!result.ok) {
@@ -78,12 +83,42 @@ export function SignupForm() {
           return;
         }
 
-        router.push('/login?signed_up=1');
+        // Mostrar el código de recuperación UNA sola vez antes de continuar.
+        setProgress(null);
+        setRecoveryCode(protected_.recoveryCode);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error inesperado');
         setProgress(null);
       }
     });
+  }
+
+  if (recoveryCode) {
+    return (
+      <div className={styles.form}>
+        <h3>Guarda tu código de recuperación</h3>
+        <p>
+          Es la <strong>única</strong> forma de recuperar tu vault si olvidas la passphrase.
+          Guárdalo en un lugar seguro (gestor de contraseñas). No se volverá a mostrar y el
+          servidor no lo conoce.
+        </p>
+        <pre className={styles.recoveryCode}>{recoveryCode}</pre>
+        <button
+          type="button"
+          className={styles.submit}
+          onClick={() => navigator.clipboard.writeText(recoveryCode)}
+        >
+          Copiar código
+        </button>
+        <button
+          type="button"
+          className={styles.submit}
+          onClick={() => router.push('/login?signed_up=1')}
+        >
+          Ya lo guardé — continuar al login
+        </button>
+      </div>
+    );
   }
 
   return (

@@ -8,6 +8,7 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { env } from '@/lib/env';
 import {
   DEFAULT_IGNORE_DIRS,
   DOTFILE_WHITELIST,
@@ -50,15 +51,31 @@ export class RepoAccessError extends Error {
   }
 }
 
+/**
+ * True iff `candidate` resolves to `root` itself or a path strictly inside it.
+ * Used to confine project repo paths to REPOS_ROOT. Both args are resolved
+ * before comparison so `..` segments cannot escape.
+ */
+export function isPathWithinRoot(root: string, candidate: string): boolean {
+  const r = path.resolve(root);
+  const c = path.resolve(candidate);
+  return c === r || c.startsWith(r + path.sep);
+}
+
 export class RepoReader {
   private readonly rootPath: string;
 
-  constructor(rootPath: string) {
+  constructor(rootPath: string, reposRoot?: string | null) {
     if (!path.isAbsolute(rootPath)) {
       throw new RepoAccessError(`repoPath debe ser absoluto: ${rootPath}`);
     }
     // Normalizamos: sin trailing separator, resolvemos symlinks parciales
     this.rootPath = path.resolve(rootPath);
+    // Defensa en profundidad: si hay REPOS_ROOT configurado, ninguna ruta
+    // (incluidas las legadas en DB) puede caer fuera de él.
+    if (reposRoot && !isPathWithinRoot(reposRoot, this.rootPath)) {
+      throw new RepoAccessError(`repoPath fuera de REPOS_ROOT: ${rootPath}`);
+    }
   }
 
   /** Resuelve un path relativo y verifica que no escape de rootPath. */
@@ -324,7 +341,7 @@ function guessLanguage(filePath: string): string | undefined {
 export async function repoReaderFor(project: { repoPath: string | null }): Promise<RepoReader | null> {
   if (!project.repoPath) return null;
   try {
-    const reader = new RepoReader(project.repoPath);
+    const reader = new RepoReader(project.repoPath, env().REPOS_ROOT);
     await reader.validate();
     return reader;
   } catch {

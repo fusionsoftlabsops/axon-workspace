@@ -44,3 +44,47 @@ export async function getSelfKeyMaterial(): Promise<
     },
   };
 }
+
+export interface SelfRecoveryMaterial {
+  publicKey: string;
+  encryptedPrivKeyRecovery: string;
+  recoveryPrivKeyNonce: string;
+  recoveryKdfSalt: string;
+}
+
+/**
+ * Return the current user's recovery blob (private key sealed with the recovery
+ * code). The client decrypts it with the recovery code to recover the key when
+ * the passphrase is lost. Returns an error if the user never set up recovery.
+ */
+export async function getSelfRecoveryMaterial(): Promise<
+  { ok: true; data: SelfRecoveryMaterial } | { ok: false; error: string }
+> {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) return { ok: false, error: 'No autenticado' };
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      publicKey: true,
+      encryptedPrivKeyRecovery: true,
+      recoveryPrivKeyNonce: true,
+      recoveryKdfSalt: true,
+    },
+  });
+  if (!user) return { ok: false, error: 'Usuario no encontrado' };
+  if (!user.encryptedPrivKeyRecovery || !user.recoveryPrivKeyNonce || !user.recoveryKdfSalt) {
+    return { ok: false, error: 'Esta cuenta no tiene código de recuperación configurado' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      publicKey: toBase64(new Uint8Array(user.publicKey)),
+      encryptedPrivKeyRecovery: toBase64(new Uint8Array(user.encryptedPrivKeyRecovery)),
+      recoveryPrivKeyNonce: toBase64(new Uint8Array(user.recoveryPrivKeyNonce)),
+      recoveryKdfSalt: toBase64(new Uint8Array(user.recoveryKdfSalt)),
+    },
+  };
+}

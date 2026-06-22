@@ -231,6 +231,13 @@ export async function revokeCredentialAccessAction(
     where: { credentialId: cred.id, userId },
   });
 
+  // El revocado pudo haber cacheado el DEK en su browser: marcar la credencial
+  // como pendiente de rotación hasta que se re-cifre.
+  await prisma.credential.update({
+    where: { id: cred.id },
+    data: { needsRotation: true },
+  });
+
   await audit({
     actorId: c.userId,
     action: 'credential.revoke',
@@ -268,6 +275,82 @@ export async function deleteCredentialAction(
     resourceId: cred.id,
     projectId: c.projectId,
   });
+  revalidatePath(`/projects/${projectSlug}/vault`);
+  return { ok: true };
+}
+
+/**
+ * Rotate a credential: replace its ciphertext (re-encrypted client-side with a
+ * fresh DEK) and rewrap the DEK for the CURRENT access holders only. This
+ * invalidates any DEK a revoked member may have cached. The caller must hold
+ * access (they need the plaintext to re-encrypt). Clears `needsRotation`.
+ */
+export async function rotateCredentialAction(
+  projectSlug: string,
+  credentialId: string,
+  payload: {
+    ciphertext: string;
+    nonce: string;
+    access: Array<{ userId: string; wrappedDek: string }>;
+  },
+): Promise<ActionResult> {
+  const c = await ctx(projectSlug);
+  if (!c.ok) return { ok: false, error: c.error };
+  if (c.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+
+  const cred = await prisma.credential.findFirst({
+    where: { id: credentialId, projectId: c.projectId },
+    include: { access: { where: { userId: c.userId }, select: { id: true } } },
+  });
+  if (!cred || cred.access.length === 0) {
+    return { ok: false, error: 'No tienes acceso a esta credencial' };
+  }
+  if (payload.access.length === 0) {
+    return { ok: false, error: 'La rotación requiere al menos un destinatario' };
+  }
+
+  // Todos los destinatarios deben ser miembros del proyecto.
+  const memberIds = await prisma.projectMember.findMany({
+    where: { projectId: c.projectId, userId: { in: payload.access.map((a) => a.userId) } },
+    select: { userId: true },
+  });
+  const memberSet = new Set(memberIds.map((m) => m.userId));
+  for (const a of payload.access) {
+    if (!memberSet.has(a.userId)) {
+      return { ok: false, error: 'Hay destinatarios que no son miembros del proyecto' };
+    }
+  }
+
+  // Reemplazar el acceso y el ciphertext atómicamente.
+  await prisma.$transaction([
+    prisma.credentialAccess.deleteMany({ where: { credentialId } }),
+    prisma.credential.update({
+      where: { id: credentialId },
+      data: {
+        ciphertext: Buffer.from(fromBase64(payload.ciphertext)),
+        nonce: Buffer.from(fromBase64(payload.nonce)),
+        rotatedAt: new Date(),
+        needsRotation: false,
+        access: {
+          create: payload.access.map((a) => ({
+            userId: a.userId,
+            wrappedDek: Buffer.from(fromBase64(a.wrappedDek)),
+            grantedById: c.userId,
+          })),
+        },
+      },
+    }),
+  ]);
+
+  await audit({
+    actorId: c.userId,
+    action: 'credential.rotate',
+    resourceType: 'credential',
+    resourceId: credentialId,
+    projectId: c.projectId,
+    payload: { recipients: payload.access.length },
+  });
+
   revalidatePath(`/projects/${projectSlug}/vault`);
   return { ok: true };
 }

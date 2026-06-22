@@ -3,9 +3,14 @@
  *
  * Trade-off narrow zero-knowledge: el server necesita la API key en claro
  * cuando invoca el LLM, así que NO usamos el vault E2E aquí. En su lugar
- * sellamos con la misma `AUTH_TOTP_KEY` que usa `lib/auth/totp.ts`:
- * XSalsa20-Poly1305 + nonce per-key. Un dump de DB sin acceso al server
- * key no revela los secretos.
+ * sellamos con `AUTH_LLM_KEY` (XSalsa20-Poly1305 + nonce per-key). Un dump de
+ * DB sin acceso al server key no revela los secretos.
+ *
+ * `AUTH_LLM_KEY` es una clave DEDICADA, separada de `AUTH_TOTP_KEY`, para que
+ * filtrar una no comprometa la otra (LLM keys vs. secretos 2FA). Por
+ * compatibilidad, si `AUTH_LLM_KEY` no está seteada caemos a `AUTH_TOTP_KEY`
+ * (las credenciales legadas se sellaron con esa); usar `scripts/rotate-llm-key.mjs`
+ * para migrarlas a la clave nueva.
  */
 import type { LlmCredential, LlmProvider } from '@prisma/client';
 import { Prisma } from '@prisma/client';
@@ -21,15 +26,18 @@ import { env } from '@/lib/env';
 import { prisma } from '@/lib/db';
 
 function getServerKey(): Uint8Array {
-  const key = env().AUTH_TOTP_KEY;
+  const e = env();
+  // Preferir la clave dedicada; caer a AUTH_TOTP_KEY para credenciales legadas.
+  const key = e.AUTH_LLM_KEY ?? e.AUTH_TOTP_KEY;
+  const source = e.AUTH_LLM_KEY ? 'AUTH_LLM_KEY' : 'AUTH_TOTP_KEY';
   if (!key) {
     throw new Error(
-      'AUTH_TOTP_KEY no está configurado: requerido para sellar credenciales LLM.',
+      'AUTH_LLM_KEY (o AUTH_TOTP_KEY) no está configurado: requerido para sellar credenciales LLM.',
     );
   }
   const bytes = fromBase64(key);
   if (bytes.length !== 32) {
-    throw new Error('AUTH_TOTP_KEY debe decodificar a exactamente 32 bytes.');
+    throw new Error(`${source} debe decodificar a exactamente 32 bytes.`);
   }
   return bytes;
 }

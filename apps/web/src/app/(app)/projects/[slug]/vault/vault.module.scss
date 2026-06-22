@@ -221,6 +221,12 @@
   font-family: var(--font-mono);
 }
 
+.rotateWarning {
+  margin: t.$space-xs 0 0;
+  font-size: 0.8rem;
+  color: var(--color-danger);
+}
+
 .rowActions {
   display: flex;
   gap: t.$space-sm;

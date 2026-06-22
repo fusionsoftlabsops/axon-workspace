@@ -76,3 +76,19 @@
   font-size: 0.9rem;
   margin: 0;
 }
+
+.recoveryCode {
+  margin: t.$space-sm 0;
+  padding: t.$space-md;
+  border: 1px solid var(--color-border);
+  border-radius: t.$radius-md;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: all;
+}

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { RepoReader, RepoAccessError, repoReaderFor } from './reader';
+import { RepoReader, RepoAccessError, isPathWithinRoot, repoReaderFor } from './reader';
 
 let tmpRoot: string;
 
@@ -35,6 +35,37 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (tmpRoot) await fs.rm(tmpRoot, { recursive: true, force: true });
+});
+
+describe('isPathWithinRoot (REPOS_ROOT confinement)', () => {
+  // Path-only assertions (no filesystem access), so absolute literals are fine.
+  const root = path.resolve(path.sep, 'srv', 'repos');
+
+  it('accepts the root itself and paths inside it', () => {
+    expect(isPathWithinRoot(root, root)).toBe(true);
+    expect(isPathWithinRoot(root, path.join(root, 'proj'))).toBe(true);
+    expect(isPathWithinRoot(root, path.join(root, 'a', 'b', 'c'))).toBe(true);
+  });
+
+  it('rejects paths outside the root, including .. escapes and sibling prefixes', () => {
+    expect(isPathWithinRoot(root, path.join(root, '..', 'other'))).toBe(false);
+    expect(isPathWithinRoot(root, `${root}-evil`)).toBe(false);
+    expect(isPathWithinRoot(root, path.resolve(path.sep, 'etc', 'passwd'))).toBe(false);
+  });
+});
+
+describe('RepoReader · REPOS_ROOT defense in depth', () => {
+  it('throws when constructed with a path outside reposRoot', () => {
+    const reposRoot = path.join(tmpRoot, 'allowed');
+    expect(() => new RepoReader(path.join(tmpRoot, 'elsewhere'), reposRoot)).toThrowError(
+      RepoAccessError,
+    );
+  });
+
+  it('allows a path inside reposRoot', () => {
+    // tmpRoot itself acts as the allowed root here.
+    expect(() => new RepoReader(path.join(tmpRoot, 'src'), tmpRoot)).not.toThrow();
+  });
 });
 
 describe('RepoReader · construction', () => {

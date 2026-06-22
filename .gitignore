@@ -43,3 +43,9 @@ prisma/*.db-journal
 
 # Docker volumes
 postgres-data/
+
+# Screenshots ad-hoc del dev (solo root level, no afecta assets de apps/web/public)
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp

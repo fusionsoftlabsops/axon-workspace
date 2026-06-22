@@ -126,7 +126,10 @@ model User {
   encryptedPrivateKey Bytes   // sk_user envuelto con KEK derivado de passphrase
   encryptedPrivKeyNonce Bytes // nonce del XSalsa20-Poly1305
   kdfSalt             Bytes   // salt para argon2id (derivación del KEK)
-  recoveryHash        String? // hash del recovery code (24 words), opcional
+  recoveryHash        String? // SHA-256 (proof) del recovery code normalizado
+  encryptedPrivKeyRecovery Bytes? // sk_user envuelto con KEK derivado del recovery code
+  recoveryPrivKeyNonce     Bytes? // nonce del XSalsa20-Poly1305 (copia recovery)
+  recoveryKdfSalt          Bytes? // salt argon2id para la copia recovery
   totpSecretEncrypted Bytes?  // TOTP secret envuelto con KEK
   totpNonce           Bytes?
   isMasterUser        Boolean @default(false)
@@ -343,6 +346,9 @@ model Credential {
   metadataPublic Json?    // metadata no sensible (username, URL) opt-in
   createdById    String
   rotatedAt      DateTime?
+  // Se marca true al revocar acceso a un miembro: el DEK puede haber quedado
+  // cacheado por el revocado, así que la credencial debe rotarse (re-cifrarse).
+  needsRotation  Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

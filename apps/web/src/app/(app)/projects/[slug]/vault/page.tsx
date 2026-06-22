@@ -38,6 +38,7 @@ export default async function VaultPage({
       metadataPublic: true,
       createdAt: true,
       createdById: true,
+      needsRotation: true,
       access: {
         include: { user: { select: { id: true, name: true, email: true } } },
       },
@@ -58,6 +59,7 @@ export default async function VaultPage({
         metadataPublic: (c.metadataPublic ?? null) as Record<string, string> | null,
         createdAt: c.createdAt.toISOString(),
         createdById: c.createdById,
+        needsRotation: c.needsRotation,
         access: c.access.map((a) => ({
           userId: a.userId,
           name: a.user.name,

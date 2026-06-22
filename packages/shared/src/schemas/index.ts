@@ -10,8 +10,35 @@ export const signupSchema = z.object({
   encryptedPrivateKey: z.string().min(1), // base64url
   encryptedPrivKeyNonce: z.string().min(1), // base64url
   kdfSalt: z.string().min(1), // base64url
+  // Vault recovery (zero-knowledge): proof = sha256(code); the server never
+  // sees the code itself. The recovery blob is sk_user sealed with the code.
+  recoveryHash: z.string().min(1), // sha256 hex proof
+  encryptedPrivKeyRecovery: z.string().min(1), // base64url
+  recoveryPrivKeyNonce: z.string().min(1), // base64url
+  recoveryKdfSalt: z.string().min(1), // base64url
 });
 export type SignupInput = z.infer<typeof signupSchema>;
+
+// Reset the vault passphrase using the recovery code. The client decrypts the
+// private key with the code, re-seals it under a NEW passphrase, and sends the
+// new passphrase blob + the sha256 proof of the code (verified server-side).
+export const resetPassphraseSchema = z.object({
+  recoveryHash: z.string().min(1), // sha256 hex proof of the code
+  encryptedPrivateKey: z.string().min(1), // base64url, re-sealed under new passphrase
+  encryptedPrivKeyNonce: z.string().min(1),
+  kdfSalt: z.string().min(1),
+});
+export type ResetPassphraseInput = z.infer<typeof resetPassphraseSchema>;
+
+// Regenerate the recovery code (vault must be unlocked client-side). Sends a
+// fresh recovery blob + its proof.
+export const setRecoveryCodeSchema = z.object({
+  recoveryHash: z.string().min(1),
+  encryptedPrivKeyRecovery: z.string().min(1),
+  recoveryPrivKeyNonce: z.string().min(1),
+  recoveryKdfSalt: z.string().min(1),
+});
+export type SetRecoveryCodeInput = z.infer<typeof setRecoveryCodeSchema>;
 
 export const loginSchema = z.object({
   email: z.string().email(),

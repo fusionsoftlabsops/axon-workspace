@@ -45,6 +45,10 @@ export async function signupAction(input: SignupInput): Promise<SignupActionResu
         encryptedPrivateKey: Buffer.from(fromBase64(data.encryptedPrivateKey)),
         encryptedPrivKeyNonce: Buffer.from(fromBase64(data.encryptedPrivKeyNonce)),
         kdfSalt: Buffer.from(fromBase64(data.kdfSalt)),
+        recoveryHash: data.recoveryHash,
+        encryptedPrivKeyRecovery: Buffer.from(fromBase64(data.encryptedPrivKeyRecovery)),
+        recoveryPrivKeyNonce: Buffer.from(fromBase64(data.recoveryPrivKeyNonce)),
+        recoveryKdfSalt: Buffer.from(fromBase64(data.recoveryKdfSalt)),
         isMasterUser: isFirstUser,
       },
     });

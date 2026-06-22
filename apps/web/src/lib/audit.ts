@@ -22,6 +22,8 @@ export type AuditAction =
   | 'auth.login'
   | 'auth.totp_enable'
   | 'auth.totp_disable'
+  | 'vault.passphrase_reset'
+  | 'vault.recovery_code_regenerated'
   | 'api_token.create'
   | 'api_token.revoke'
   | 'ai.invoke'
