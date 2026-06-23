@@ -36,6 +36,7 @@ const schema = z.object({
   SMTP_USER: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   SMTP_PASS: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   SMTP_FROM: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  SMTP_SECURE: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AI_MODEL_FAST: z.string().default('claude-haiku-4-5-20251001'),
   AI_MODEL_BALANCED: z.string().default('claude-sonnet-4-6'),
   AI_MODEL_DEEP: z.string().default('claude-opus-4-8'),

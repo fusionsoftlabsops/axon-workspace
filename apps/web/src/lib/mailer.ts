@@ -12,10 +12,14 @@ function transport(): Transporter | null {
     return _transport;
   }
   const port = e.SMTP_PORT ? Number(e.SMTP_PORT) : 587;
+  // Honor SMTP_SECURE if the platform/app provides it; otherwise derive from the
+  // port (implicit TLS on 465, STARTTLS elsewhere).
+  const secure =
+    e.SMTP_SECURE === 'true' ? true : e.SMTP_SECURE === 'false' ? false : port === 465;
   _transport = nodemailer.createTransport({
     host: e.SMTP_HOST,
     port,
-    secure: port === 465, // implicit TLS on 465; STARTTLS otherwise
+    secure,
     auth: { user: e.SMTP_USER, pass: e.SMTP_PASS },
   });
   return _transport;
