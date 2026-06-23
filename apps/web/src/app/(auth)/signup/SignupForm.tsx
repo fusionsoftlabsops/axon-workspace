@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { signupAction } from '@/lib/actions/auth';
 import { generateProtectedKeypairWithRecovery, toBase64 } from '@/lib/crypto';
+import { PasswordInput } from './PasswordInput';
 import styles from './SignupForm.module.scss';
 
 interface FormState {
@@ -136,8 +137,7 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
 
       <label>
         <span>Contraseña de login</span>
-        <input
-          type="password"
+        <PasswordInput
           required
           autoComplete="new-password"
           minLength={12}
@@ -149,8 +149,7 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
 
       <label>
         <span>Passphrase del vault</span>
-        <input
-          type="password"
+        <PasswordInput
           required
           autoComplete="new-password"
           minLength={12}
@@ -165,8 +164,7 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
 
       <label>
         <span>Confirma la passphrase</span>
-        <input
-          type="password"
+        <PasswordInput
           required
           autoComplete="new-password"
           value={form.passphraseConfirm}
