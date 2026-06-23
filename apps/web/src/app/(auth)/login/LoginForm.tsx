@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { loginAction } from '@/lib/actions/auth';
+import { PasswordInput } from '../signup/PasswordInput';
 import styles from '../signup/SignupForm.module.scss';
 
 export function LoginForm() {
@@ -53,8 +54,7 @@ export function LoginForm() {
 
       <label>
         <span>Contraseña</span>
-        <input
-          type="password"
+        <PasswordInput
           required
           autoComplete="current-password"
           value={password}
