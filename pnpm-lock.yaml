@@ -83,7 +83,10 @@ importers:
         version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.99.0)
       next-auth:
         specifier: 5.0.0-beta.25
-        version: 5.0.0-beta.25(next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.99.0))(react@19.2.6)
+        version: 5.0.0-beta.25(next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.99.0))(nodemailer@6.10.1)(react@19.2.6)
+      nodemailer:
+        specifier: ^6.9.16
+        version: 6.10.1
       openai:
         specifier: ^6.38.0
         version: 6.38.0(ws@8.20.1)(zod@3.25.76)
@@ -124,6 +127,9 @@ importers:
       '@types/node':
         specifier: ^22.10.0
         version: 22.19.19
+      '@types/nodemailer':
+        specifier: ^6.4.17
+        version: 6.4.24
       '@types/qrcode':
         specifier: ^1.5.5
         version: 1.5.6
@@ -1199,6 +1205,9 @@ packages:
   '@types/node@22.19.19':
     resolution: {integrity: sha512-dyh/xO2Fh5bYrfWaaqGrRQQGkNdmYw6AmaAUvYeUMNTWQtvb796ikLdmTchRmOlOiIJ1TDXfWgVx1QkUlQ6Hew==}
 
+  '@types/nodemailer@6.4.24':
+    resolution: {integrity: sha512-Ww4u0rT9wQNXh4JiQaIwx3QWdcOFXzOjQA2zc+jtFYNmQiT4mIUqcDin51bDFdkzKubFnQCZNK7FIHlPKQ/q9w==}
+
   '@types/qrcode@1.5.6':
     resolution: {integrity: sha512-te7NQcV2BOvdj2b1hCAHzAoMNuj65kNBMz0KBaxM6c3VGBOhU0dURQKOtH8CFNI/dsKkwlv32p26qYQTWoB5bw==}
 
@@ -1994,6 +2003,10 @@ packages:
     resolution: {integrity: sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  nodemailer@6.10.1:
+    resolution: {integrity: sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==}
+    engines: {node: '>=6.0.0'}
+
   oauth4webapi@3.8.6:
     resolution: {integrity: sha512-iwemM91xz8nryHti2yTmg5fhyEMVOkOXwHNqbvcATjyajb5oQxCQzrNOA6uElRHuMhQQTKUyFKV9y/CNyg25BQ==}
 
@@ -2551,7 +2564,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@auth/core@0.37.2':
+  '@auth/core@0.37.2(nodemailer@6.10.1)':
     dependencies:
       '@panva/hkdf': 1.2.1
       '@types/cookie': 0.6.0
@@ -2560,6 +2573,8 @@ snapshots:
       oauth4webapi: 3.8.6
       preact: 10.11.3
       preact-render-to-string: 5.2.3(preact@10.11.3)
+    optionalDependencies:
+      nodemailer: 6.10.1
 
   '@dnd-kit/accessibility@3.1.1(react@19.2.6)':
     dependencies:
@@ -3255,6 +3270,10 @@ snapshots:
   '@types/node@22.19.19':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/nodemailer@6.4.24':
+    dependencies:
+      '@types/node': 22.19.19
 
   '@types/qrcode@1.5.6':
     dependencies:
@@ -4251,11 +4270,13 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next-auth@5.0.0-beta.25(next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.99.0))(react@19.2.6):
+  next-auth@5.0.0-beta.25(next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.99.0))(nodemailer@6.10.1)(react@19.2.6):
     dependencies:
-      '@auth/core': 0.37.2
+      '@auth/core': 0.37.2(nodemailer@6.10.1)
       next: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.99.0)
       react: 19.2.6
+    optionalDependencies:
+      nodemailer: 6.10.1
 
   next@15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.99.0):
     dependencies:
@@ -4295,6 +4316,8 @@ snapshots:
       data-uri-to-buffer: 4.0.1
       fetch-blob: 3.2.0
       formdata-polyfill: 4.0.10
+
+  nodemailer@6.10.1: {}
 
   oauth4webapi@3.8.6: {}
 

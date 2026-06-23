@@ -31,7 +31,7 @@ export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [link, setLink] = useState<{ email: string; url: string } | null>(null);
+  const [link, setLink] = useState<{ email: string; url: string; emailSent: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
 
   function invite(e: React.FormEvent) {
@@ -45,7 +45,7 @@ export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
         return;
       }
       const url = `${window.location.origin}/signup?token=${r.data.token}`;
-      setLink({ email: r.data.email, url });
+      setLink({ email: r.data.email, url, emailSent: r.data.emailSent });
       setEmail('');
       router.refresh();
     });
@@ -88,6 +88,11 @@ export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
         {link && (
           <div style={{ marginTop: '0.5rem' }}>
             <p>
+              {link.emailSent ? (
+                <>✓ Invitación enviada por email a <strong>{link.email}</strong>. </>
+              ) : (
+                <>No se pudo enviar el email (SMTP no configurado o falló). </>
+              )}
               Enlace para <strong>{link.email}</strong> (se muestra una sola vez):
             </p>
             <div style={linkBox}>{link.url}</div>

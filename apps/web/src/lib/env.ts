@@ -28,6 +28,14 @@ const schema = z.object({
     (v) => (v === '' ? undefined : v),
     z.string().startsWith('sk-ant-').optional(),
   ),
+  // SMTP for outbound email (e.g. invitation links). All optional — if unset,
+  // email sending is skipped and the app falls back to the copyable link.
+  // Works with any SMTP provider (Hostinger, Resend's smtp.resend.com, etc.).
+  SMTP_HOST: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  SMTP_PORT: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  SMTP_USER: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  SMTP_PASS: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  SMTP_FROM: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AI_MODEL_FAST: z.string().default('claude-haiku-4-5-20251001'),
   AI_MODEL_BALANCED: z.string().default('claude-sonnet-4-6'),
   AI_MODEL_DEEP: z.string().default('claude-opus-4-8'),

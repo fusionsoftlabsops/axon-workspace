@@ -7,8 +7,28 @@ import { prisma } from '@/lib/db';
 import { createInvitationSchema, type CreateInvitationInput } from '@admin/shared/schemas';
 import { audit } from '@/lib/audit';
 import { hashInviteToken } from '@/lib/invite-token';
+import { env } from '@/lib/env';
+import { sendMail } from '@/lib/mailer';
 
 const INVITE_TTL_DAYS = 7;
+
+/** Build the invitation email (HTML + text) for a signup link. */
+function inviteEmail(link: string): { subject: string; html: string; text: string } {
+  const subject = 'Invitación a Axon';
+  const text =
+    `Te invitaron a Axon.\n\n` +
+    `Creá tu cuenta con este enlace (válido 7 días, un solo uso):\n${link}\n\n` +
+    `Si no esperabas esta invitación, ignorá este correo.`;
+  const html =
+    `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;margin:0 auto;color:#111">` +
+    `<h2>Te invitaron a Axon</h2>` +
+    `<p>Creá tu cuenta con este enlace (válido 7 días, un solo uso):</p>` +
+    `<p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#111;color:#fff;border-radius:8px;text-decoration:none">Crear mi cuenta</a></p>` +
+    `<p style="font-size:12px;color:#666;word-break:break-all">O copiá este enlace: ${link}</p>` +
+    `<p style="font-size:12px;color:#666">Si no esperabas esta invitación, ignorá este correo.</p>` +
+    `</div>`;
+  return { subject, html, text };
+}
 
 /** Only the master (super-admin) user may manage invitations. */
 async function requireMaster(): Promise<string | null> {
@@ -45,7 +65,8 @@ export async function getInvitationByToken(
 export async function createInvitationAction(
   input: CreateInvitationInput,
 ): Promise<
-  { ok: true; data: { email: string; token: string; expiresAt: string } } | { ok: false; error: string }
+  | { ok: true; data: { email: string; token: string; expiresAt: string; emailSent: boolean } }
+  | { ok: false; error: string }
 > {
   const masterId = await requireMaster();
   if (!masterId) return { ok: false, error: 'Solo el super-admin puede invitar' };
@@ -66,16 +87,26 @@ export async function createInvitationAction(
     data: { email, tokenHash: hashInviteToken(token), invitedById: masterId, expiresAt },
   });
 
+  // Additional channel: email the link (best-effort). The copyable link is
+  // always returned, so this never blocks creating the invitation.
+  let emailSent = false;
+  const base = env().AUTH_URL?.replace(/\/+$/, '');
+  if (base) {
+    const link = `${base}/signup?token=${token}`;
+    const { subject, html, text } = inviteEmail(link);
+    emailSent = await sendMail({ to: email, subject, html, text });
+  }
+
   await audit({
     actorId: masterId,
     action: 'invitation.create',
     resourceType: 'invitation',
     resourceId: email,
-    payload: { email },
+    payload: { email, emailSent },
   });
 
   revalidatePath('/settings/invitations');
-  return { ok: true, data: { email, token, expiresAt: expiresAt.toISOString() } };
+  return { ok: true, data: { email, token, expiresAt: expiresAt.toISOString(), emailSent } };
 }
 
 export async function listInvitationsAction(): Promise<
