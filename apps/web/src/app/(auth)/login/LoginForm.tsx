@@ -5,11 +5,13 @@ import { useState, useTransition } from 'react';
 import { loginAction } from '@/lib/actions/auth';
 import { PasswordInput } from '../signup/PasswordInput';
 import styles from '../signup/SignupForm.module.scss';
+import { useI18n } from '@/lib/i18n/i18n';
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/projects';
+  const { t } = useI18n();
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +33,10 @@ export function LoginForm() {
       }
       if (res.error === 'TOTP_REQUIRED') {
         setNeedsTotp(true);
-        setError('Ingresa el código de tu app de autenticación');
+        setError(t('Ingresa el código de tu app de autenticación', 'Enter the code from your authenticator app'));
         return;
       }
-      setError('Credenciales inválidas');
+      setError(t('Credenciales inválidas', 'Invalid credentials'));
     });
   }
 
@@ -53,7 +55,7 @@ export function LoginForm() {
       </label>
 
       <label>
-        <span>Contraseña</span>
+        <span>{t('Contraseña', 'Password')}</span>
         <PasswordInput
           required
           autoComplete="current-password"
@@ -65,7 +67,7 @@ export function LoginForm() {
 
       {needsTotp && (
         <label>
-          <span>Código de 2FA</span>
+          <span>{t('Código de 2FA', '2FA code')}</span>
           <input
             type="text"
             required
@@ -77,14 +79,18 @@ export function LoginForm() {
             onChange={(e) => setTotp(e.target.value.replace(/\D/g, ''))}
             autoFocus
           />
-          <small>6 dígitos de tu app de autenticación (Google Authenticator, 1Password…)</small>
+          <small>{t('6 dígitos de tu app de autenticación (Google Authenticator, 1Password…)', '6 digits from your authenticator app (Google Authenticator, 1Password…)')}</small>
         </label>
       )}
 
       {error && <p className={styles.error}>{error}</p>}
 
       <button type="submit" disabled={pending} className={styles.submit}>
-        {pending ? 'Verificando…' : needsTotp ? 'Verificar 2FA' : 'Iniciar sesión'}
+        {pending
+          ? t('Verificando…', 'Verifying…')
+          : needsTotp
+            ? t('Verificar 2FA', 'Verify 2FA')
+            : t('Iniciar sesión', 'Sign in')}
       </button>
     </form>
   );

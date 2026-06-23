@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { Fraunces, Newsreader, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
+import { cookies } from 'next/headers';
 import { Providers } from './providers';
+import { LANG_COOKIE, type Lang } from '@/lib/i18n/lang';
 import './globals.scss';
 
 // Display serif — dramático para mastheads y drop caps. Variable axes:
@@ -37,13 +39,24 @@ const mono = JetBrains_Mono({
   weight: ['400', '500', '600'],
 });
 
-export const metadata: Metadata = {
-  title: 'admin_data_project',
-  description: 'Plataforma multi-proyecto con vault E2E e integración Claude Code',
-  robots: { index: false, follow: false },
-};
+async function serverLang(): Promise<Lang> {
+  const cookieStore = await cookies();
+  return cookieStore.get(LANG_COOKIE)?.value === 'es' ? 'es' : 'en';
+}
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export async function generateMetadata(): Promise<Metadata> {
+  const isEs = (await serverLang()) === 'es';
+  return {
+    title: 'Axon',
+    description: isEs
+      ? 'Plataforma multi-proyecto con vault E2E e integración Claude Code.'
+      : 'Multi-project platform with E2E vault and Claude Code integration.',
+    robots: { index: false, follow: false },
+  };
+}
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const lang = await serverLang();
   const fontClasses = [
     fraunces.variable,
     newsreader.variable,
@@ -52,7 +65,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   ].join(' ');
 
   return (
-    <html lang="es" className={fontClasses}>
+    <html lang={lang} className={fontClasses}>
       <body>
         <Providers>{children}</Providers>
       </body>

@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import QRCode from 'qrcode';
+import { useI18n } from '@/lib/i18n/i18n';
 import { beginTotpEnrollment, confirmTotpEnrollment } from '@/lib/actions/totp';
 
 export function TotpEnrollment({ email }: { email: string }) {
+  const { t } = useI18n();
   const [pending, startTransition] = useTransition();
   const [secret, setSecret] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function TotpEnrollment({ email }: { email: string }) {
         setSecret(s);
         setQrDataUrl(qr);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Error iniciando 2FA');
+        if (!cancelled) setError(e instanceof Error ? e.message : t('Error iniciando 2FA', 'Error starting 2FA'));
       }
     })();
     return () => {
@@ -48,7 +50,7 @@ export function TotpEnrollment({ email }: { email: string }) {
   if (enrolled) {
     return (
       <p style={{ color: 'var(--color-success)' }}>
-        ✓ 2FA habilitado. En tu próximo login se te pedirá el código.
+        {t('✓ 2FA habilitado. En tu próximo login se te pedirá el código.', '✓ 2FA enabled. You will be asked for the code on your next login.')}
       </p>
     );
   }
@@ -56,28 +58,28 @@ export function TotpEnrollment({ email }: { email: string }) {
   return (
     <div style={{ marginTop: '1.5rem' }}>
       <ol>
-        <li>Abre tu app de autenticación (Google Authenticator, 1Password, Aegis…).</li>
-        <li>Escanea el QR o ingresa el código manualmente.</li>
-        <li>Confirma con el código que muestra la app.</li>
+        <li>{t('Abre tu app de autenticación (Google Authenticator, 1Password, Aegis…).', 'Open your authenticator app (Google Authenticator, 1Password, Aegis…).')}</li>
+        <li>{t('Escanea el QR o ingresa el código manualmente.', 'Scan the QR code or enter the code manually.')}</li>
+        <li>{t('Confirma con el código que muestra la app.', 'Confirm with the code shown by the app.')}</li>
       </ol>
 
       {qrDataUrl ? (
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', marginTop: '1rem' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrDataUrl} alt="QR de configuración TOTP" width={220} height={220} />
+          <img src={qrDataUrl} alt={t('QR de configuración TOTP', 'TOTP setup QR code')} width={220} height={220} />
           <div>
             <p style={{ marginTop: 0, fontSize: '0.85rem' }}>
-              <strong>Cuenta:</strong> {email}
+              <strong>{t('Cuenta:', 'Account:')}</strong> {email}
             </p>
             <p style={{ fontSize: '0.85rem' }}>
-              <strong>Código manual:</strong>
+              <strong>{t('Código manual:', 'Manual code:')}</strong>
               <br />
               <code style={{ wordBreak: 'break-all' }}>{secret}</code>
             </p>
           </div>
         </div>
       ) : (
-        <p style={{ color: 'var(--color-fg-muted)' }}>Generando QR…</p>
+        <p style={{ color: 'var(--color-fg-muted)' }}>{t('Generando QR…', 'Generating QR…')}</p>
       )}
 
       <form onSubmit={submit} style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem' }}>
@@ -86,7 +88,7 @@ export function TotpEnrollment({ email }: { email: string }) {
           inputMode="numeric"
           pattern="\d{6}"
           maxLength={6}
-          placeholder="Código de 6 dígitos"
+          placeholder={t('Código de 6 dígitos', '6-digit code')}
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           required
@@ -114,7 +116,7 @@ export function TotpEnrollment({ email }: { email: string }) {
             fontWeight: 600,
           }}
         >
-          {pending ? 'Verificando…' : 'Habilitar 2FA'}
+          {pending ? t('Verificando…', 'Verifying…') : t('Habilitar 2FA', 'Enable 2FA')}
         </button>
       </form>
 

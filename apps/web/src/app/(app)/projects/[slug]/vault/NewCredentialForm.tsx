@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n/i18n';
 import { useVaultUnlock } from '@/components/vault/UnlockContext';
 import {
   encryptAndShareCredential,
@@ -30,6 +31,7 @@ export function NewCredentialForm({
   onCreated: () => void;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const { vault } = useVaultUnlock();
   const [pending, startTransition] = useTransition();
 
@@ -77,7 +79,7 @@ export function NewCredentialForm({
       .map((m) => ({ userId: m.userId, publicKey: fromBase64(m.publicKey) }));
 
     if (recipients.length === 0) {
-      setError('Debes compartir contigo mismo al menos');
+      setError(t('Debes compartir contigo mismo al menos', 'You must at least share with yourself'));
       return;
     }
 
@@ -113,34 +115,34 @@ export function NewCredentialForm({
 
   return (
     <form onSubmit={submit} className={styles.newCred}>
-      <h3>Nueva credencial</h3>
+      <h3>{t('Nueva credencial', 'New credential')}</h3>
       <div className={styles.grid2}>
         <label>
-          <span>Nombre</span>
+          <span>{t('Nombre', 'Name')}</span>
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label>
-          <span>Tipo</span>
+          <span>{t('Tipo', 'Type')}</span>
           <select value={type} onChange={(e) => setType(e.target.value as CredType)}>
-            <option value="EMAIL_LOGIN">Email + login</option>
-            <option value="PASSWORD">Password</option>
-            <option value="API_KEY">API key</option>
-            <option value="SSH_KEY">SSH key</option>
-            <option value="CERT">Certificado</option>
-            <option value="NOTE">Nota segura</option>
+            <option value="EMAIL_LOGIN">{t('Email + login', 'Email + login')}</option>
+            <option value="PASSWORD">{t('Password', 'Password')}</option>
+            <option value="API_KEY">{t('API key', 'API key')}</option>
+            <option value="SSH_KEY">{t('SSH key', 'SSH key')}</option>
+            <option value="CERT">{t('Certificado', 'Certificate')}</option>
+            <option value="NOTE">{t('Nota segura', 'Secure note')}</option>
           </select>
         </label>
         <label>
-          <span>Username / cuenta (metadata pública)</span>
+          <span>{t('Username / cuenta (metadata pública)', 'Username / account (public metadata)')}</span>
           <input value={meta.username} onChange={(e) => setMeta((m) => ({ ...m, username: e.target.value }))} />
         </label>
         <label>
-          <span>URL (metadata pública)</span>
+          <span>{t('URL (metadata pública)', 'URL (public metadata)')}</span>
           <input value={meta.url} onChange={(e) => setMeta((m) => ({ ...m, url: e.target.value }))} />
         </label>
       </div>
       <label>
-        <span>Secreto (se encripta en este navegador antes de enviarlo)</span>
+        <span>{t('Secreto (se encripta en este navegador antes de enviarlo)', 'Secret (encrypted in this browser before sending)')}</span>
         <textarea
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
@@ -150,8 +152,8 @@ export function NewCredentialForm({
       </label>
 
       <div className={styles.shareSection}>
-        <strong>Compartir con:</strong>
-        {members === null && <p>Cargando miembros…</p>}
+        <strong>{t('Compartir con:', 'Share with:')}</strong>
+        {members === null && <p>{t('Cargando miembros…', 'Loading members…')}</p>}
         {members?.map((m) => (
           <label key={m.userId} className={styles.checkbox}>
             <input
@@ -163,7 +165,7 @@ export function NewCredentialForm({
             <span>
               {m.name}
               <small> · {m.email}</small>
-              {m.userId === currentUserId && <small> (tú)</small>}
+              {m.userId === currentUserId && <small> {t('(tú)', '(you)')}</small>}
             </span>
           </label>
         ))}
@@ -172,7 +174,7 @@ export function NewCredentialForm({
       {error && <p className={styles.error}>{error}</p>}
 
       <button type="submit" disabled={pending || !members}>
-        {pending ? 'Encriptando + guardando…' : 'Crear credencial'}
+        {pending ? t('Encriptando + guardando…', 'Encrypting + saving…') : t('Crear credencial', 'Create credential')}
       </button>
     </form>
   );

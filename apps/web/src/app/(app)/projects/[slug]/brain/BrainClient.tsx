@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import { Eyebrow, RuleDivider, Stat } from '@/components/ui';
 import { MemoryCard, type MemoryView } from './MemoryCard';
 import { NewMemoryForm } from './NewMemoryForm';
@@ -64,6 +65,7 @@ export function BrainClient({
     stale: number;
   }> | null;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -93,42 +95,44 @@ export function BrainClient({
       <header className={styles.header}>
         <div>
           <Eyebrow ornament="section" tone="muted">
-            Bitácora compartida del proyecto
+            {t('Bitácora compartida del proyecto', 'Shared project logbook')}
           </Eyebrow>
-          <h1 className={styles.title}>El cerebro</h1>
+          <h1 className={styles.title}>{t('El cerebro', 'The brain')}</h1>
           <p className={styles.subtitle}>
-            Conocimiento curado: decisiones, trampas, patrones y runbooks. Lo que se publica al
-            principal queda visible para todo el equipo.
+            {t(
+              'Conocimiento curado: decisiones, trampas, patrones y runbooks. Lo que se publica al principal queda visible para todo el equipo.',
+              'Curated knowledge: decisions, gotchas, patterns and runbooks. Anything published to the main brain stays visible to the whole team.',
+            )}
           </p>
         </div>
         <button onClick={() => setShowNew((v) => !v)} className={styles.newBtn}>
-          {showNew ? 'Cancelar' : '+ Nueva entrada'}
+          {showNew ? t('Cancelar', 'Cancel') : t('+ Nueva entrada', '+ New entry')}
         </button>
       </header>
 
       <div aria-hidden className={styles['masthead-rule']} />
 
       <div className={styles.statsStrip}>
-        <Stat value={stats.project} label="en cerebro principal" />
-        <Stat value={stats.local} label="en tu local" />
+        <Stat value={stats.project} label={t('en cerebro principal', 'in main brain')} />
+        <Stat value={stats.local} label={t('en tu local', 'in your local')} />
         <Stat
           value={stats.stale}
-          label="stale (>6 meses)"
-          hint="sin uso reciente"
+          label={t('stale (>6 meses)', 'stale (>6 months)')}
+          hint={t('sin uso reciente', 'no recent use')}
           active={staleActive}
           trend={stats.stale > 0 ? 'warn' : 'flat'}
           onClick={() => setParam('stale', staleActive ? null : '1')}
         />
         <Stat
           value={stats.orphans}
-          label="huérfanas"
-          hint="cero citations"
+          label={t('huérfanas', 'orphans')}
+          hint={t('cero citas', 'zero citations')}
           active={orphansActive}
           onClick={() => setParam('orphans', orphansActive ? null : '1')}
         />
         {stats.topCited.length > 0 && (
           <div className={styles.topCited}>
-            <span className={styles.topCitedLabel}>Más citadas</span>
+            <span className={styles.topCitedLabel}>{t('Más citadas', 'Most cited')}</span>
             {stats.topCited.map((m) => (
               <Link
                 key={m.id}
@@ -159,36 +163,44 @@ export function BrainClient({
           className={`${styles.tab} ${activeTab === 'project' ? styles.tabActive : ''}`}
           onClick={() => setTab('project')}
         >
-          § Principal
+          § {t('Principal', 'Main')}
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'local' ? styles.tabActive : ''}`}
           onClick={() => setTab('local')}
         >
-          ※ Mi local
+          ※ {t('Mi local', 'My local')}
         </button>
         {isOwner && (
           <button
             className={`${styles.tab} ${activeTab === 'audit' ? styles.tabActive : ''}`}
             onClick={() => setTab('audit')}
           >
-            ⁂ Auditoría
+            ⁂ {t('Auditoría', 'Audit')}
           </button>
         )}
       </div>
 
       {activeTab === 'audit' && auditByAuthor && auditByAuthor.length > 0 && (
         <section className={styles.auditTable}>
-          <h3>Contribución por miembro</h3>
+          <h3>{t('Contribución por miembro', 'Contribution by member')}</h3>
           <table>
             <thead>
               <tr>
-                <th>Miembro</th>
-                <th>Rol</th>
-                <th title="Memorias en su cerebro local">Local</th>
-                <th title="Memorias publicadas al cerebro del proyecto">Principal</th>
-                <th title="Memorias propias que ya fueron citadas">Citadas</th>
-                <th title="Memorias propias sin citation en 6+ meses">Stale</th>
+                <th>{t('Miembro', 'Member')}</th>
+                <th>{t('Rol', 'Role')}</th>
+                <th title={t('Memorias en su cerebro local', 'Memories in their local brain')}>
+                  {t('Local', 'Local')}
+                </th>
+                <th title={t('Memorias publicadas al cerebro del proyecto', 'Memories published to the project brain')}>
+                  {t('Principal', 'Main')}
+                </th>
+                <th title={t('Memorias propias que ya fueron citadas', 'Own memories that have already been cited')}>
+                  {t('Citadas', 'Cited')}
+                </th>
+                <th title={t('Memorias propias sin cita en 6+ meses', 'Own memories with no citation in 6+ months')}>
+                  {t('Stale', 'Stale')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -217,7 +229,7 @@ export function BrainClient({
       <form onSubmit={submitSearch} className={styles.filters}>
         <input
           type="search"
-          placeholder="Buscar en el cuaderno…"
+          placeholder={t('Buscar en el cuaderno…', 'Search the notebook…')}
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
           className={styles.search}
@@ -227,7 +239,7 @@ export function BrainClient({
           onChange={(e) => setParam('type', e.target.value || null)}
           className={styles.select}
         >
-          <option value="">Todos los tipos</option>
+          <option value="">{t('Todos los tipos', 'All types')}</option>
           {TYPE_OPTIONS.map((t) => (
             <option key={t} value={t}>
               {t}
@@ -237,21 +249,21 @@ export function BrainClient({
         {tagFilter && (
           <span className={styles.tagFilter}>
             <code>#{tagFilter}</code>
-            <button type="button" onClick={() => setParam('tag', null)} aria-label="Quitar filtro">
+            <button type="button" onClick={() => setParam('tag', null)} aria-label={t('Quitar filtro', 'Remove filter')}>
               ×
             </button>
           </span>
         )}
         <button type="submit" disabled={pending} className={styles.searchBtn}>
-          {pending ? '…' : 'Buscar'}
+          {pending ? '…' : t('Buscar', 'Search')}
         </button>
       </form>
 
       <div className={styles.results}>
         {memories.length === 0 ? (
           <p className={styles.empty}>
-            El cuaderno aguarda su primera entrada. Cierra una tarea con curiosidad o pulsa{' '}
-            <em>Nueva entrada</em>.
+            {t('El cuaderno aguarda su primera entrada. Cierra una tarea con curiosidad o pulsa', 'The notebook awaits its first entry. Close a task with curiosity or press')}{' '}
+            <em>{t('Nueva entrada', 'New entry')}</em>.
           </p>
         ) : (
           memories.map((m, i) => (

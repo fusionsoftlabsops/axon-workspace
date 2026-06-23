@@ -4,10 +4,12 @@ import { prisma } from '@/lib/db';
 import { Eyebrow } from '@/components/ui';
 import { NewProjectForm } from './NewProjectForm';
 import styles from './page.module.scss';
+import { getServerT } from '@/lib/i18n/server';
 
 export default async function ProjectsPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
+  const t = await getServerT();
 
   const projects = await prisma.project.findMany({
     where: { members: { some: { userId: session.user.id } } },
@@ -31,13 +33,15 @@ export default async function ProjectsPage() {
           <div>
             <div className={styles.eyebrow}>
               <Eyebrow ornament="reference" tone="muted">
-                Catálogo · Vol. {year}
+                {t('Catálogo · Vol.', 'Catalog · Vol.')} {year}
               </Eyebrow>
             </div>
-            <h1 className={styles.title}>Proyectos</h1>
+            <h1 className={styles.title}>{t('Proyectos', 'Projects')}</h1>
             <p className={styles.deck}>
-              Cada proyecto es una edición con su propio tablero, vault y cerebro. Pasa página
-              entre ellos cuando cambies de cliente o de iniciativa.
+              {t(
+                'Cada proyecto es una edición con su propio tablero, vault y cerebro. Pasa página entre ellos cuando cambies de cliente o de iniciativa.',
+                'Each project is an edition with its own board, vault and brain. Turn the page between them when you switch client or initiative.',
+              )}
             </p>
           </div>
         </div>
@@ -64,11 +68,11 @@ export default async function ProjectsPage() {
             {p.description && <p className={styles.desc}>{p.description}</p>}
             <div className={styles.meta}>
               <span>
-                <span className={styles.metaNum}>{p._count.tasks}</span> tareas
+                <span className={styles.metaNum}>{p._count.tasks}</span> {t('tareas', 'tasks')}
               </span>
               <span>
                 <span className={styles.metaNum}>{p._count.members}</span>{' '}
-                {p._count.members === 1 ? 'miembro' : 'miembros'}
+                {p._count.members === 1 ? t('miembro', 'member') : t('miembros', 'members')}
               </span>
               <code>{p.slug}</code>
             </div>
@@ -76,7 +80,7 @@ export default async function ProjectsPage() {
         ))}
 
         <div className={styles.newCard}>
-          <h3>№ {issueNumber} · Nueva edición</h3>
+          <h3>№ {issueNumber} · {t('Nueva edición', 'New edition')}</h3>
           <NewProjectForm />
         </div>
       </div>

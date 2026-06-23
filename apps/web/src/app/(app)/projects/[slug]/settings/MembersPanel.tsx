@@ -8,6 +8,7 @@ import {
   removeMemberAction,
   updateMemberRoleAction,
 } from '@/lib/actions/projects';
+import { useI18n } from '@/lib/i18n/i18n';
 
 interface MemberView {
   id: string;
@@ -31,6 +32,7 @@ export function MembersPanel({
   ownerId: string;
   members: MemberView[];
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +63,7 @@ export function MembersPanel({
   }
 
   function remove(userId: string, name: string) {
-    if (!confirm(`¿Expulsar a ${name} del proyecto?`)) return;
+    if (!confirm(t(`¿Expulsar a ${name} del proyecto?`, `Remove ${name} from the project?`))) return;
     startTransition(async () => {
       const r = await removeMemberAction(projectSlug, userId);
       if (!r.ok) setError(r.error);
@@ -86,7 +88,7 @@ export function MembersPanel({
       >
         <input
           type="email"
-          placeholder="email@dominio.com"
+          placeholder={t('email@dominio.com', 'email@domain.com')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -128,7 +130,7 @@ export function MembersPanel({
             fontWeight: 600,
           }}
         >
-          Invitar
+          {t('Invitar', 'Invite')}
         </button>
       </form>
 
@@ -148,9 +150,9 @@ export function MembersPanel({
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
-            <th style={{ padding: '0.65rem 0.5rem' }}>Nombre</th>
-            <th style={{ padding: '0.65rem 0.5rem' }}>Email</th>
-            <th style={{ padding: '0.65rem 0.5rem' }}>Rol</th>
+            <th style={{ padding: '0.65rem 0.5rem' }}>{t('Nombre', 'Name')}</th>
+            <th style={{ padding: '0.65rem 0.5rem' }}>{t('Email', 'Email')}</th>
+            <th style={{ padding: '0.65rem 0.5rem' }}>{t('Rol', 'Role')}</th>
             <th style={{ padding: '0.65rem 0.5rem' }}></th>
           </tr>
         </thead>
@@ -211,7 +213,7 @@ export function MembersPanel({
                         color: 'var(--color-danger)',
                       }}
                     >
-                      Expulsar
+                      {t('Expulsar', 'Remove')}
                     </button>
                   )}
                 </td>

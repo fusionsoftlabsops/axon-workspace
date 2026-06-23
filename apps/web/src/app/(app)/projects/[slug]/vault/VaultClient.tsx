@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import { useVaultUnlock } from '@/components/vault/UnlockContext';
 import { UnlockPrompt } from './UnlockPrompt';
 import { CredentialRow } from './CredentialRow';
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function VaultClient({ projectSlug, currentUserId, isAdmin, canCreate, credentials }: Props) {
+  const { t } = useI18n();
   const { vault, lock } = useVaultUnlock();
   const [showNew, setShowNew] = useState(false);
 
@@ -34,22 +36,22 @@ export function VaultClient({ projectSlug, currentUserId, isAdmin, canCreate, cr
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <h2>Vault</h2>
+          <h2>{t('Vault', 'Vault')}</h2>
           <p className={styles.subtitle}>
             {vault
-              ? 'Vault desbloqueado. Tu private key vive solo en memoria.'
-              : 'Vault bloqueado. Ingresa tu passphrase para desencriptar.'}
+              ? t('Vault desbloqueado. Tu private key vive solo en memoria.', 'Vault unlocked. Your private key lives only in memory.')
+              : t('Vault bloqueado. Ingresa tu passphrase para desencriptar.', 'Vault locked. Enter your passphrase to decrypt.')}
           </p>
         </div>
         <div className={styles.headerActions}>
           {vault ? (
             <button className={styles.lockBtn} onClick={lock}>
-              🔒 Bloquear vault
+              {t('🔒 Bloquear vault', '🔒 Lock vault')}
             </button>
           ) : null}
           {canCreate && vault && (
             <button className={styles.newBtn} onClick={() => setShowNew((v) => !v)}>
-              {showNew ? 'Cancelar' : '+ Nueva credencial'}
+              {showNew ? t('Cancelar', 'Cancel') : t('+ Nueva credencial', '+ New credential')}
             </button>
           )}
         </div>
@@ -77,7 +79,7 @@ export function VaultClient({ projectSlug, currentUserId, isAdmin, canCreate, cr
         ))}
         {credentials.length === 0 && (
           <li className={styles.empty}>
-            Aún no tienes credenciales accesibles en este proyecto.
+            {t('Aún no tienes credenciales accesibles en este proyecto.', 'You don’t have any accessible credentials in this project yet.')}
           </li>
         )}
       </ul>

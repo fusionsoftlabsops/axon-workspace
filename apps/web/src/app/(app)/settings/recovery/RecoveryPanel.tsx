@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import { useVaultUnlock } from '@/components/vault/UnlockContext';
 import {
   generateRecoveryCode,
@@ -50,6 +51,7 @@ export function RecoveryPanel({ hasRecovery }: { hasRecovery: boolean }) {
 }
 
 function ResetWithCode() {
+  const { t } = useI18n();
   const { lock } = useVaultUnlock();
   const [code, setCode] = useState('');
   const [pass, setPass] = useState('');
@@ -61,8 +63,8 @@ function ResetWithCode() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (pass.length < 12) return setError('La nueva passphrase debe tener al menos 12 caracteres');
-    if (pass !== confirm) return setError('Las passphrases no coinciden');
+    if (pass.length < 12) return setError(t('La nueva passphrase debe tener al menos 12 caracteres', 'The new passphrase must be at least 12 characters'));
+    if (pass !== confirm) return setError(t('Las passphrases no coinciden', 'The passphrases do not match'));
 
     startTransition(async () => {
       const mat = await getSelfRecoveryMaterial();
@@ -88,7 +90,7 @@ function ResetWithCode() {
         setPass('');
         setConfirm('');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'No se pudo restablecer');
+        setError(err instanceof Error ? err.message : t('No se pudo restablecer', 'Could not reset'));
       } finally {
         if (privateKey) memzero(privateKey);
       }
@@ -98,37 +100,38 @@ function ResetWithCode() {
   if (done) {
     return (
       <div style={box}>
-        <h3>Passphrase restablecida</h3>
-        <p>Tu nueva passphrase ya está activa. Desbloquea el vault con ella la próxima vez.</p>
+        <h3>{t('Passphrase restablecida', 'Passphrase reset')}</h3>
+        <p>{t('Tu nueva passphrase ya está activa. Desbloquea el vault con ella la próxima vez.', 'Your new passphrase is now active. Unlock the vault with it next time.')}</p>
       </div>
     );
   }
 
   return (
     <form style={box} onSubmit={submit}>
-      <h3>Olvidé mi passphrase</h3>
-      <p>Recupera el vault con tu código de recuperación y define una nueva passphrase.</p>
+      <h3>{t('Olvidé mi passphrase', 'I forgot my passphrase')}</h3>
+      <p>{t('Recupera el vault con tu código de recuperación y define una nueva passphrase.', 'Recover the vault with your recovery code and set a new passphrase.')}</p>
       <label>
-        Código de recuperación
+        {t('Código de recuperación', 'Recovery code')}
         <input value={code} onChange={(e) => setCode(e.target.value)} required autoComplete="off" />
       </label>
       <label>
-        Nueva passphrase
+        {t('Nueva passphrase', 'New passphrase')}
         <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} minLength={12} required />
       </label>
       <label>
-        Confirma la passphrase
+        {t('Confirma la passphrase', 'Confirm the passphrase')}
         <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
       </label>
       {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
       <button type="submit" disabled={pending}>
-        {pending ? 'Restableciendo…' : 'Restablecer passphrase'}
+        {pending ? t('Restableciendo…', 'Resetting…') : t('Restablecer passphrase', 'Reset passphrase')}
       </button>
     </form>
   );
 }
 
 function RegenerateCode({ hasRecovery }: { hasRecovery: boolean }) {
+  const { t } = useI18n();
   const { vault, unlock } = useVaultUnlock();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -164,29 +167,29 @@ function RegenerateCode({ hasRecovery }: { hasRecovery: boolean }) {
 
   return (
     <div style={box}>
-      <h3>{hasRecovery ? 'Regenerar código de recuperación' : 'Configurar código de recuperación'}</h3>
+      <h3>{hasRecovery ? t('Regenerar código de recuperación', 'Regenerate recovery code') : t('Configurar código de recuperación', 'Set up recovery code')}</h3>
       <p>
         {hasRecovery
-          ? 'Genera un código nuevo (invalida el anterior). Requiere el vault desbloqueado.'
-          : 'Esta cuenta aún no tiene código. Genera uno (requiere el vault desbloqueado).'}
+          ? t('Genera un código nuevo (invalida el anterior). Requiere el vault desbloqueado.', 'Generate a new code (invalidates the previous one). Requires the vault unlocked.')
+          : t('Esta cuenta aún no tiene código. Genera uno (requiere el vault desbloqueado).', 'This account does not have a code yet. Generate one (requires the vault unlocked).')}
       </p>
 
       {newCode ? (
         <>
-          <p>Guárdalo ahora — no se volverá a mostrar:</p>
+          <p>{t('Guárdalo ahora — no se volverá a mostrar:', 'Save it now — it will not be shown again:')}</p>
           <pre style={codeStyle}>{newCode}</pre>
           <button type="button" onClick={() => navigator.clipboard.writeText(newCode)}>
-            Copiar código
+            {t('Copiar código', 'Copy code')}
           </button>
         </>
       ) : vault ? (
         <button type="button" onClick={regenerate} disabled={pending}>
-          {pending ? 'Generando…' : 'Generar código nuevo'}
+          {pending ? t('Generando…', 'Generating…') : t('Generar código nuevo', 'Generate new code')}
         </button>
       ) : (
         <form onSubmit={doUnlock} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <label>
-            Desbloquea el vault para continuar
+            {t('Desbloquea el vault para continuar', 'Unlock the vault to continue')}
             <input
               type="password"
               value={passphrase}
@@ -195,7 +198,7 @@ function RegenerateCode({ hasRecovery }: { hasRecovery: boolean }) {
             />
           </label>
           <button type="submit" disabled={pending}>
-            {pending ? 'Desbloqueando…' : 'Desbloquear'}
+            {pending ? t('Desbloqueando…', 'Unlocking…') : t('Desbloquear', 'Unlock')}
           </button>
         </form>
       )}

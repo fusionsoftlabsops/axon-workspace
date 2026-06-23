@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { fromBase64, memzero, unlockPrivateKey } from '@/lib/crypto';
 import { getSelfKeyMaterial } from '@/lib/actions/me';
+import { useI18n } from '@/lib/i18n/i18n';
 
 interface UnlockedVault {
   publicKey: Uint8Array;
@@ -26,6 +27,7 @@ interface UnlockContextValue {
 const Ctx = createContext<UnlockContextValue | null>(null);
 
 export function VaultUnlockProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [vault, setVault] = useState<UnlockedVault | null>(null);
   // Hold a ref so we can wipe the bytes on lock without depending on stale closures.
   const ref = useRef<UnlockedVault | null>(null);
@@ -45,9 +47,9 @@ export function VaultUnlockProvider({ children }: { children: ReactNode }) {
       setVault(v);
       return { ok: true as const };
     } catch (e) {
-      return { ok: false as const, error: e instanceof Error ? e.message : 'No se pudo desbloquear' };
+      return { ok: false as const, error: e instanceof Error ? e.message : t('No se pudo desbloquear', 'Could not unlock') };
     }
-  }, []);
+  }, [t]);
 
   const lock = useCallback(() => {
     if (ref.current) memzero(ref.current.privateKey);

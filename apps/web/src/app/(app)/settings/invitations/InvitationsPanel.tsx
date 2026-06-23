@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import {
   createInvitationAction,
   revokeInvitationAction,
@@ -28,6 +29,7 @@ const linkBox: React.CSSProperties = {
 };
 
 export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
   }
 
   function revoke(id: string) {
-    if (!confirm('Revocar esta invitación pendiente?')) return;
+    if (!confirm(t('Revocar esta invitación pendiente?', 'Revoke this pending invitation?'))) return;
     startTransition(async () => {
       const r = await revokeInvitationAction(id);
       if (!r.ok) setError(r.error);
@@ -61,17 +63,17 @@ export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
   }
 
   function statusOf(i: InvitationView): string {
-    if (i.acceptedAt) return 'Aceptada';
-    if (i.expired) return 'Expirada';
-    return 'Pendiente';
+    if (i.acceptedAt) return t('Aceptada', 'Accepted');
+    if (i.expired) return t('Expirada', 'Expired');
+    return t('Pendiente', 'Pending');
   }
 
   return (
     <>
       <form style={box} onSubmit={invite}>
-        <h3>Invitar a alguien</h3>
+        <h3>{t('Invitar a alguien', 'Invite someone')}</h3>
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          Email
+          {t('Email', 'Email')}
           <input
             type="email"
             required
@@ -82,30 +84,30 @@ export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
         </label>
         {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
         <button type="submit" disabled={pending}>
-          {pending ? 'Generando…' : 'Generar invitación'}
+          {pending ? t('Generando…', 'Generating…') : t('Generar invitación', 'Generate invitation')}
         </button>
 
         {link && (
           <div style={{ marginTop: '0.5rem' }}>
             <p>
               {link.emailSent ? (
-                <>✓ Invitación enviada por email a <strong>{link.email}</strong>. </>
+                <>{t('✓ Invitación enviada por email a ', '✓ Invitation sent by email to ')}<strong>{link.email}</strong>. </>
               ) : (
-                <>No se pudo enviar el email (SMTP no configurado o falló). </>
+                <>{t('No se pudo enviar el email (SMTP no configurado o falló). ', 'Could not send the email (SMTP not configured or failed). ')}</>
               )}
-              Enlace para <strong>{link.email}</strong> (se muestra una sola vez):
+              {t('Enlace para ', 'Link for ')}<strong>{link.email}</strong>{t(' (se muestra una sola vez):', ' (shown only once):')}
             </p>
             <div style={linkBox}>{link.url}</div>
             <button type="button" onClick={() => navigator.clipboard.writeText(link.url)}>
-              Copiar enlace
+              {t('Copiar enlace', 'Copy link')}
             </button>
           </div>
         )}
       </form>
 
       <div style={box}>
-        <h3>Invitaciones</h3>
-        {initial.length === 0 && <p>Aún no generaste invitaciones.</p>}
+        <h3>{t('Invitaciones', 'Invitations')}</h3>
+        {initial.length === 0 && <p>{t('Aún no generaste invitaciones.', 'You have not generated any invitations yet.')}</p>}
         {initial.length > 0 && (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {initial.map((i) => (
@@ -118,7 +120,7 @@ export function InvitationsPanel({ initial }: { initial: InvitationView[] }) {
                 </span>
                 {!i.acceptedAt && (
                   <button type="button" onClick={() => revoke(i.id)} disabled={pending}>
-                    Revocar
+                    {t('Revocar', 'Revoke')}
                   </button>
                 )}
               </li>

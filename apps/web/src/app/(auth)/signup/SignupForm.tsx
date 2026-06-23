@@ -6,6 +6,7 @@ import { signupAction } from '@/lib/actions/auth';
 import { generateProtectedKeypairWithRecovery, toBase64 } from '@/lib/crypto';
 import { PasswordInput } from './PasswordInput';
 import styles from './SignupForm.module.scss';
+import { useI18n } from '@/lib/i18n/i18n';
 
 interface FormState {
   email: string;
@@ -17,6 +18,7 @@ interface FormState {
 
 export function SignupForm({ token, invitedEmail }: { token: string; invitedEmail: string }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
@@ -39,31 +41,31 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
     setError(null);
 
     if (form.passphrase.length < 12) {
-      setError('La passphrase debe tener al menos 12 caracteres');
+      setError(t('La passphrase debe tener al menos 12 caracteres', 'The passphrase must be at least 12 characters long'));
       return;
     }
     if (form.passphrase !== form.passphraseConfirm) {
-      setError('Las passphrases no coinciden');
+      setError(t('Las passphrases no coinciden', 'The passphrases do not match'));
       return;
     }
     if (form.password.length < 12) {
-      setError('La contraseña de login debe tener al menos 12 caracteres');
+      setError(t('La contraseña de login debe tener al menos 12 caracteres', 'The login password must be at least 12 characters long'));
       return;
     }
     if (form.password === form.passphrase) {
-      setError('La contraseña de login y la passphrase del vault deben ser diferentes');
+      setError(t('La contraseña de login y la passphrase del vault deben ser diferentes', 'The login password and the vault passphrase must be different'));
       return;
     }
 
     startTransition(async () => {
       try {
-        setProgress('Generando claves criptográficas (~3-5s)…');
+        setProgress(t('Generando claves criptográficas (~3-5s)…', 'Generating cryptographic keys (~3-5s)…'));
         // Yield to the browser so the progress message renders before we
         // start the CPU-heavy argon2id derivation.
         await new Promise((r) => setTimeout(r, 50));
         const protected_ = generateProtectedKeypairWithRecovery(form.passphrase);
 
-        setProgress('Registrando cuenta…');
+        setProgress(t('Registrando cuenta…', 'Registering account…'));
         const result = await signupAction({
           token,
           email: form.email,
@@ -89,7 +91,7 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
         setProgress(null);
         setRecoveryCode(protected_.recoveryCode);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error inesperado');
+        setError(err instanceof Error ? err.message : t('Error inesperado', 'Unexpected error'));
         setProgress(null);
       }
     });
@@ -98,11 +100,13 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
   if (recoveryCode) {
     return (
       <div className={styles.form}>
-        <h3>Guarda tu código de recuperación</h3>
+        <h3>{t('Guarda tu código de recuperación', 'Save your recovery code')}</h3>
         <p>
-          Es la <strong>única</strong> forma de recuperar tu vault si olvidas la passphrase.
-          Guárdalo en un lugar seguro (gestor de contraseñas). No se volverá a mostrar y el
-          servidor no lo conoce.
+          {t('Es la', 'It is the')} <strong>{t('única', 'only')}</strong>{' '}
+          {t(
+            'forma de recuperar tu vault si olvidas la passphrase. Guárdalo en un lugar seguro (gestor de contraseñas). No se volverá a mostrar y el servidor no lo conoce.',
+            'way to recover your vault if you forget the passphrase. Store it somewhere safe (a password manager). It will not be shown again and the server does not know it.',
+          )}
         </p>
         <pre className={styles.recoveryCode}>{recoveryCode}</pre>
         <button
@@ -110,14 +114,14 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
           className={styles.submit}
           onClick={() => navigator.clipboard.writeText(recoveryCode)}
         >
-          Copiar código
+          {t('Copiar código', 'Copy code')}
         </button>
         <button
           type="button"
           className={styles.submit}
           onClick={() => router.push('/login?signed_up=1')}
         >
-          Ya lo guardé — continuar al login
+          {t('Ya lo guardé — continuar al login', 'I saved it — continue to login')}
         </button>
       </div>
     );
@@ -126,17 +130,17 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       <label>
-        <span>Email (de la invitación)</span>
+        <span>{t('Email (de la invitación)', 'Email (from the invitation)')}</span>
         <input type="email" value={form.email} readOnly disabled autoComplete="email" />
       </label>
 
       <label>
-        <span>Nombre</span>
+        <span>{t('Nombre', 'Name')}</span>
         <input type="text" required value={form.name} onChange={update('name')} />
       </label>
 
       <label>
-        <span>Contraseña de login</span>
+        <span>{t('Contraseña de login', 'Login password')}</span>
         <PasswordInput
           required
           autoComplete="new-password"
@@ -144,11 +148,11 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
           value={form.password}
           onChange={update('password')}
         />
-        <small>Mínimo 12 caracteres. Se usa para autenticarte con el servidor.</small>
+        <small>{t('Mínimo 12 caracteres. Se usa para autenticarte con el servidor.', 'At least 12 characters. Used to authenticate you with the server.')}</small>
       </label>
 
       <label>
-        <span>Passphrase del vault</span>
+        <span>{t('Passphrase del vault', 'Vault passphrase')}</span>
         <PasswordInput
           required
           autoComplete="new-password"
@@ -157,13 +161,13 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
           onChange={update('passphrase')}
         />
         <small>
-          Mínimo 12 caracteres. Encripta tus credenciales E2E.{' '}
-          <strong>Si la pierdes, pierdes el vault.</strong>
+          {t('Mínimo 12 caracteres. Encripta tus credenciales E2E.', 'At least 12 characters. Encrypts your credentials end-to-end.')}{' '}
+          <strong>{t('Si la pierdes, pierdes el vault.', 'If you lose it, you lose the vault.')}</strong>
         </small>
       </label>
 
       <label>
-        <span>Confirma la passphrase</span>
+        <span>{t('Confirma la passphrase', 'Confirm the passphrase')}</span>
         <PasswordInput
           required
           autoComplete="new-password"
@@ -176,7 +180,7 @@ export function SignupForm({ token, invitedEmail }: { token: string; invitedEmai
       {progress && !error && <p className={styles.progress}>{progress}</p>}
 
       <button type="submit" disabled={pending} className={styles.submit}>
-        {pending ? 'Procesando…' : 'Crear cuenta'}
+        {pending ? t('Procesando…', 'Processing…') : t('Crear cuenta', 'Create account')}
       </button>
     </form>
   );

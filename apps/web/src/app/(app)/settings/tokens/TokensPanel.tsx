@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import { createApiTokenAction, revokeApiTokenAction } from '@/lib/actions/api-tokens';
 import type { ApiScope } from '@admin/shared/types';
 
@@ -36,6 +37,7 @@ export function TokensPanel({
   tokens: TokenRow[];
   availableProjects: Array<{ slug: string; name: string }>;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -68,7 +70,7 @@ export function TokensPanel({
   }
 
   function revoke(id: string) {
-    if (!confirm('Revocar este token? Cualquier cliente que lo use dejará de funcionar.')) return;
+    if (!confirm(t('Revocar este token? Cualquier cliente que lo use dejará de funcionar.', 'Revoke this token? Any client using it will stop working.'))) return;
     startTransition(async () => {
       const r = await revokeApiTokenAction(id);
       if (!r.ok) setError(r.error);
@@ -92,11 +94,11 @@ export function TokensPanel({
         }}
       >
         <label style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontWeight: 500 }}>Nombre</span>
+          <span style={{ fontWeight: 500 }}>{t('Nombre', 'Name')}</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="ej. MCP server - laptop trabajo"
+            placeholder={t('ej. MCP server - laptop trabajo', 'e.g. MCP server - work laptop')}
             required
             style={{
               padding: '0.5rem',
@@ -109,7 +111,7 @@ export function TokensPanel({
         </label>
 
         <div>
-          <strong style={{ fontSize: '0.85rem' }}>Scopes</strong>
+          <strong style={{ fontSize: '0.85rem' }}>{t('Scopes', 'Scopes')}</strong>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
             {SCOPES.map((s) => (
               <label
@@ -142,7 +144,7 @@ export function TokensPanel({
         </div>
 
         <div>
-          <strong style={{ fontSize: '0.85rem' }}>Proyectos (vacío = todos los tuyos)</strong>
+          <strong style={{ fontSize: '0.85rem' }}>{t('Proyectos (vacío = todos los tuyos)', 'Projects (empty = all of yours)')}</strong>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
             {availableProjects.map((p) => (
               <label
@@ -188,7 +190,7 @@ export function TokensPanel({
             alignSelf: 'flex-start',
           }}
         >
-          {pending ? 'Generando…' : 'Crear token'}
+          {pending ? t('Generando…', 'Generating…') : t('Crear token', 'Create token')}
         </button>
       </form>
 
@@ -203,7 +205,7 @@ export function TokensPanel({
           }}
         >
           <p style={{ margin: '0 0 0.5rem', fontWeight: 600 }}>
-            ✓ Token creado · cópialo ahora, no se mostrará otra vez
+            {t('✓ Token creado · cópialo ahora, no se mostrará otra vez', '✓ Token created · copy it now, it will not be shown again')}
           </p>
           <code
             style={{
@@ -223,47 +225,47 @@ export function TokensPanel({
             onClick={() => navigator.clipboard.writeText(created.plain)}
             style={{ marginTop: '0.5rem', padding: '0.4rem 0.75rem' }}
           >
-            Copiar
+            {t('Copiar', 'Copy')}
           </button>
         </div>
       )}
 
-      <h2 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Tokens activos</h2>
+      <h2 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>{t('Tokens activos', 'Active tokens')}</h2>
       {tokens.length === 0 ? (
-        <p style={{ color: 'var(--color-fg-muted)' }}>Aún no has creado tokens.</p>
+        <p style={{ color: 'var(--color-fg-muted)' }}>{t('Aún no has creado tokens.', 'You have not created any tokens yet.')}</p>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
-              <th style={{ padding: '0.5rem' }}>Nombre</th>
-              <th style={{ padding: '0.5rem' }}>Prefijo</th>
-              <th style={{ padding: '0.5rem' }}>Scopes</th>
-              <th style={{ padding: '0.5rem' }}>Proyectos</th>
-              <th style={{ padding: '0.5rem' }}>Último uso</th>
+              <th style={{ padding: '0.5rem' }}>{t('Nombre', 'Name')}</th>
+              <th style={{ padding: '0.5rem' }}>{t('Prefijo', 'Prefix')}</th>
+              <th style={{ padding: '0.5rem' }}>{t('Scopes', 'Scopes')}</th>
+              <th style={{ padding: '0.5rem' }}>{t('Proyectos', 'Projects')}</th>
+              <th style={{ padding: '0.5rem' }}>{t('Último uso', 'Last used')}</th>
               <th style={{ padding: '0.5rem' }}></th>
             </tr>
           </thead>
           <tbody>
-            {tokens.map((t) => (
-              <tr key={t.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <td style={{ padding: '0.5rem' }}>{t.name}</td>
-                <td style={{ padding: '0.5rem', fontFamily: 'var(--font-mono)' }}>{t.prefix}…</td>
+            {tokens.map((tok) => (
+              <tr key={tok.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <td style={{ padding: '0.5rem' }}>{tok.name}</td>
+                <td style={{ padding: '0.5rem', fontFamily: 'var(--font-mono)' }}>{tok.prefix}…</td>
                 <td style={{ padding: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-                  {t.scopes.join(', ')}
+                  {tok.scopes.join(', ')}
                 </td>
                 <td style={{ padding: '0.5rem' }}>
-                  {t.projectSlugs.length === 0 ? (
-                    <span style={{ color: 'var(--color-fg-muted)' }}>todos</span>
+                  {tok.projectSlugs.length === 0 ? (
+                    <span style={{ color: 'var(--color-fg-muted)' }}>{t('todos', 'all')}</span>
                   ) : (
-                    t.projectSlugs.join(', ')
+                    tok.projectSlugs.join(', ')
                   )}
                 </td>
                 <td style={{ padding: '0.5rem', color: 'var(--color-fg-muted)' }}>
-                  {t.lastUsedAt ? new Date(t.lastUsedAt).toLocaleString() : 'nunca'}
+                  {tok.lastUsedAt ? new Date(tok.lastUsedAt).toLocaleString() : t('nunca', 'never')}
                 </td>
                 <td style={{ padding: '0.5rem', textAlign: 'right' }}>
                   <button
-                    onClick={() => revoke(t.id)}
+                    onClick={() => revoke(tok.id)}
                     disabled={pending}
                     style={{
                       padding: '0.3rem 0.75rem',
@@ -273,7 +275,7 @@ export function TokensPanel({
                       color: 'var(--color-danger)',
                     }}
                   >
-                    Revocar
+                    {t('Revocar', 'Revoke')}
                   </button>
                 </td>
               </tr>

@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setProjectRepoConfigAction } from '@/lib/actions/repo-config';
+import { useI18n } from '@/lib/i18n/i18n';
 
 export function RepoSettingsPanel({
   projectSlug,
@@ -11,6 +12,7 @@ export function RepoSettingsPanel({
   projectSlug: string;
   initial: { repoPath: string | null; repoUrl: string | null; repoDefaultBranch: string | null };
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +33,10 @@ export function RepoSettingsPanel({
         repoDefaultBranch: branch.trim() || 'main',
       });
       if (!res.ok) {
-        setError(res.error ?? 'no se pudo guardar');
+        setError(res.error ?? t('no se pudo guardar', 'could not save'));
         return;
       }
-      setSuccess('Configuración guardada');
+      setSuccess(t('Configuración guardada', 'Settings saved'));
       router.refresh();
     });
   };
@@ -61,7 +63,7 @@ export function RepoSettingsPanel({
           textTransform: 'uppercase',
           color: 'var(--color-fg-muted)',
         }}>
-          Ruta absoluta del repo (server-side)
+          {t('Ruta absoluta del repo (server-side)', 'Absolute repo path (server-side)')}
         </span>
         <input
           type="text"
@@ -79,7 +81,7 @@ export function RepoSettingsPanel({
           }}
         />
         <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)', fontStyle: 'italic' }}>
-          Debe existir en el filesystem del server. Solo lectura.
+          {t('Debe existir en el filesystem del server. Solo lectura.', 'Must exist on the server filesystem. Read-only.')}
         </span>
       </label>
 
@@ -91,13 +93,13 @@ export function RepoSettingsPanel({
           textTransform: 'uppercase',
           color: 'var(--color-fg-muted)',
         }}>
-          URL del repo <span style={{ textTransform: 'none', letterSpacing: 0, fontStyle: 'italic' }}>(opcional, para mostrar links)</span>
+          {t('URL del repo', 'Repo URL')} <span style={{ textTransform: 'none', letterSpacing: 0, fontStyle: 'italic' }}>{t('(opcional, para mostrar links)', '(optional, to show links)')}</span>
         </span>
         <input
           type="url"
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
-          placeholder="https://github.com/usuario/repo"
+          placeholder={t('https://github.com/usuario/repo', 'https://github.com/user/repo')}
           style={{
             fontFamily: 'var(--font-ui)',
             fontSize: '0.9rem',
@@ -118,7 +120,7 @@ export function RepoSettingsPanel({
           textTransform: 'uppercase',
           color: 'var(--color-fg-muted)',
         }}>
-          Branch por defecto
+          {t('Branch por defecto', 'Default branch')}
         </span>
         <input
           type="text"
@@ -157,7 +159,7 @@ export function RepoSettingsPanel({
           alignSelf: 'flex-start',
         }}
       >
-        {pending ? 'Guardando…' : 'Guardar'}
+        {pending ? t('Guardando…', 'Saving…') : t('Guardar', 'Save')}
       </button>
     </form>
   );

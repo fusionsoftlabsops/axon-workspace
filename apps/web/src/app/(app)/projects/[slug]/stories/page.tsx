@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { Masthead, Eyebrow, Tag, Stat } from '@/components/ui';
+import { getServerT, getServerLang } from '@/lib/i18n/server';
 import styles from './stories.module.scss';
 
 export default async function StoriesIndex({
@@ -11,6 +12,8 @@ export default async function StoriesIndex({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getServerT();
+  const lang = await getServerLang();
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
@@ -58,34 +61,34 @@ export default async function StoriesIndex({
   return (
     <main className={styles.page}>
       <Masthead
-        eyebrow={<Eyebrow ornament="reference">Historias de usuario · borradores</Eyebrow>}
-        deck="Parte del código y del cerebro del proyecto. Genera, refina, publica."
+        eyebrow={<Eyebrow ornament="reference">{t('Historias de usuario · borradores', 'User stories · drafts')}</Eyebrow>}
+        deck={t('Parte del código y del cerebro del proyecto. Genera, refina, publica.', 'Part of the project’s code and brain. Generate, refine, publish.')}
         size="lg"
       >
-        El editor de HUs
+        {t('El editor de HUs', 'The user story editor')}
       </Masthead>
 
       <div className={styles.statsStrip}>
-        <Stat label="Borradores" value={totalDrafts} />
-        <Stat label="Publicados" value={totalPublished} />
-        <Stat label="Credenciales LLM" value={credCount} />
-        <Stat label="Repo" value={project.repoPath ? '✓' : '—'} />
+        <Stat label={t('Borradores', 'Drafts')} value={totalDrafts} />
+        <Stat label={t('Publicados', 'Published')} value={totalPublished} />
+        <Stat label={t('Credenciales LLM', 'LLM credentials')} value={credCount} />
+        <Stat label={t('Repo', 'Repo')} value={project.repoPath ? '✓' : '—'} />
       </div>
 
       {(noCredentials || noRepo) && (
         <aside className={styles.setup}>
-          <Eyebrow tone="accent">Setup pendiente</Eyebrow>
+          <Eyebrow tone="accent">{t('Setup pendiente', 'Setup pending')}</Eyebrow>
           <ul>
             {noCredentials && (
               <li>
-                Configura al menos una credencial de LLM en{' '}
+                {t('Configura al menos una credencial de LLM en', 'Configure at least one LLM credential at')}{' '}
                 <Link href="/settings/llm-credentials">/settings/llm-credentials</Link>.
               </li>
             )}
             {noRepo && (
               <li>
-                Configura la ruta del repositorio en{' '}
-                <Link href={`/projects/${slug}/settings`}>los ajustes del proyecto</Link>.
+                {t('Configura la ruta del repositorio en', 'Configure the repository path in')}{' '}
+                <Link href={`/projects/${slug}/settings`}>{t('los ajustes del proyecto', 'the project settings')}</Link>.
               </li>
             )}
           </ul>
@@ -98,13 +101,13 @@ export default async function StoriesIndex({
           className={`${styles.newBtn} ${noCredentials ? styles.disabled : ''}`}
           aria-disabled={noCredentials}
         >
-          + Nueva HU
+          {t('+ Nueva HU', '+ New story')}
         </Link>
       </div>
 
       {drafts.length === 0 ? (
         <p className={styles.empty}>
-          Aún no hay borradores. Empieza describiendo una necesidad concreta.
+          {t('Aún no hay borradores. Empieza describiendo una necesidad concreta.', 'No drafts yet. Start by describing a concrete need.')}
         </p>
       ) : (
         <ul className={styles.draftList}>
@@ -113,7 +116,7 @@ export default async function StoriesIndex({
               <Link href={`/projects/${slug}/stories/drafts/${d.id}`}>
                 <div className={styles.draftHead}>
                   <Eyebrow tone="muted">
-                    {d.provider} · {d.model} · {formatDate(d.createdAt)}
+                    {d.provider} · {d.model} · {formatDate(d.createdAt, lang)}
                   </Eyebrow>
                   <Tag tone={statusTone(d.status)}>{d.status}</Tag>
                 </div>
@@ -122,7 +125,7 @@ export default async function StoriesIndex({
                 </p>
                 <div className={styles.draftMeta}>
                   <span>${d.estimatedCostUsd.toString()}</span>
-                  {d.taskId && <span className={styles.published}>→ Publicado como tarea</span>}
+                  {d.taskId && <span className={styles.published}>{t('→ Publicado como tarea', '→ Published as task')}</span>}
                 </div>
               </Link>
             </li>
@@ -148,6 +151,10 @@ function statusTone(status: string): 'subtle' | 'accent' | 'ink' {
   }
 }
 
-function formatDate(d: Date): string {
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' });
+function formatDate(d: Date, lang: 'es' | 'en'): string {
+  return d.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+  });
 }

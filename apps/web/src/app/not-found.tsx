@@ -1,19 +1,22 @@
 import Link from 'next/link';
 import { Eyebrow, RuleDivider } from '@/components/ui';
+import { getServerT } from '@/lib/i18n/server';
 import styles from './not-found.module.scss';
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getServerT();
   return (
     <main className={styles.shell}>
       <article className={styles.composition}>
         <aside className={styles.aside}>
           <Eyebrow ornament="reference" tone="muted" as="div">
-            Erratum · página inexistente
+            {t('Erratum · página inexistente', 'Erratum · page not found')}
           </Eyebrow>
           <p className={styles.kicker}>
-            La signatura solicitada no figura en el catálogo. Es posible que la edición se haya
-            descontinuado, que el enlace contenga una errata, o que esta página jamás haya sido
-            impresa.
+            {t(
+              'La signatura solicitada no figura en el catálogo. Es posible que la edición se haya descontinuado, que el enlace contenga una errata, o que esta página jamás haya sido impresa.',
+              'The requested shelfmark does not appear in the catalog. The edition may have been discontinued, the link may contain a typo, or this page may never have been printed.',
+            )}
           </p>
         </aside>
 
@@ -25,12 +28,15 @@ export default function NotFound() {
 
         <section className={styles.body}>
           <h1 className={styles.title}>
-            Folio <em>inexistente.</em>
+            {t('Folio ', 'Folio ')}
+            <em>{t('inexistente.', 'not found.')}</em>
           </h1>
 
           <p className={styles.lead}>
-            Has llegado a una entrada que el cuaderno no registra. Tres opciones para continuar
-            sin perder el hilo:
+            {t(
+              'Has llegado a una entrada que el cuaderno no registra. Tres opciones para continuar sin perder el hilo:',
+              'You have reached an entry the notebook does not record. Three options to carry on without losing the thread:',
+            )}
           </p>
 
           <RuleDivider variant="double" spacing="md" />
@@ -39,21 +45,21 @@ export default function NotFound() {
             <li>
               <span className={styles.num}>I.</span>
               <div>
-                <strong>Volver al catálogo principal.</strong>{' '}
-                <Link href="/projects">→ ir a proyectos</Link>
+                <strong>{t('Volver al catálogo principal.', 'Return to the main catalog.')}</strong>{' '}
+                <Link href="/projects">{t('→ ir a proyectos', '→ go to projects')}</Link>
               </div>
             </li>
             <li>
               <span className={styles.num}>II.</span>
               <div>
-                <strong>Iniciar sesión otra vez.</strong>{' '}
+                <strong>{t('Iniciar sesión otra vez.', 'Sign in again.')}</strong>{' '}
                 <Link href="/login">→ /login</Link>
               </div>
             </li>
             <li>
               <span className={styles.num}>III.</span>
               <div>
-                <strong>Empezar desde la portada.</strong>{' '}
+                <strong>{t('Empezar desde la portada.', 'Start from the home page.')}</strong>{' '}
                 <Link href="/">→ home</Link>
               </div>
             </li>
@@ -62,8 +68,10 @@ export default function NotFound() {
           <RuleDivider variant="ornament" spacing="lg" />
 
           <p className={styles.footnote}>
-            ※ Si crees que esto es un error de imprenta, revisa la URL o repórtalo como bug desde
-            cualquier tablero activo.
+            {t(
+              '※ Si crees que esto es un error de imprenta, revisa la URL o repórtalo como bug desde cualquier tablero activo.',
+              '※ If you think this is a printing error, check the URL or report it as a bug from any active board.',
+            )}
           </p>
         </section>
       </article>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import { Eyebrow, Tag } from '@/components/ui';
 import {
   deprecateMemoryAction,
@@ -33,15 +34,17 @@ export interface MemoryView {
   updatedAt: string;
 }
 
-const TYPE_LABEL: Record<MemoryView['type'], string> = {
-  DECISION: 'Decisión',
-  GOTCHA: 'Trampa',
-  PATTERN: 'Patrón',
-  ANTIPATTERN: 'Anti-patrón',
-  RUNBOOK: 'Runbook',
-  GLOSSARY: 'Glosario',
-  NOTE: 'Nota',
-};
+function typeLabel(t: <T>(es: T, en: T) => T): Record<MemoryView['type'], string> {
+  return {
+    DECISION: t('Decisión', 'Decision'),
+    GOTCHA: t('Trampa', 'Gotcha'),
+    PATTERN: t('Patrón', 'Pattern'),
+    ANTIPATTERN: t('Anti-patrón', 'Anti-pattern'),
+    RUNBOOK: t('Runbook', 'Runbook'),
+    GLOSSARY: t('Glosario', 'Glossary'),
+    NOTE: t('Nota', 'Note'),
+  };
+}
 
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 30 * 6;
 
@@ -60,8 +63,10 @@ export function MemoryCard({
   onTagClick: (tag: string) => void;
   index?: number;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const TYPE_LABEL = typeLabel(t);
 
   const canPublish =
     memory.scope === 'LOCAL' &&
@@ -83,7 +88,15 @@ export function MemoryCard({
   }
 
   function deprecate() {
-    if (!confirm(`¿Deprecar la memoria "${memory.title}"? Queda visible pero marcada.`)) return;
+    if (
+      !confirm(
+        t(
+          `¿Deprecar la memoria "${memory.title}"? Queda visible pero marcada.`,
+          `Deprecate the memory "${memory.title}"? It stays visible but flagged.`,
+        ),
+      )
+    )
+      return;
     startTransition(async () => {
       const r = await deprecateMemoryAction(memory.id);
       if (!r.ok) alert(r.error);
@@ -107,7 +120,7 @@ export function MemoryCard({
             memory.scope === 'PROJECT' ? styles.scopeStampProject : styles.scopeStampLocal
           }
         >
-          {memory.scope === 'PROJECT' ? 'Principal' : 'Local'}
+          {memory.scope === 'PROJECT' ? t('Principal', 'Main') : t('Local', 'Local')}
         </span>
         {memory.status === 'DEPRECATED' && (
           <span className={styles.statusStamp}>Deprecated</span>
@@ -130,7 +143,7 @@ export function MemoryCard({
             <span>
               {' · '}
               {memory.citationCount}{' '}
-              {memory.citationCount === 1 ? 'cita' : 'citas'}
+              {memory.citationCount === 1 ? t('cita', 'citation') : t('citas', 'citations')}
             </span>
           )}
         </div>
@@ -156,16 +169,16 @@ export function MemoryCard({
 
       <div className={styles.cardActions}>
         <Link href={`/projects/${projectSlug}/brain/${memory.id}`} className={styles.detailLink}>
-          Leer ↗
+          {t('Leer', 'Read')} ↗
         </Link>
         {canPublish && (
           <button onClick={publish} disabled={pending} className={styles.publishBtn}>
-            ↑ Publicar
+            ↑ {t('Publicar', 'Publish')}
           </button>
         )}
         {canDeprecate && (
           <button onClick={deprecate} disabled={pending} className={styles.deprecateBtn}>
-            Deprecar
+            {t('Deprecar', 'Deprecate')}
           </button>
         )}
       </div>

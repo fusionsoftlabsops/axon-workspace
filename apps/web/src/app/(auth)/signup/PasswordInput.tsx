@@ -2,10 +2,12 @@
 
 import { useState, type InputHTMLAttributes } from 'react';
 import styles from './SignupForm.module.scss';
+import { useI18n } from '@/lib/i18n/i18n';
 
 /** Text/password input with a show/hide eye toggle. */
 export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
   const [show, setShow] = useState(false);
+  const { t } = useI18n();
   return (
     <span className={styles.pwWrap}>
       <input {...props} type={show ? 'text' : 'password'} />
@@ -13,8 +15,8 @@ export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
         type="button"
         className={styles.pwToggle}
         onClick={() => setShow((s) => !s)}
-        aria-label={show ? 'Ocultar' : 'Mostrar'}
-        title={show ? 'Ocultar' : 'Mostrar'}
+        aria-label={show ? t('Ocultar', 'Hide') : t('Mostrar', 'Show')}
+        title={show ? t('Ocultar', 'Hide') : t('Mostrar', 'Show')}
         tabIndex={-1}
       >
         {show ? <EyeOffIcon /> : <EyeIcon />}

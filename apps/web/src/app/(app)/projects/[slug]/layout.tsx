@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import styles from './layout.module.scss';
+import { getServerT } from '@/lib/i18n/server';
 
 export default async function ProjectLayout({
   children,
@@ -15,6 +16,7 @@ export default async function ProjectLayout({
   const { slug } = await params;
   const session = await auth();
   if (!session?.user?.id) return null;
+  const t = await getServerT();
 
   const project = await prisma.project.findUnique({
     where: { slug },
@@ -34,17 +36,17 @@ export default async function ProjectLayout({
     <div className={styles.project}>
       <div className={styles.subnav}>
         <div className={styles.title}>
-          <Link href="/projects" className={styles.back}>← Catálogo</Link>
+          <Link href="/projects" className={styles.back}>← {t('Catálogo', 'Catalog')}</Link>
           <h1 className={styles.heading}>{project.name}</h1>
           <code className={styles.slug}>{project.slug}</code>
         </div>
         <nav className={styles.tabs}>
-          <Link href={`/projects/${slug}/board`}>§ Tablero</Link>
+          <Link href={`/projects/${slug}/board`}>§ {t('Tablero', 'Board')}</Link>
           <Link href={`/projects/${slug}/vault`}>※ Vault</Link>
-          <Link href={`/projects/${slug}/brain`}>⁂ Cerebro</Link>
-          <Link href={`/projects/${slug}/stories`}>✎ HUs</Link>
-          {canManage && <Link href={`/projects/${slug}/settings`}>¶ Ajustes</Link>}
-          {canManage && <Link href={`/projects/${slug}/settings/audit`}>☞ Auditoría</Link>}
+          <Link href={`/projects/${slug}/brain`}>⁂ {t('Cerebro', 'Brain')}</Link>
+          <Link href={`/projects/${slug}/stories`}>✎ {t('HUs', 'Stories')}</Link>
+          {canManage && <Link href={`/projects/${slug}/settings`}>¶ {t('Ajustes', 'Settings')}</Link>}
+          {canManage && <Link href={`/projects/${slug}/settings/audit`}>☞ {t('Auditoría', 'Audit')}</Link>}
         </nav>
       </div>
       {children}

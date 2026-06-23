@@ -1,25 +1,30 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
+import { getServerT } from '@/lib/i18n/server';
 
-const ACTION_LABEL: Record<string, string> = {
-  'project.create': 'Proyecto creado',
-  'member.invite': 'Miembro invitado',
-  'member.role_change': 'Rol cambiado',
-  'member.remove': 'Miembro expulsado',
-  'credential.create': 'Credencial creada',
-  'credential.read': 'Credencial leída',
-  'credential.share': 'Acceso compartido',
-  'credential.revoke': 'Acceso revocado',
-  'credential.delete': 'Credencial eliminada',
-  'credential.rotate': 'Credencial rotada',
-  'task.create': 'Tarea creada',
-  'task.update': 'Tarea actualizada',
-  'task.move': 'Tarea movida',
-  'api_token.create': 'API token creado',
-  'api_token.revoke': 'API token revocado',
-  'ai.invoke': 'Llamada de IA',
-};
+type T = (es: string, en: string) => string;
+
+function buildActionLabels(t: T): Record<string, string> {
+  return {
+    'project.create': t('Proyecto creado', 'Project created'),
+    'member.invite': t('Miembro invitado', 'Member invited'),
+    'member.role_change': t('Rol cambiado', 'Role changed'),
+    'member.remove': t('Miembro expulsado', 'Member removed'),
+    'credential.create': t('Credencial creada', 'Credential created'),
+    'credential.read': t('Credencial leída', 'Credential read'),
+    'credential.share': t('Acceso compartido', 'Access shared'),
+    'credential.revoke': t('Acceso revocado', 'Access revoked'),
+    'credential.delete': t('Credencial eliminada', 'Credential deleted'),
+    'credential.rotate': t('Credencial rotada', 'Credential rotated'),
+    'task.create': t('Tarea creada', 'Task created'),
+    'task.update': t('Tarea actualizada', 'Task updated'),
+    'task.move': t('Tarea movida', 'Task moved'),
+    'api_token.create': t('API token creado', 'API token created'),
+    'api_token.revoke': t('API token revocado', 'API token revoked'),
+    'ai.invoke': t('Llamada de IA', 'AI call'),
+  };
+}
 
 export default async function AuditPage({
   params,
@@ -32,6 +37,8 @@ export default async function AuditPage({
   const sp = await searchParams;
   const session = await auth();
   if (!session?.user?.id) return null;
+  const t = await getServerT();
+  const ACTION_LABEL = buildActionLabels(t);
 
   const project = await prisma.project.findUnique({
     where: { slug },
@@ -60,9 +67,9 @@ export default async function AuditPage({
 
   return (
     <div style={{ maxWidth: '1000px', padding: '2rem 1.5rem' }}>
-      <h2>Auditoría</h2>
+      <h2>{t('Auditoría', 'Audit')}</h2>
       <p style={{ color: 'var(--color-fg-muted)' }}>
-        Últimos {days} días · {entries.length} eventos
+        {t(`Últimos ${days} días`, `Last ${days} days`)} · {t(`${entries.length} eventos`, `${entries.length} events`)}
       </p>
 
       <form
@@ -87,7 +94,7 @@ export default async function AuditPage({
             color: 'var(--color-fg)',
           }}
         >
-          <option value="">Todas las acciones</option>
+          <option value="">{t('Todas las acciones', 'All actions')}</option>
           {Object.keys(ACTION_LABEL).map((k) => (
             <option key={k} value={k}>
               {ACTION_LABEL[k]}
@@ -105,10 +112,10 @@ export default async function AuditPage({
             color: 'var(--color-fg)',
           }}
         >
-          <option value="1">1 día</option>
-          <option value="7">7 días</option>
-          <option value="30">30 días</option>
-          <option value="90">90 días</option>
+          <option value="1">{t('1 día', '1 day')}</option>
+          <option value="7">{t('7 días', '7 days')}</option>
+          <option value="30">{t('30 días', '30 days')}</option>
+          <option value="90">{t('90 días', '90 days')}</option>
         </select>
         <button
           type="submit"
@@ -121,19 +128,19 @@ export default async function AuditPage({
             fontWeight: 600,
           }}
         >
-          Filtrar
+          {t('Filtrar', 'Filter')}
         </button>
       </form>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
         <thead>
           <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)' }}>
-            <th style={{ padding: '0.5rem' }}>Cuándo</th>
-            <th style={{ padding: '0.5rem' }}>Actor</th>
-            <th style={{ padding: '0.5rem' }}>Acción</th>
-            <th style={{ padding: '0.5rem' }}>Recurso</th>
-            <th style={{ padding: '0.5rem' }}>Payload</th>
-            <th style={{ padding: '0.5rem' }}>IP</th>
+            <th style={{ padding: '0.5rem' }}>{t('Cuándo', 'When')}</th>
+            <th style={{ padding: '0.5rem' }}>{t('Actor', 'Actor')}</th>
+            <th style={{ padding: '0.5rem' }}>{t('Acción', 'Action')}</th>
+            <th style={{ padding: '0.5rem' }}>{t('Recurso', 'Resource')}</th>
+            <th style={{ padding: '0.5rem' }}>{t('Payload', 'Payload')}</th>
+            <th style={{ padding: '0.5rem' }}>{t('IP', 'IP')}</th>
           </tr>
         </thead>
         <tbody>
@@ -168,7 +175,7 @@ export default async function AuditPage({
 
       {entries.length === 0 && (
         <p style={{ color: 'var(--color-fg-muted)', padding: '2rem', textAlign: 'center' }}>
-          Sin eventos en el rango seleccionado.
+          {t('Sin eventos en el rango seleccionado.', 'No events in the selected range.')}
         </p>
       )}
     </div>

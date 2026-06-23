@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import { disableTotp } from '@/lib/actions/totp';
 
 export function TotpStatus() {
+  const { t } = useI18n();
   const [pending, startTransition] = useTransition();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export function TotpStatus() {
 
   return (
     <div style={{ marginTop: '1.5rem' }}>
-      <p style={{ color: 'var(--color-success)' }}>✓ 2FA activo</p>
+      <p style={{ color: 'var(--color-success)' }}>{t('✓ 2FA activo', '✓ 2FA active')}</p>
 
       {!showDisable ? (
         <button
@@ -38,7 +40,7 @@ export function TotpStatus() {
             color: 'var(--color-danger)',
           }}
         >
-          Deshabilitar 2FA
+          {t('Deshabilitar 2FA', 'Disable 2FA')}
         </button>
       ) : (
         <form onSubmit={submit} style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
@@ -47,7 +49,7 @@ export function TotpStatus() {
             inputMode="numeric"
             pattern="\d{6}"
             maxLength={6}
-            placeholder="Código actual"
+            placeholder={t('Código actual', 'Current code')}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             required
@@ -69,7 +71,7 @@ export function TotpStatus() {
               color: 'white',
             }}
           >
-            Confirmar
+            {t('Confirmar', 'Confirm')}
           </button>
           <button
             type="button"
@@ -82,7 +84,7 @@ export function TotpStatus() {
               color: 'var(--color-fg)',
             }}
           >
-            Cancelar
+            {t('Cancelar', 'Cancel')}
           </button>
         </form>
       )}

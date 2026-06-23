@@ -1,9 +1,11 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { redirect } from 'next/navigation';
+import { getServerT } from '@/lib/i18n/server';
 import { RecoveryPanel } from './RecoveryPanel';
 
 export default async function RecoveryPage() {
+  const t = await getServerT();
   const session = await auth();
   if (!session?.user?.id) redirect('/login');
 
@@ -15,10 +17,12 @@ export default async function RecoveryPage() {
 
   return (
     <div style={{ maxWidth: '640px', padding: '2rem' }}>
-      <h1>Recuperación del vault</h1>
+      <h1>{t('Recuperación del vault', 'Vault recovery')}</h1>
       <p>
-        Tu código de recuperación es la única forma de recuperar el vault si olvidas la
-        passphrase. El servidor nunca conoce el código.
+        {t(
+          'Tu código de recuperación es la única forma de recuperar el vault si olvidas la passphrase. El servidor nunca conoce el código.',
+          'Your recovery code is the only way to recover the vault if you forget the passphrase. The server never knows the code.',
+        )}
       </p>
       <RecoveryPanel hasRecovery={hasRecovery} />
     </div>

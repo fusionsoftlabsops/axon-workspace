@@ -2,19 +2,22 @@
 
 import { useState, useTransition } from 'react';
 import { invokeAiAction } from '@/lib/actions/ai';
+import { useI18n } from '@/lib/i18n/i18n';
 import type { AiPurpose } from '@admin/shared/types';
 
-const LABELS: Record<AiPurpose, string> = {
-  'task.draft': 'Redactar descripción',
-  'task.summarize': 'Resumir',
-  'ac.generate': 'Generar criterios de aceptación',
-  'epic.breakdown': 'Dividir en subtareas',
-  'commit.message': 'Mensaje de commit',
-  'pr.description': 'Descripción de PR',
-  'bug.report': 'Convertir a bug report',
-  'brain.extract': 'Extraer memorias del cerebro',
-  'story.generate': 'Generar Historia de Usuario',
-};
+function labelsFor(t: <T>(es: T, en: T) => T): Record<AiPurpose, string> {
+  return {
+    'task.draft': t('Redactar descripción', 'Draft description'),
+    'task.summarize': t('Resumir', 'Summarize'),
+    'ac.generate': t('Generar criterios de aceptación', 'Generate acceptance criteria'),
+    'epic.breakdown': t('Dividir en subtareas', 'Break down into subtasks'),
+    'commit.message': t('Mensaje de commit', 'Commit message'),
+    'pr.description': t('Descripción de PR', 'PR description'),
+    'bug.report': t('Convertir a bug report', 'Convert to bug report'),
+    'brain.extract': t('Extraer memorias del cerebro', 'Extract memories from the brain'),
+    'story.generate': t('Generar Historia de Usuario', 'Generate User Story'),
+  };
+}
 
 export function AiAssist({
   projectSlug,
@@ -27,6 +30,8 @@ export function AiAssist({
   context: string;
   onResult?: (output: string) => void;
 }) {
+  const { t } = useI18n();
+  const LABELS = labelsFor(t);
   const [pending, startTransition] = useTransition();
   const [output, setOutput] = useState<string | null>(null);
   const [meta, setMeta] = useState<{ model: string; cost: number } | null>(null);
@@ -81,7 +86,7 @@ export function AiAssist({
       </div>
 
       {pending && (
-        <p style={{ color: 'var(--color-fg-muted)', fontSize: '0.85rem' }}>Pensando…</p>
+        <p style={{ color: 'var(--color-fg-muted)', fontSize: '0.85rem' }}>{t('Pensando…', 'Thinking…')}</p>
       )}
       {error && (
         <p style={{ color: 'var(--color-danger)', fontSize: '0.85rem' }}>{error}</p>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n/i18n';
 import type { LlmProvider } from '@prisma/client';
 import type { ProviderInfo } from '@/lib/ai/providers/types';
 import { estimateCost, formatUsd } from '@/lib/ai/cost-estimator';
@@ -40,6 +41,7 @@ export function Composer({
   hasRepo: boolean;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -91,8 +93,8 @@ export function Composer({
   };
 
   const onGenerate = () => {
-    if (!selectedCred) return setError('Selecciona una credencial LLM');
-    if (rawInput.trim().length < 10) return setError('Describe la necesidad con un poco más de detalle');
+    if (!selectedCred) return setError(t('Selecciona una credencial LLM', 'Select an LLM credential'));
+    if (rawInput.trim().length < 10) return setError(t('Describe la necesidad con un poco más de detalle', 'Describe the need with a bit more detail'));
     setError(null);
     startTransition(async () => {
       const res = await startStoryDraftAction(projectSlug, {
@@ -104,7 +106,7 @@ export function Composer({
         citedMemoryIds: [],
       });
       if (!res.ok || !res.draftId) {
-        setError(res.error ?? 'no se pudo crear el borrador');
+        setError(res.error ?? t('no se pudo crear el borrador', 'could not create the draft'));
         return;
       }
       router.push(`/projects/${projectSlug}/stories/drafts/${res.draftId}`);
@@ -116,14 +118,14 @@ export function Composer({
       <div className={styles.composerMain}>
         <div className={styles.field}>
           <label className={styles.fieldLabel} htmlFor="rawInput">
-            Necesidad
+            {t('Necesidad', 'Need')}
           </label>
           <textarea
             id="rawInput"
             className={styles.rawInput}
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
-            placeholder="Como product owner quiero exportar las tareas en CSV para preparar el reporte mensual…"
+            placeholder={t('Como product owner quiero exportar las tareas en CSV para preparar el reporte mensual…', 'As a product owner I want to export tasks as CSV to prepare the monthly report…')}
             autoFocus
           />
         </div>
@@ -131,23 +133,23 @@ export function Composer({
         {hasRepo ? (
           <div className={styles.field}>
             <label className={styles.fieldLabel}>
-              Archivos del repo a incluir ({selectedPaths.size} sel.)
+              {t(`Archivos del repo a incluir (${selectedPaths.size} sel.)`, `Repo files to include (${selectedPaths.size} sel.)`)}
             </label>
             <FileTree nodes={repoTree} selected={selectedPaths} toggle={toggle} />
           </div>
         ) : (
           <p>
-            <em>No hay repositorio configurado para este proyecto. La generación funciona sin archivos, pero el contexto será más débil.</em>
+            <em>{t('No hay repositorio configurado para este proyecto. La generación funciona sin archivos, pero el contexto será más débil.', 'No repository is configured for this project. Generation works without files, but the context will be weaker.')}</em>
           </p>
         )}
       </div>
 
       <aside className={styles.composerSide}>
         <div className={styles.field}>
-          <label className={styles.fieldLabel} htmlFor="cred">Credencial LLM</label>
+          <label className={styles.fieldLabel} htmlFor="cred">{t('Credencial LLM', 'LLM credential')}</label>
           {credentials.length === 0 ? (
             <p style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>
-              Sin credenciales. <a href="/settings/llm-credentials">Configura una primero.</a>
+              {t('Sin credenciales.', 'No credentials.')} <a href="/settings/llm-credentials">{t('Configura una primero.', 'Configure one first.')}</a>
             </p>
           ) : (
             <select
@@ -167,7 +169,7 @@ export function Composer({
 
         {providerInfo && (
           <div className={styles.field}>
-            <label className={styles.fieldLabel} htmlFor="model">Modelo</label>
+            <label className={styles.fieldLabel} htmlFor="model">{t('Modelo', 'Model')}</label>
             <select
               id="model"
               className={styles.select}
@@ -201,7 +203,7 @@ export function Composer({
           disabled={pending || credentials.length === 0 || !model}
           onClick={onGenerate}
         >
-          {pending ? 'Creando borrador…' : 'Generar borrador'}
+          {pending ? t('Creando borrador…', 'Creating draft…') : t('Generar borrador', 'Generate draft')}
         </button>
       </aside>
     </div>

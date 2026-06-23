@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useI18n } from '@/lib/i18n/i18n';
 import { useVaultUnlock } from '@/components/vault/UnlockContext';
 import styles from './vault.module.scss';
 
 export function UnlockPrompt() {
+  const { t } = useI18n();
   const { unlock } = useVaultUnlock();
   const [passphrase, setPassphrase] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export function UnlockPrompt() {
   return (
     <form className={styles.unlock} onSubmit={submit}>
       <label>
-        Passphrase del vault
+        {t('Passphrase del vault', 'Vault passphrase')}
         <input
           type="password"
           autoFocus
@@ -36,11 +38,11 @@ export function UnlockPrompt() {
       </label>
       {error && <p className={styles.error}>{error}</p>}
       <button type="submit" disabled={pending}>
-        {pending ? 'Desbloqueando…' : 'Desbloquear'}
+        {pending ? t('Desbloqueando…', 'Unlocking…') : t('Desbloquear', 'Unlock')}
       </button>
       <small>
-        La passphrase nunca sale del navegador. Si la olvidaste, usa tu código de recuperación
-        en <a href="/settings/recovery">Ajustes → Recuperación</a>.
+        {t('La passphrase nunca sale del navegador. Si la olvidaste, usa tu código de recuperación en', 'The passphrase never leaves the browser. If you forgot it, use your recovery code in')}{' '}
+        <a href="/settings/recovery">{t('Ajustes → Recuperación', 'Settings → Recovery')}</a>.
       </small>
     </form>
   );

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { Masthead, Eyebrow } from '@/components/ui';
+import { getServerT, getServerLang } from '@/lib/i18n/server';
 import { DraftView } from './DraftView';
 import styles from '../../stories.module.scss';
 
@@ -11,6 +12,8 @@ export default async function DraftPage({
   params: Promise<{ slug: string; id: string }>;
 }) {
   const { slug, id } = await params;
+  const t = await getServerT();
+  const lang = await getServerLang();
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
@@ -64,8 +67,8 @@ export default async function DraftPage({
       <Masthead
         eyebrow={
           <Eyebrow ornament="pilcrow">
-            Borrador · {draft.provider} · {draft.model} ·{' '}
-            {draft.createdAt.toLocaleDateString('es-ES', {
+            {t('Borrador', 'Draft')} · {draft.provider} · {draft.model} ·{' '}
+            {draft.createdAt.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', {
               day: '2-digit',
               month: 'short',
               year: '2-digit',
@@ -74,7 +77,7 @@ export default async function DraftPage({
         }
         size="md"
       >
-        {draft.summary?.split('\n')[0]?.slice(0, 120) ?? 'HU en redacción'}
+        {draft.summary?.split('\n')[0]?.slice(0, 120) ?? t('HU en redacción', 'Story in progress')}
       </Masthead>
 
       <DraftView

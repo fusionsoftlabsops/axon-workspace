@@ -1,4 +1,5 @@
 import { Eyebrow } from '@/components/ui';
+import { getServerT } from '@/lib/i18n/server';
 import styles from './loading.module.scss';
 
 /**
@@ -6,13 +7,14 @@ import styles from './loading.module.scss';
  * tirando galeradas: reglas horizontales en cascada + un eyebrow
  * pulsante mientras la página real "se compone" detrás.
  */
-export default function Loading() {
+export default async function Loading() {
+  const t = await getServerT();
   return (
     <div className={styles.shell}>
       <div className={styles.inner}>
         <div className={styles.eyebrow}>
           <Eyebrow ornament="asterism" tone="muted">
-            Componiendo galera
+            {t('Componiendo galera', 'Composing the galley')}
           </Eyebrow>
         </div>
 
@@ -43,7 +45,7 @@ export default function Loading() {
 
         <p className={styles.footnote}>
           <span className={styles.dot} aria-hidden />
-          Levantando datos del proyecto
+          {t('Levantando datos del proyecto', 'Loading project data')}
           <span className={styles.ellipsis} aria-hidden>
             ⁂
           </span>

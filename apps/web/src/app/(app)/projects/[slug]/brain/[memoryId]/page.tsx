@@ -4,19 +4,22 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { getServerT } from '@/lib/i18n/server';
 import { Eyebrow, RuleDivider, Tag } from '@/components/ui';
 import { MemoryActions } from './MemoryActions';
 import styles from './detail.module.scss';
 
-const TYPE_LABEL: Record<string, string> = {
-  DECISION: 'Decisión',
-  GOTCHA: 'Trampa',
-  PATTERN: 'Patrón',
-  ANTIPATTERN: 'Anti-patrón',
-  RUNBOOK: 'Runbook',
-  GLOSSARY: 'Glosario',
-  NOTE: 'Nota',
-};
+function typeLabel(t: <T>(es: T, en: T) => T): Record<string, string> {
+  return {
+    DECISION: t('Decisión', 'Decision'),
+    GOTCHA: t('Trampa', 'Gotcha'),
+    PATTERN: t('Patrón', 'Pattern'),
+    ANTIPATTERN: t('Anti-patrón', 'Anti-pattern'),
+    RUNBOOK: t('Runbook', 'Runbook'),
+    GLOSSARY: t('Glosario', 'Glossary'),
+    NOTE: t('Nota', 'Note'),
+  };
+}
 
 export default async function MemoryDetailPage({
   params,
@@ -24,6 +27,8 @@ export default async function MemoryDetailPage({
   params: Promise<{ slug: string; memoryId: string }>;
 }) {
   const { slug, memoryId } = await params;
+  const t = await getServerT();
+  const TYPE_LABEL = typeLabel(t);
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
@@ -73,7 +78,7 @@ export default async function MemoryDetailPage({
     <div className={styles.page}>
       <aside className={styles.aside}>
         <Link href={`/projects/${slug}/brain`} className={styles.back}>
-          ← Volver al cerebro
+          ← {t('Volver al cerebro', 'Back to the brain')}
         </Link>
         <div className={styles.stamps}>
           <span className={styles.typeStamp}>{TYPE_LABEL[memory.type] ?? memory.type}</span>
@@ -82,7 +87,7 @@ export default async function MemoryDetailPage({
               memory.scope === 'PROJECT' ? styles.scopeStampProject : styles.scopeStampLocal
             }
           >
-            {memory.scope === 'PROJECT' ? 'Principal' : 'Local'}
+            {memory.scope === 'PROJECT' ? t('Principal', 'Main') : t('Local', 'Local')}
           </span>
           {memory.status !== 'ACTIVE' && (
             <span className={styles.statusStamp}>{memory.status}</span>
@@ -94,8 +99,11 @@ export default async function MemoryDetailPage({
         <div className={styles.eyebrowLine}>
           <Eyebrow ornament="section" tone="accent">
             {memory.sourceTask
-              ? `Memoria · de la tarea #${memory.sourceTask.taskNumber}`
-              : 'Memoria capturada a mano'}
+              ? t(
+                  `Memoria · de la tarea #${memory.sourceTask.taskNumber}`,
+                  `Memory · from task #${memory.sourceTask.taskNumber}`,
+                )
+              : t('Memoria capturada a mano', 'Manually captured memory')}
           </Eyebrow>
         </div>
 
@@ -104,7 +112,7 @@ export default async function MemoryDetailPage({
         {deck && <p className={styles.deck}>{deck}</p>}
 
         <p className={styles.metaLine}>
-          por <strong>{memory.author.name}</strong>
+          {t('por', 'by')} <strong>{memory.author.name}</strong>
           {memory.sourceTask && (
             <>
               {' · '}
@@ -114,9 +122,10 @@ export default async function MemoryDetailPage({
             </>
           )}
           {' · '}
-          {memory.citationCount} {memory.citationCount === 1 ? 'cita' : 'citas'}
+          {memory.citationCount}{' '}
+          {memory.citationCount === 1 ? t('cita', 'citation') : t('citas', 'citations')}
           {' · '}
-          actualizada {memory.updatedAt.toLocaleString()}
+          {t('actualizada', 'updated')} {memory.updatedAt.toLocaleString()}
         </p>
 
         {memory.tags.length > 0 && (
@@ -136,7 +145,7 @@ export default async function MemoryDetailPage({
 
         {memory.supersededBy && (
           <div className={styles.notice}>
-            Esta entrada fue reemplazada por{' '}
+            {t('Esta entrada fue reemplazada por', 'This entry was superseded by')}{' '}
             <Link href={`/projects/${slug}/brain/${memory.supersededBy.id}`}>
               {memory.supersededBy.title}
             </Link>
@@ -164,25 +173,25 @@ export default async function MemoryDetailPage({
 
         <div className={styles.marginaliaPanel}>
           <div className={styles.marginaliaItem}>
-            <span className={styles.marginaliaLabel}>Autor</span>
+            <span className={styles.marginaliaLabel}>{t('Autor', 'Author')}</span>
             <span className={styles.marginaliaValue}>{memory.author.name}</span>
           </div>
           {memory.ownerUser && memory.scope === 'LOCAL' && (
             <div className={styles.marginaliaItem}>
-              <span className={styles.marginaliaLabel}>Local de</span>
+              <span className={styles.marginaliaLabel}>{t('Local de', 'Local to')}</span>
               <span className={styles.marginaliaValue}>{memory.ownerUser.name}</span>
             </div>
           )}
           <div className={styles.marginaliaItem}>
-            <span className={styles.marginaliaLabel}>Creada</span>
+            <span className={styles.marginaliaLabel}>{t('Creada', 'Created')}</span>
             <span className={styles.marginaliaValue}>
               {memory.createdAt.toLocaleDateString()}
             </span>
           </div>
           <div className={styles.marginaliaItem}>
-            <span className={styles.marginaliaLabel}>Última citación</span>
+            <span className={styles.marginaliaLabel}>{t('Última citación', 'Last citation')}</span>
             <span className={styles.marginaliaValue}>
-              {memory.lastCitedAt ? memory.lastCitedAt.toLocaleDateString() : 'sin citar'}
+              {memory.lastCitedAt ? memory.lastCitedAt.toLocaleDateString() : t('sin citar', 'never cited')}
             </span>
           </div>
         </div>
@@ -190,7 +199,7 @@ export default async function MemoryDetailPage({
 
       {memory.supersedes.length > 0 && (
         <section className={styles.section}>
-          <h2>Reemplaza a</h2>
+          <h2>{t('Reemplaza a', 'Supersedes')}</h2>
           <ul className={styles.lineageList}>
             {memory.supersedes.map((s) => (
               <li key={s.id}>
@@ -205,11 +214,13 @@ export default async function MemoryDetailPage({
       )}
 
       <section className={styles.section}>
-        <h2>Citations ({memory.citations.length})</h2>
+        <h2>{t('Citas', 'Citations')} ({memory.citations.length})</h2>
         {memory.citations.length === 0 ? (
           <p className={styles.dim}>
-            Aún nadie ha citado esta entrada. Cuando Claude Code la use durante una tarea, queda
-            registrada aquí con la nota correspondiente.
+            {t(
+              'Aún nadie ha citado esta entrada. Cuando Claude Code la use durante una tarea, queda registrada aquí con la nota correspondiente.',
+              'No one has cited this entry yet. When Claude Code uses it during a task, it gets recorded here with the relevant note.',
+            )}
           </p>
         ) : (
           <ul className={styles.citationList}>
@@ -222,7 +233,7 @@ export default async function MemoryDetailPage({
                   #{c.citedInTask.taskNumber} {c.citedInTask.title}
                 </Link>
                 <span className={styles.citationMeta}>
-                  por {c.citedByUser.name} · {c.createdAt.toLocaleString()}
+                  {t('por', 'by')} {c.citedByUser.name} · {c.createdAt.toLocaleString()}
                 </span>
                 {c.context && <p className={styles.citationContext}>“{c.context}”</p>}
               </li>

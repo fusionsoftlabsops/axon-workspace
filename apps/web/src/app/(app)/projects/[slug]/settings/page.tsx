@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
+import { getServerT } from '@/lib/i18n/server';
 import { MembersPanel } from './MembersPanel';
 import { RepoSettingsPanel } from './RepoSettingsPanel';
 
@@ -12,6 +13,7 @@ export default async function ProjectSettingsPage({
   const { slug } = await params;
   const session = await auth();
   if (!session?.user?.id) return null;
+  const t = await getServerT();
 
   const project = await prisma.project.findUnique({
     where: { slug },
@@ -34,10 +36,12 @@ export default async function ProjectSettingsPage({
 
   return (
     <div style={{ maxWidth: '900px', padding: '2rem 1.5rem' }}>
-      <h2>Miembros</h2>
+      <h2>{t('Miembros', 'Members')}</h2>
       <p style={{ color: 'var(--color-fg-muted)' }}>
-        Solo usuarios con cuenta pueden ser miembros. Invítalos por email después de que se
-        registren.
+        {t(
+          'Solo usuarios con cuenta pueden ser miembros. Invítalos por email después de que se registren.',
+          'Only users with an account can be members. Invite them by email after they sign up.',
+        )}
       </p>
       <MembersPanel
         projectSlug={slug}
@@ -53,10 +57,12 @@ export default async function ProjectSettingsPage({
         }))}
       />
 
-      <h2 style={{ marginTop: '3rem' }}>Repositorio</h2>
+      <h2 style={{ marginTop: '3rem' }}>{t('Repositorio', 'Repository')}</h2>
       <p style={{ color: 'var(--color-fg-muted)' }}>
-        Asocia el proyecto a una copia local del repo. El generador de HUs leerá archivos de ahí
-        para construir contexto. Solo lectura, sandboxed: ningún path puede escapar de esta raíz.
+        {t(
+          'Asocia el proyecto a una copia local del repo. El generador de HUs leerá archivos de ahí para construir contexto. Solo lectura, sandboxed: ningún path puede escapar de esta raíz.',
+          'Associate the project with a local copy of the repo. The user-story generator will read files from there to build context. Read-only, sandboxed: no path can escape this root.',
+        )}
       </p>
       <RepoSettingsPanel
         projectSlug={slug}

@@ -1,8 +1,10 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
+import { getServerT } from '@/lib/i18n/server';
 import { LlmCredentialsPanel } from './LlmCredentialsPanel';
 
 export default async function LlmCredentialsPage() {
+  const t = await getServerT();
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
@@ -32,11 +34,12 @@ export default async function LlmCredentialsPage() {
 
   return (
     <div style={{ maxWidth: '900px', padding: '2rem 1.5rem' }}>
-      <h1>Credenciales LLM</h1>
+      <h1>{t('Credenciales LLM', 'LLM credentials')}</h1>
       <p style={{ color: 'var(--color-fg-muted)' }}>
-        API keys cifradas server-side con la clave del proceso (XSalsa20-Poly1305). Son necesarias
-        para generar HUs con Claude, GPT, Gemini o Kimi. Un dump de DB sin acceso al server key no
-        revela los secretos.
+        {t(
+          'API keys cifradas server-side con la clave del proceso (XSalsa20-Poly1305). Son necesarias para generar HUs con Claude, GPT, Gemini o Kimi. Un dump de DB sin acceso al server key no revela los secretos.',
+          'API keys encrypted server-side with the process key (XSalsa20-Poly1305). They are required to generate user stories with Claude, GPT, Gemini or Kimi. A DB dump without access to the server key does not reveal the secrets.',
+        )}
       </p>
       <LlmCredentialsPanel
         credentials={creds.map((c) => ({

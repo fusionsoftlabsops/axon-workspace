@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useI18n } from '@/lib/i18n/i18n';
 import { publishStoryDraftAsTaskAction } from '@/lib/actions/stories';
 import styles from '../../stories.module.scss';
 
@@ -48,6 +49,7 @@ export function DraftView({
   canPublish: boolean;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [draft, setDraft] = useState<DraftState>(initialDraft);
   const [stateId, setStateId] = useState<string>(states[0]?.id ?? '');
   const [includedSubtasks, setIncludedSubtasks] = useState<Set<number>>(new Set());
@@ -126,14 +128,14 @@ export function DraftView({
   return (
     <div className={styles.viewer}>
       <div className={styles.viewerMain}>
-        <Section title="Resumen" body={draft.summary} placeholder="generando…" />
-        <Section title="Contexto técnico" body={draft.technicalContext} placeholder="generando…" />
-        <Section title="Criterios de aceptación" body={draft.acceptanceCriteria} placeholder="generando…" />
-        <Section title="Riesgos" body={draft.risks} placeholder="generando…" />
+        <Section title={t('Resumen', 'Summary')} body={draft.summary} placeholder={t('generando…', 'generating…')} />
+        <Section title={t('Contexto técnico', 'Technical context')} body={draft.technicalContext} placeholder={t('generando…', 'generating…')} />
+        <Section title={t('Criterios de aceptación', 'Acceptance criteria')} body={draft.acceptanceCriteria} placeholder={t('generando…', 'generating…')} />
+        <Section title={t('Riesgos', 'Risks')} body={draft.risks} placeholder={t('generando…', 'generating…')} />
 
         {draft.subtaskBreakdown && draft.subtaskBreakdown.length > 0 && (
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>Subtareas técnicas</div>
+            <div className={styles.sectionTitle}>{t('Subtareas técnicas', 'Technical subtasks')}</div>
             <ul className={styles.subtaskList}>
               {draft.subtaskBreakdown.map((s, i) => (
                 <li key={i} className={styles.subtask}>
@@ -167,7 +169,7 @@ export function DraftView({
 
         {draft.filesToTouch && draft.filesToTouch.length > 0 && (
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>Archivos a tocar</div>
+            <div className={styles.sectionTitle}>{t('Archivos a tocar', 'Files to touch')}</div>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {draft.filesToTouch.map((f, i) => (
                 <li key={i} style={{ padding: '0.4rem 0', borderTop: '1px dotted var(--rule)' }}>
@@ -182,10 +184,10 @@ export function DraftView({
 
       <aside className={styles.viewerSide}>
         <div className={`${styles.streamStatus} ${draft.status === 'GENERATING' ? styles.live : ''}`}>
-          {draft.status === 'GENERATING' && '◌ generando…'}
-          {draft.status === 'READY' && '✓ listo'}
-          {draft.status === 'PUBLISHED' && '◆ publicado'}
-          {draft.status === 'ERRORED' && '✕ error'}
+          {draft.status === 'GENERATING' && t('◌ generando…', '◌ generating…')}
+          {draft.status === 'READY' && t('✓ listo', '✓ ready')}
+          {draft.status === 'PUBLISHED' && t('◆ publicado', '◆ published')}
+          {draft.status === 'ERRORED' && t('✕ error', '✕ error')}
         </div>
 
         {draft.errorMessage && (
@@ -197,19 +199,19 @@ export function DraftView({
         {draft.status === 'READY' && (
           <>
             <div>
-              <label className={styles.fieldLabel}>Tokens</label>
+              <label className={styles.fieldLabel}>{t('Tokens', 'Tokens')}</label>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
                 ↓ {draft.inputTokens} · ↑ {draft.outputTokens}
               </div>
             </div>
             <div>
-              <label className={styles.fieldLabel}>Costo</label>
+              <label className={styles.fieldLabel}>{t('Costo', 'Cost')}</label>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontStyle: 'italic' }}>
                 ${draft.estimatedCostUsd}
               </div>
             </div>
             <div>
-              <label className={styles.fieldLabel}>Tiempo</label>
+              <label className={styles.fieldLabel}>{t('Tiempo', 'Time')}</label>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
                 {(draft.durationMs / 1000).toFixed(1)}s
               </div>
@@ -220,7 +222,7 @@ export function DraftView({
         {draft.status === 'READY' && canPublish && (
           <>
             <div className={styles.field}>
-              <label className={styles.fieldLabel} htmlFor="publishState">Publicar en columna</label>
+              <label className={styles.fieldLabel} htmlFor="publishState">{t('Publicar en columna', 'Publish to column')}</label>
               <select
                 id="publishState"
                 className={styles.select}
@@ -241,21 +243,21 @@ export function DraftView({
               onClick={onPublish}
               disabled={pending}
             >
-              {pending ? 'Publicando…' : 'Publicar como tarea'}
+              {pending ? t('Publicando…', 'Publishing…') : t('Publicar como tarea', 'Publish as task')}
             </button>
           </>
         )}
 
         {draft.taskId && (
           <p style={{ color: 'var(--accent-ink)', fontSize: '0.85rem' }}>
-            ✓ Publicado como tarea
+            {t('✓ Publicado como tarea', '✓ Published as task')}
           </p>
         )}
 
         {draft.citedMemoryIds.length > 0 && (
           <div>
             <label className={styles.fieldLabel}>
-              Memorias citadas ({draft.citedMemoryIds.length})
+              {t(`Memorias citadas (${draft.citedMemoryIds.length})`, `Cited memories (${draft.citedMemoryIds.length})`)}
             </label>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '0.75rem' }}>
               {draft.citedMemoryIds.map((id) => (

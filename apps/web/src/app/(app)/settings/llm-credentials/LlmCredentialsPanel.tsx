@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { LlmProvider } from '@prisma/client';
+import { useI18n } from '@/lib/i18n/i18n';
 import {
   createLlmCredentialAction,
   revokeLlmCredentialAction,
@@ -41,6 +42,7 @@ export function LlmCredentialsPanel({
   credentials: CredRow[];
   projects: ProjectRow[];
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export function LlmCredentialsPanel({
         setError(res.error);
         return;
       }
-      setSuccess(`Credencial guardada (prefix: ${res.keyPrefix}…)`);
+      setSuccess(t(`Credencial guardada (prefix: ${res.keyPrefix}…)`, `Credential saved (prefix: ${res.keyPrefix}…)`));
       setLabel('');
       setPlainKey('');
       setModelDefault('');
@@ -77,10 +79,10 @@ export function LlmCredentialsPanel({
   };
 
   const onRevoke = (id: string) => {
-    if (!confirm('¿Revocar esta credencial? No es recuperable.')) return;
+    if (!confirm(t('¿Revocar esta credencial? No es recuperable.', 'Revoke this credential? It cannot be recovered.'))) return;
     startTransition(async () => {
       const res = await revokeLlmCredentialAction(id);
-      if (!res.ok) setError(res.error ?? 'no se pudo revocar');
+      if (!res.ok) setError(res.error ?? t('no se pudo revocar', 'could not revoke'));
       router.refresh();
     });
   };
@@ -91,11 +93,11 @@ export function LlmCredentialsPanel({
   return (
     <div className={styles.panel}>
       <form className={styles.form} onSubmit={onCreate}>
-        <h2>Nueva credencial</h2>
+        <h2>{t('Nueva credencial', 'New credential')}</h2>
 
         <div className={styles.row}>
           <label>
-            Provider
+            {t('Provider', 'Provider')}
             <select value={provider} onChange={(e) => setProvider(e.target.value as LlmProvider)}>
               <option value="ANTHROPIC">Anthropic (Claude)</option>
               <option value="OPENAI">OpenAI (GPT)</option>
@@ -104,7 +106,7 @@ export function LlmCredentialsPanel({
             </select>
           </label>
           <p className={styles.hint}>
-            Genera la key en{' '}
+            {t('Genera la key en', 'Generate the key at')}{' '}
             <a href={PROVIDER_HINTS[provider].url} target="_blank" rel="noreferrer">
               {PROVIDER_HINTS[provider].label}
             </a>
@@ -113,19 +115,19 @@ export function LlmCredentialsPanel({
         </div>
 
         <label>
-          Etiqueta
+          {t('Etiqueta', 'Label')}
           <input
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="ej. cuenta personal"
+            placeholder={t('ej. cuenta personal', 'e.g. personal account')}
             maxLength={80}
             required
           />
         </label>
 
         <label>
-          API key
+          {t('API key', 'API key')}
           <input
             type="password"
             value={plainKey}
@@ -137,7 +139,7 @@ export function LlmCredentialsPanel({
         </label>
 
         <label>
-          Modelo por defecto <span className={styles.optional}>(opcional)</span>
+          {t('Modelo por defecto', 'Default model')} <span className={styles.optional}>{t('(opcional)', '(optional)')}</span>
           <input
             type="text"
             value={modelDefault}
@@ -148,9 +150,9 @@ export function LlmCredentialsPanel({
         </label>
 
         <label>
-          Limitar a un proyecto <span className={styles.optional}>(opcional)</span>
+          {t('Limitar a un proyecto', 'Limit to a project')} <span className={styles.optional}>{t('(opcional)', '(optional)')}</span>
           <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            <option value="">— Disponible en todos mis proyectos —</option>
+            <option value="">{t('— Disponible en todos mis proyectos —', '— Available in all my projects —')}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -161,23 +163,23 @@ export function LlmCredentialsPanel({
         {success && <p className={styles.success}>{success}</p>}
 
         <button type="submit" disabled={pending || !label.trim() || plainKey.trim().length < 8}>
-          {pending ? 'Guardando…' : 'Guardar credencial'}
+          {pending ? t('Guardando…', 'Saving…') : t('Guardar credencial', 'Save credential')}
         </button>
       </form>
 
       <section className={styles.list}>
-        <h2>Activas ({active.length})</h2>
+        <h2>{t('Activas', 'Active')} ({active.length})</h2>
         {active.length === 0 ? (
-          <p className={styles.empty}>Aún no hay credenciales activas.</p>
+          <p className={styles.empty}>{t('Aún no hay credenciales activas.', 'No active credentials yet.')}</p>
         ) : (
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Provider</th>
-                <th>Etiqueta</th>
-                <th>Key</th>
-                <th>Modelo</th>
-                <th>Último uso</th>
+                <th>{t('Provider', 'Provider')}</th>
+                <th>{t('Etiqueta', 'Label')}</th>
+                <th>{t('Key', 'Key')}</th>
+                <th>{t('Modelo', 'Model')}</th>
+                <th>{t('Último uso', 'Last used')}</th>
                 <th />
               </tr>
             </thead>
@@ -188,10 +190,10 @@ export function LlmCredentialsPanel({
                   <td>{c.label}</td>
                   <td><code>{c.keyPrefix}…</code></td>
                   <td>{c.modelDefault ?? '—'}</td>
-                  <td>{c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleDateString('es-ES') : 'nunca'}</td>
+                  <td>{c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleDateString('es-ES') : t('nunca', 'never')}</td>
                   <td>
                     <button type="button" className={styles.revoke} onClick={() => onRevoke(c.id)}>
-                      Revocar
+                      {t('Revocar', 'Revoke')}
                     </button>
                   </td>
                 </tr>
@@ -202,7 +204,7 @@ export function LlmCredentialsPanel({
 
         {revoked.length > 0 && (
           <details className={styles.revokedList}>
-            <summary>Revocadas ({revoked.length})</summary>
+            <summary>{t('Revocadas', 'Revoked')} ({revoked.length})</summary>
             <ul>
               {revoked.map((c) => (
                 <li key={c.id}>

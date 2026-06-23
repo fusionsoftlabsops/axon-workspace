@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { repoReaderFor } from '@/lib/repo/reader';
 import { listProviders } from '@/lib/ai/providers/registry';
 import { Masthead, Eyebrow } from '@/components/ui';
+import { getServerT } from '@/lib/i18n/server';
 import { Composer } from './Composer';
 import styles from '../stories.module.scss';
 
@@ -13,6 +14,7 @@ export default async function NewStoryPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getServerT();
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
@@ -59,11 +61,11 @@ export default async function NewStoryPage({
   return (
     <main className={styles.page}>
       <Masthead
-        eyebrow={<Eyebrow ornament="pilcrow">Nuevo borrador</Eyebrow>}
-        deck="Describe la necesidad. El sistema lee el código real y las memorias relevantes."
+        eyebrow={<Eyebrow ornament="pilcrow">{t('Nuevo borrador', 'New draft')}</Eyebrow>}
+        deck={t('Describe la necesidad. El sistema lee el código real y las memorias relevantes.', 'Describe the need. The system reads the real code and the relevant memories.')}
         size="lg"
       >
-        ¿Qué HU vas a levantar?
+        {t('¿Qué HU vas a levantar?', 'What story will you raise?')}
       </Masthead>
 
       <Composer
