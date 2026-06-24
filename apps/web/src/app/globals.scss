@@ -62,9 +62,10 @@
   // src/app/layout.tsx. Aquí solo definimos los stacks completos
   // con fallbacks decentes.
   --font-display: var(--font-display, 'Space Grotesk'), system-ui, -apple-system, sans-serif;
-  // Serif sólo opcional para cuerpo largo de una memoria abierta (no en el
-  // chrome). Sin web-font: cae a la serif del sistema.
-  --font-editorial: Georgia, 'Times New Roman', serif;
+  // "Editorial" ahora apunta al stack sans: la app es una herramienta, un solo
+  // idioma visual (audit: claridad sobre carácter). Cada `var(--font-editorial)`
+  // heredado en los module.scss legacy deja de ser serif sin tocar cada hoja.
+  --font-editorial: var(--font-sans, 'IBM Plex Sans'), system-ui, -apple-system, sans-serif;
   --font-sans: var(--font-sans, 'IBM Plex Sans'), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-mono, 'JetBrains Mono'), 'SF Mono', Consolas, monospace;
 }
