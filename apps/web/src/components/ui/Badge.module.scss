@@ -1,0 +1,43 @@
+@use '@/styles/tokens' as t;
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 0.3em 0.6em;
+  border-radius: t.$radius-full;
+  border: 1px solid transparent;
+}
+
+.dot {
+  width: 0.45em;
+  height: 0.45em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.t-neutral {
+  color: var(--ink-muted);
+  background: var(--ink-wash-8);
+}
+.t-accent {
+  color: var(--accent-ink);
+  background: var(--accent-ink-wash);
+}
+.t-ok {
+  color: var(--accent-correction);
+  background: color-mix(in srgb, var(--accent-correction) 12%, transparent);
+}
+.t-warn {
+  color: var(--accent-amber);
+  background: color-mix(in srgb, var(--accent-amber) 14%, transparent);
+}
+.t-bad {
+  color: var(--accent-stamp);
+  background: color-mix(in srgb, var(--accent-stamp) 12%, transparent);
+}

@@ -1,0 +1,38 @@
+@use '@/styles/tokens' as t;
+
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: t.$space-sm;
+  background: var(--paper-elev);
+  border: 1px solid var(--rule-strong);
+  border-radius: t.$radius-lg;
+  padding: 0 0.7rem;
+
+  &:focus-within {
+    border-color: var(--accent-ink);
+    box-shadow: 0 0 0 3px var(--accent-ink-wash);
+  }
+}
+
+.icon {
+  color: var(--ink-subtle);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
+
+  &::placeholder {
+    color: var(--ink-subtle);
+  }
+}

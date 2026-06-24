@@ -1,0 +1,37 @@
+@use '@/styles/tokens' as t;
+@use '@/styles/typography' as ty;
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: t.$space-lg;
+  flex-wrap: wrap;
+  padding-bottom: t.$space-lg;
+  margin-bottom: t.$space-xl;
+  border-bottom: 1px solid var(--rule);
+}
+
+.text {
+  min-width: 0;
+}
+
+.eyebrow {
+  margin-bottom: t.$space-sm;
+}
+
+.title {
+  @include ty.masthead(1.875rem);
+}
+
+.description {
+  @include ty.deck(1rem);
+  margin: t.$space-sm 0 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  flex-shrink: 0;
+}

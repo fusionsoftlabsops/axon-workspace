@@ -1,0 +1,38 @@
+@use '@/styles/tokens' as t;
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: t.$space-sm;
+  padding: t.$space-2xl t.$space-lg;
+  border: 1px dashed var(--rule-strong);
+  border-radius: t.$radius-lg;
+  background: var(--paper-deep);
+}
+
+.compact {
+  padding: t.$space-lg t.$space-md;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+
+.hint {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  max-width: 36ch;
+}
+
+.action {
+  margin-top: t.$space-xs;
+}

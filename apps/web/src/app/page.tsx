@@ -9,7 +9,7 @@ export default async function HomePage() {
     <main className={styles.main}>
       <div className={styles.hero}>
         <div className={styles.eyebrow}>
-          <Eyebrow ornament="asterism" tone="muted">
+          <Eyebrow tone="muted">
             Axon
           </Eyebrow>
         </div>
@@ -31,10 +31,10 @@ export default async function HomePage() {
 
         <div className={styles.actions}>
           <Link href="/login" className={styles.primary}>
-            {t('§ Iniciar sesión', '§ Sign in')}
+            {t('Iniciar sesión', 'Sign in')}
           </Link>
           <Link href="/signup" className={styles.secondary}>
-            {t('※ Crear cuenta', '※ Create account')}
+            {t('Crear cuenta', 'Create account')}
           </Link>
         </div>
 

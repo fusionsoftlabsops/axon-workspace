@@ -2,7 +2,7 @@
 @use '@/styles/tokens' as t;
 
 // ============================================================
-// Tablero · production schedule de imprenta
+// Tablero · Graphite — columnas como paneles, tarjetas que resaltan
 // ============================================================
 
 // ---------- Banner de memorias pendientes ----------
@@ -12,51 +12,37 @@
   gap: t.$space-md;
   margin: t.$space-lg t.$space-xl 0;
   padding: t.$space-md t.$space-lg;
-  background: var(--paper-elev);
-  border-top: 2px solid var(--accent-ink);
-  border-bottom: 1px solid var(--rule);
+  background: var(--accent-ink-wash);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent-ink);
+  border-radius: t.$radius-lg;
   text-decoration: none;
   color: var(--ink);
-  font-family: var(--font-editorial);
-  font-style: italic;
-  font-size: 0.95rem;
-  position: relative;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
   transition: background t.$dur-quick t.$ease-editorial;
 
-  &::before {
-    content: '';
-    position: absolute;
-    top: -3px;
-    left: 0;
-    width: 32px;
-    height: 4px;
-    background: var(--accent-ink);
-  }
-
   &:hover {
-    background: var(--paper-deep);
+    background: color-mix(in srgb, var(--accent-ink) 12%, var(--paper-elev));
   }
 
   strong {
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: 700;
     color: var(--accent-ink);
-    font-style: normal;
-    font-size: 1.1em;
-    font-variation-settings: 'opsz' 72;
   }
 }
 
 .bannerIcon {
-  font-size: 1.4rem;
-  font-style: normal;
+  font-size: 1.2rem;
 }
 
 .bannerCta {
-  @include ty.ui-label;
   margin-left: auto;
   color: var(--accent-ink);
-  font-size: 0.72rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
@@ -64,8 +50,8 @@
 .board {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(280px, 320px);
-  gap: 0;
+  grid-auto-columns: minmax(284px, 1fr);
+  gap: t.$space-md;
   padding: t.$space-xl;
   overflow-x: auto;
   min-height: calc(100dvh - 200px);
@@ -73,61 +59,62 @@
 }
 
 .column {
-  background: var(--paper-elev);
-  border-left: 1px solid var(--rule);
-  border-right: 1px solid var(--rule);
-  border-top: 3px solid;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-lg;
   display: flex;
   flex-direction: column;
   max-height: calc(100dvh - 220px);
-  transition: border-color t.$dur-quick t.$ease-editorial;
-  position: relative;
-
-  // Asterismo del column header acompaña al hover
-  &:not(:last-child) {
-    margin-right: -1px;
-  }
+  transition: border-color t.$dur-quick t.$ease-editorial,
+    background t.$dur-quick t.$ease-editorial;
 }
 
 .columnOver {
-  background: var(--paper-deep);
-  border-top-color: var(--ink) !important;
+  border-color: var(--accent-ink);
+  background: var(--accent-ink-wash);
 }
 
 .columnHeader {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: baseline;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: t.$space-md t.$space-md t.$space-sm;
-  border-bottom: 1px solid var(--rule);
   gap: t.$space-sm;
 }
 
 .columnTitle {
-  @include ty.eyebrow;
-  color: var(--ink);
-  font-size: 0.78rem;
-  letter-spacing: 0.15em;
-  margin: 0;
-  font-style: italic;
-  display: flex;
-  align-items: baseline;
+  display: inline-flex;
+  align-items: center;
   gap: t.$space-xs;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
+  color: var(--ink);
 }
 
 .dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
 }
 
+// Count as a small neutral chip.
 .count {
   @include ty.tabular;
-  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.25rem;
+  padding: 0 0.4rem;
+  border-radius: t.$radius-full;
+  background: var(--ink-wash-8);
+  color: var(--ink-muted);
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
 }
 
 .columnBody {
@@ -142,16 +129,16 @@
 // ---------- Task cards ----------
 .card {
   padding: t.$space-md;
-  background: var(--paper);
+  background: var(--paper-elev);
   border: 1px solid var(--rule);
-  border-bottom-width: 3px;
+  border-radius: t.$radius-md;
   cursor: grab;
-  transition: all t.$dur-quick t.$ease-editorial;
-  position: relative;
+  transition: border-color t.$dur-quick t.$ease-editorial,
+    box-shadow t.$dur-quick t.$ease-editorial;
 
   &:hover {
     border-color: var(--rule-strong);
-    border-bottom-color: var(--accent-ink);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px -8px rgba(0, 0, 0, 0.14);
   }
 
   &:active {
@@ -162,7 +149,7 @@
 .cardOverlay {
   box-shadow: t.$shadow-drop;
   cursor: grabbing;
-  border-bottom-color: var(--accent-ink);
+  border-color: var(--accent-ink);
 }
 
 .cardHeader {
@@ -186,9 +173,9 @@
 }
 
 .cardTitle {
-  font-family: var(--font-editorial);
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
   line-height: 1.4;
   color: var(--ink);
   margin: 0;
@@ -200,23 +187,23 @@
   align-items: center;
   gap: t.$space-sm;
   margin-top: t.$space-sm;
-  @include ty.caption;
+  font-family: var(--font-sans);
   font-size: 0.72rem;
+  color: var(--ink-muted);
 }
 
 .assignee {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--accent-ink);
+  color: var(--color-accent-fg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   font-size: 0.62rem;
   font-weight: 700;
-  font-variation-settings: 'opsz' 14;
   letter-spacing: 0.02em;
 }
 
@@ -228,21 +215,27 @@
   font-family: var(--font-mono);
 }
 
-// ---------- Add task affordance ----------
+// ---------- Add task affordance — a clear, visible CTA (audit F4) ----------
 .addBtn {
-  @include ty.eyebrow;
-  margin: t.$space-sm;
-  padding: t.$space-sm t.$space-md;
-  border: 1px dashed var(--rule-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: t.$space-xs t.$space-sm t.$space-sm;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: t.$radius-md;
   background: transparent;
   color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8125rem;
   text-align: left;
   cursor: pointer;
-  transition: all t.$dur-quick t.$ease-editorial;
+  transition: background t.$dur-quick t.$ease-editorial,
+    color t.$dur-quick t.$ease-editorial;
 
   &:hover {
-    border-color: var(--accent-ink);
-    border-style: solid;
+    background: var(--accent-ink-wash);
     color: var(--accent-ink);
   }
 }
@@ -255,30 +248,38 @@
 
   textarea {
     padding: t.$space-sm;
-    border: 1px solid var(--rule);
-    background: var(--paper);
+    border: 1px solid var(--rule-strong);
+    background: var(--paper-elev);
     color: var(--ink);
     font: inherit;
-    font-family: var(--font-editorial);
-    font-size: 0.92rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
     resize: vertical;
-    border-radius: 0;
+    border-radius: t.$radius-md;
 
     &:focus {
       outline: none;
       border-color: var(--accent-ink);
+      box-shadow: 0 0 0 3px var(--accent-ink-wash);
     }
   }
 
   button {
-    @include ty.ui-label;
-    padding: t.$space-xs t.$space-sm;
-    border: 1px solid var(--ink);
-    background: var(--ink);
-    color: var(--paper);
-    font-size: 0.62rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--accent-ink);
+    background: var(--accent-ink);
+    color: var(--color-accent-fg);
+    border-radius: t.$radius-md;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.8125rem;
     cursor: pointer;
-    transition: all t.$dur-quick t.$ease-editorial;
+    transition: background t.$dur-quick t.$ease-editorial;
+
+    &:hover:not(:disabled) {
+      background: var(--color-accent-hover);
+      border-color: var(--color-accent-hover);
+    }
 
     &:disabled {
       opacity: 0.5;
@@ -290,7 +291,8 @@
       border-color: var(--rule-strong);
 
       &:hover {
-        border-color: var(--ink);
+        background: var(--ink-wash-8);
+        border-color: var(--ink-subtle);
       }
     }
   }
