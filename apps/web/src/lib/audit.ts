@@ -6,6 +6,8 @@ export type AuditAction =
   | 'project.create'
   | 'project.update'
   | 'project.delete'
+  | 'file.upload'
+  | 'file.delete'
   | 'member.invite'
   | 'member.role_change'
   | 'member.remove'

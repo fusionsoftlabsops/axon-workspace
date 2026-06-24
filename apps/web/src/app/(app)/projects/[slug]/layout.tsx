@@ -42,6 +42,7 @@ export default async function ProjectLayout({
         </div>
         <nav className={styles.tabs}>
           <Link href={`/projects/${slug}/board`}>§ {t('Tablero', 'Board')}</Link>
+          <Link href={`/projects/${slug}/files`}>❏ {t('Archivos', 'Files')}</Link>
           <Link href={`/projects/${slug}/vault`}>※ Vault</Link>
           <Link href={`/projects/${slug}/brain`}>⁂ {t('Cerebro', 'Brain')}</Link>
           <Link href={`/projects/${slug}/stories`}>✎ {t('HUs', 'Stories')}</Link>

@@ -162,6 +162,7 @@ model User {
   brainSyncStates  BrainSyncState[]
   llmCredentials   LlmCredential[]
   storyDrafts      StoryDraft[]
+  uploadedFiles    ProjectFile[]    @relation("FileUploader")
   invitesSent      Invitation[]     @relation("InvitedBy")
 
   @@index([email])
@@ -225,8 +226,45 @@ model Project {
   brainSyncStates BrainSyncState[]
   llmCredentials LlmCredential[]
   storyDrafts    StoryDraft[]
+  files          ProjectFile[]
 
   @@index([ownerId])
+}
+
+// Categoría de archivo derivada del mime-type al subir; usada para agrupar
+// el almacén de archivos del proyecto por tipo.
+enum FileCategory {
+  IMAGE
+  DOCUMENT
+  SPREADSHEET
+  PRESENTATION
+  PDF
+  ARCHIVE
+  AUDIO
+  VIDEO
+  CODE
+  OTHER
+}
+
+// Almacén de archivos por proyecto. Accesible a cualquier miembro. Los bytes
+// viven en `data` (bytea) — NUNCA seleccionar `data` al listar; sólo la ruta de
+// descarga lo lee. Organizado por `category` (tipo) y `createdAt` (fecha).
+model ProjectFile {
+  id           String       @id @default(cuid())
+  projectId    String
+  name         String
+  mimeType     String
+  size         Int
+  category     FileCategory @default(OTHER)
+  data         Bytes
+  uploadedById String
+  createdAt    DateTime     @default(now())
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("FileUploader", fields: [uploadedById], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([projectId, category])
 }
 
 // Tracks the next task number per project (for sequential PROJ-N numbering).
