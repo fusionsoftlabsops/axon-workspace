@@ -10,7 +10,7 @@ export default async function HomePage() {
       <div className={styles.hero}>
         <div className={styles.eyebrow}>
           <Eyebrow ornament="asterism" tone="muted">
-            admin · data · project
+            Axon
           </Eyebrow>
         </div>
 

@@ -1,29 +1,22 @@
 import type { Metadata } from 'next';
-import { Fraunces, Newsreader, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
+import { Space_Grotesk, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { cookies } from 'next/headers';
 import { Providers } from './providers';
 import { LANG_COOKIE, type Lang } from '@/lib/i18n/lang';
+import { THEME_COOKIE, type Theme } from '@/lib/theme';
 import './globals.scss';
 
-// Display serif — dramático para mastheads y drop caps. Variable axes:
-// opsz (12-144), wght (100-900), soft (0-100), WONK (0-1).
-const fraunces = Fraunces({
+// Display sans — Space Grotesk para títulos y encabezados (sustituye a
+// Fraunces/Newsreader; la app es una herramienta, no una pieza editorial).
+const display = Space_Grotesk({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-display',
-  axes: ['opsz', 'SOFT', 'WONK'],
+  weight: ['400', '500', '600', '700'],
 });
 
-// Editorial serif — body de memorias largas y pull quotes.
-const newsreader = Newsreader({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-editorial',
-  style: ['normal', 'italic'],
-});
-
-// UI sans — neutral con character. Navegación, botones, labels.
+// UI sans — neutral con character. Navegación, botones, labels, cuerpo.
 const plex = IBM_Plex_Sans({
   subsets: ['latin'],
   display: 'swap',
@@ -44,6 +37,11 @@ async function serverLang(): Promise<Lang> {
   return cookieStore.get(LANG_COOKIE)?.value === 'es' ? 'es' : 'en';
 }
 
+async function serverTheme(): Promise<Theme> {
+  const cookieStore = await cookies();
+  return cookieStore.get(THEME_COOKIE)?.value === 'dark' ? 'dark' : 'light';
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const isEs = (await serverLang()) === 'es';
   return {
@@ -57,15 +55,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const lang = await serverLang();
-  const fontClasses = [
-    fraunces.variable,
-    newsreader.variable,
-    plex.variable,
-    mono.variable,
-  ].join(' ');
+  const theme = await serverTheme();
+  const fontClasses = [display.variable, plex.variable, mono.variable].join(' ');
 
   return (
-    <html lang={lang} className={fontClasses}>
+    <html lang={lang} data-theme={theme} className={fontClasses}>
       <body>
         <Providers>{children}</Providers>
       </body>

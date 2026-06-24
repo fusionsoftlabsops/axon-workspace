@@ -9,7 +9,7 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
     <div className={styles.shell}>
       <aside className={styles.cover}>
         <div className={styles.coverHeader}>
-          <span className={styles.brand}>※ admin · data · project</span>
+          <span className={styles.brand}>Axon</span>
           <h1 className={styles.coverTitle}>
             {t('El cuaderno', 'The team’s')}
             <br />

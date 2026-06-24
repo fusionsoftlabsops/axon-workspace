@@ -6,6 +6,7 @@ import { logoutAction } from '@/lib/actions/auth';
 import styles from './layout.module.scss';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -16,7 +17,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <div className={styles.shell}>
       <header className={styles.header}>
         <Link href="/projects" className={styles.brand}>
-          <span className={styles.brandPrefix}>admin · </span>data
+          Axon
         </Link>
         <nav className={styles.nav}>
           <Link href="/projects">{t('Proyectos', 'Projects')}</Link>
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           {session.user.isMasterUser && <Link href="/settings/invitations">{t('Invitaciones', 'Invitations')}</Link>}
         </nav>
         <div className={styles.user}>
+          <ThemeToggle />
           <LocaleSwitcher />
           <span className={styles.userEmail}>{session.user.email}</span>
           <form

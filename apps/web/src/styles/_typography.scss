@@ -21,56 +21,50 @@
 // $type-4xl: 3.5rem;  // 56 — H1 / masthead body
 // $type-5xl: 5rem;    // 80 — display masthead
 
-// Eyebrow: small caps Fraunces italic encima de un titular.
+// Eyebrow: label en versalitas SANS (sin itálica ni small-caps — F1).
 @mixin eyebrow {
-  font-family: var(--font-display), Georgia, serif;
-  font-style: italic;
-  font-weight: 500;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 600;
   font-size: 0.72rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  font-feature-settings: 'smcp' on, 'c2sc' on;
   color: var(--ink-muted);
   line-height: 1;
 }
 
-// Masthead: H1 dramático con kerning negativo y opsz alta.
-@mixin masthead($size: 4rem) {
-  font-family: var(--font-display), Georgia, serif;
-  font-weight: 600;
+// Masthead: ahora un H1 sans razonable (Space Grotesk), no un titular de revista.
+@mixin masthead($size: 2.25rem) {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 700;
   font-size: $size;
-  line-height: 0.95;
-  letter-spacing: -0.025em;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
   color: var(--ink);
-  font-variation-settings:
-    'opsz' 144,
-    'SOFT' 30,
-    'WONK' 1;
   text-wrap: balance;
 }
 
 // Section title — H2 moderado.
-@mixin section-title($size: 1.75rem) {
-  font-family: var(--font-display), Georgia, serif;
+@mixin section-title($size: 1.5rem) {
+  font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 600;
   font-size: $size;
-  line-height: 1.1;
+  line-height: 1.2;
   letter-spacing: -0.015em;
   color: var(--ink);
-  font-variation-settings: 'opsz' 72, 'SOFT' 50;
   text-wrap: balance;
 }
 
-// Deck — subtitular debajo de masthead, en italic editorial.
-@mixin deck($size: 1.15rem) {
-  font-family: var(--font-editorial), Georgia, serif;
-  font-style: italic;
+// Deck — subtitular debajo de un título, sans y sin itálica.
+@mixin deck($size: 1.0625rem) {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-style: normal;
   font-weight: 400;
   font-size: $size;
-  line-height: 1.4;
+  line-height: 1.5;
   color: var(--ink-muted);
   text-wrap: balance;
-  max-width: 56ch;
+  max-width: 64ch;
 }
 
 // Body de artículo (memorias largas, descripciones).
@@ -111,20 +105,13 @@
   font-feature-settings: 'ss01' on, 'cv11' on;
 }
 
-// Drop cap: primera letra de un artículo, gigantesca.
+// Drop cap retirado del chrome (F1): se neutraliza a primera letra normal.
+// La memoria abierta lee como texto corrido escaneable, sin ornamento.
 @mixin drop-cap($lines: 3) {
   &::first-letter {
-    font-family: var(--font-display), Georgia, serif;
-    font-weight: 700;
-    font-size: 4.5em;
-    line-height: 0.85;
-    float: left;
-    padding: 0.05em 0.08em 0 0;
-    color: var(--accent-ink);
-    font-variation-settings:
-      'opsz' 144,
-      'SOFT' 20,
-      'WONK' 1;
+    font-size: inherit;
+    float: none;
+    color: inherit;
   }
 }
 
@@ -170,19 +157,18 @@
   color: var(--ink-muted);
 }
 
-// Stamp — para badges tipo "sello".
+// Stamp — badge limpio (sans, sin itálica/small-caps); pill suave.
 @mixin stamp($color: var(--accent-ink)) {
-  font-family: var(--font-display), Georgia, serif;
-  font-style: italic;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-style: normal;
   font-weight: 600;
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  font-feature-settings: 'smcp' on, 'c2sc' on;
   color: $color;
-  border: 1.5px solid $color;
-  padding: 0.18em 0.55em;
+  border: 1px solid $color;
+  padding: 0.2em 0.55em;
   display: inline-block;
-  border-radius: 1px;
+  border-radius: t.$radius-md;
   line-height: 1;
 }
