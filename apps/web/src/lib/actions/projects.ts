@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db';
 import { audit } from '@/lib/audit';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { ensureMcpServiceMembership } from '@/lib/mcp-service';
+import { ensureProjectFolder, isStorageConfigured } from '@/lib/storage';
 import {
   createProjectSchema,
   inviteMemberSchema,
@@ -86,9 +87,21 @@ export async function createProjectAction(
     action: 'project.create',
     resourceType: 'project',
     resourceId: createdProjectId,
-    projectId: createdProjectId,
     payload: { slug: data.slug, name: data.name },
+    projectId: createdProjectId,
   });
+
+  // Materialize the project's main folder in object storage. Best-effort: the
+  // project is already created, and the folder is also created lazily on the
+  // first upload, so a storage hiccup must not fail project creation.
+  if (isStorageConfigured()) {
+    try {
+      await ensureProjectFolder(data.slug);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[projects] ensureProjectFolder failed:', err);
+    }
+  }
 
   revalidatePath('/projects');
   return { ok: true, data: { slug: data.slug } };

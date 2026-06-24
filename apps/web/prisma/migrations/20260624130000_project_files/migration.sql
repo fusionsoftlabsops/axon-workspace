@@ -9,7 +9,7 @@ CREATE TABLE "ProjectFile" (
     "mimeType" TEXT NOT NULL,
     "size" INTEGER NOT NULL,
     "category" "FileCategory" NOT NULL DEFAULT 'OTHER',
-    "data" BYTEA NOT NULL,
+    "storageKey" TEXT NOT NULL,
     "uploadedById" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

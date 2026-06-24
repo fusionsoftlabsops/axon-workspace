@@ -1,7 +1,8 @@
 import type { FileCategory } from '@prisma/client';
 
-/** Per-file upload cap. Files live in Postgres (bytea), so keep it sane. */
-export const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25 MB
+/** Per-file upload cap. Files live in MinIO; the route still buffers the body,
+ *  so keep it within a reasonable memory budget. */
+export const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100 MB
 
 /** Derive a coarse category from the mime type (and filename as a fallback),
  *  used to organize the project file store by type. */

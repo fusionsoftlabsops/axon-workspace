@@ -256,7 +256,9 @@ model ProjectFile {
   mimeType     String
   size         Int
   category     FileCategory @default(OTHER)
-  data         Bytes
+  // Object key in MinIO/S3 (bytes live there, not in Postgres):
+  //   projects/<slug>/<category>/<YYYY-MM>/<fileId>-<name>
+  storageKey   String
   uploadedById String
   createdAt    DateTime     @default(now())
 
