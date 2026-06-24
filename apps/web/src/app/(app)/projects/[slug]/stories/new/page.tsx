@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { repoReaderFor } from '@/lib/repo/reader';
 import { listProviders } from '@/lib/ai/providers/registry';
-import { Masthead, Eyebrow } from '@/components/ui';
+import { PageHeader, Eyebrow } from '@/components/ui';
 import { getServerT } from '@/lib/i18n/server';
 import { Composer } from './Composer';
 import styles from '../stories.module.scss';
@@ -60,13 +60,11 @@ export default async function NewStoryPage({
 
   return (
     <main className={styles.page}>
-      <Masthead
-        eyebrow={<Eyebrow ornament="pilcrow">{t('Nuevo borrador', 'New draft')}</Eyebrow>}
-        deck={t('Describe la necesidad. El sistema lee el código real y las memorias relevantes.', 'Describe the need. The system reads the real code and the relevant memories.')}
-        size="lg"
-      >
-        {t('¿Qué HU vas a levantar?', 'What story will you raise?')}
-      </Masthead>
+      <PageHeader
+        eyebrow={<Eyebrow>{t('Nuevo borrador', 'New draft')}</Eyebrow>}
+        title={t('¿Qué HU vas a levantar?', 'What story will you raise?')}
+        description={t('Describe la necesidad. El sistema lee el código real y las memorias relevantes.', 'Describe the need. The system reads the real code and the relevant memories.')}
+      />
 
       <Composer
         projectSlug={slug}

@@ -131,7 +131,7 @@
 .empty {
   @include ty.ui-body;
   color: var(--color-fg-muted);
-  font-style: italic;
+  font-style: normal;
   padding: t.$space-xl 0;
 }
 
@@ -178,7 +178,7 @@
 .rawInput {
   @include ty.ui-body(1.05rem);
   font-family: var(--font-editorial);
-  font-style: italic;
+  font-style: normal;
   width: 100%;
   min-height: 160px;
   background: transparent;
@@ -193,7 +193,7 @@
     border-bottom-color: var(--accent-ink);
   }
 
-  &::placeholder { color: var(--color-fg-muted); font-style: italic; }
+  &::placeholder { color: var(--color-fg-muted); font-style: normal; }
 }
 
 .select {
@@ -223,7 +223,7 @@
 
   strong {
     font-family: var(--font-display);
-    font-style: italic;
+    font-style: normal;
     font-size: 0.95rem;
     color: var(--accent-ink);
     text-transform: none;

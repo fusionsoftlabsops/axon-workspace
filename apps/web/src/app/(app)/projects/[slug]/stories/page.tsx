@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { Masthead, Eyebrow, Tag, Stat } from '@/components/ui';
+import { PageHeader, Eyebrow, Tag, Stat } from '@/components/ui';
 import { getServerT, getServerLang } from '@/lib/i18n/server';
 import styles from './stories.module.scss';
 
@@ -60,13 +60,11 @@ export default async function StoriesIndex({
 
   return (
     <main className={styles.page}>
-      <Masthead
-        eyebrow={<Eyebrow ornament="reference">{t('Historias de usuario · borradores', 'User stories · drafts')}</Eyebrow>}
-        deck={t('Parte del código y del cerebro del proyecto. Genera, refina, publica.', 'Part of the project’s code and brain. Generate, refine, publish.')}
-        size="lg"
-      >
-        {t('El editor de HUs', 'The user story editor')}
-      </Masthead>
+      <PageHeader
+        eyebrow={<Eyebrow>{t('Historias de usuario · borradores', 'User stories · drafts')}</Eyebrow>}
+        title={t('El editor de HUs', 'The user story editor')}
+        description={t('Parte del código y del cerebro del proyecto. Genera, refina, publica.', 'Part of the project’s code and brain. Generate, refine, publish.')}
+      />
 
       <div className={styles.statsStrip}>
         <Stat label={t('Borradores', 'Drafts')} value={totalDrafts} />

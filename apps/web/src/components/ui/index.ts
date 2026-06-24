@@ -9,11 +9,9 @@ export { Toolbar } from './Toolbar';
 export { Stat } from './Stat';
 export { Tag } from './Tag';
 
-// Editorial primitives — kept for optional long-form reading, no longer used
-// in the app chrome (audit: move to an editorial/ namespace later).
+// Label + divider primitives (now flat/sans — kept in the kit).
 export { Eyebrow } from './Eyebrow';
-export { Masthead } from './Masthead';
 export { RuleDivider } from './RuleDivider';
-export { DropCap } from './DropCap';
-export { PullQuote } from './PullQuote';
-export { Marginalia } from './Marginalia';
+
+// Magazine-only primitives (Masthead, DropCap, PullQuote, Marginalia) were
+// retired from the chrome — import them from '@/components/editorial' instead.

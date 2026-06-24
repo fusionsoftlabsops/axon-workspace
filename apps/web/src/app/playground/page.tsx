@@ -4,7 +4,8 @@
  * Pública (no requiere auth) para que el iterador de diseño pueda
  * verla sin tener sesión. Borrable cuando el sistema esté maduro.
  */
-import { Eyebrow, Masthead, RuleDivider, DropCap, PullQuote, Marginalia, Stat, Tag } from '@/components/ui';
+import { Eyebrow, RuleDivider, Stat, Tag } from '@/components/ui';
+import { Masthead, DropCap, PullQuote, Marginalia } from '@/components/editorial';
 import { getServerT } from '@/lib/i18n/server';
 import styles from './page.module.scss';
 

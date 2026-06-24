@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { Masthead, Eyebrow } from '@/components/ui';
+import { PageHeader, Eyebrow } from '@/components/ui';
 import { getServerT, getServerLang } from '@/lib/i18n/server';
 import { DraftView } from './DraftView';
 import styles from '../../stories.module.scss';
@@ -64,9 +64,9 @@ export default async function DraftPage({
 
   return (
     <main className={styles.page}>
-      <Masthead
+      <PageHeader
         eyebrow={
-          <Eyebrow ornament="pilcrow">
+          <Eyebrow>
             {t('Borrador', 'Draft')} · {draft.provider} · {draft.model} ·{' '}
             {draft.createdAt.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', {
               day: '2-digit',
@@ -75,10 +75,8 @@ export default async function DraftPage({
             })}
           </Eyebrow>
         }
-        size="md"
-      >
-        {draft.summary?.split('\n')[0]?.slice(0, 120) ?? t('HU en redacción', 'Story in progress')}
-      </Masthead>
+        title={draft.summary?.split('\n')[0]?.slice(0, 120) ?? t('HU en redacción', 'Story in progress')}
+      />
 
       <DraftView
         projectSlug={slug}
