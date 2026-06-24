@@ -26,6 +26,13 @@ export default async function ProjectsPage() {
   const issueNumber = String(projects.length + 1).padStart(3, '0');
   const year = new Date().getFullYear();
 
+  // Bilingual label + accent for each non-active lifecycle status.
+  const statusBadge: Record<string, { label: string; color: string }> = {
+    PAUSED: { label: t('Pausado', 'Paused'), color: '#b45309' },
+    INACTIVE: { label: t('Desactivado', 'Inactive'), color: 'var(--color-fg-muted)' },
+    COMPLETED: { label: t('Completado', 'Completed'), color: '#15803d' },
+  };
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -65,6 +72,23 @@ export default async function ProjectsPage() {
               <h2 className={styles.cardTitle}>{p.name}</h2>
               <span className={styles.role}>{p.members[0]?.role}</span>
             </div>
+            {statusBadge[p.status] && (
+              <span
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '0.15rem 0.55rem',
+                  borderRadius: '999px',
+                  border: `1px solid ${statusBadge[p.status]!.color}`,
+                  color: statusBadge[p.status]!.color,
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {statusBadge[p.status]!.label}
+              </span>
+            )}
             {p.description && <p className={styles.desc}>{p.description}</p>}
             <div className={styles.meta}>
               <span>

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getServerT } from '@/lib/i18n/server';
 import { MembersPanel } from './MembersPanel';
 import { RepoSettingsPanel } from './RepoSettingsPanel';
+import { ProjectLifecyclePanel } from './ProjectLifecyclePanel';
 
 export default async function ProjectSettingsPage({
   params,
@@ -71,6 +72,19 @@ export default async function ProjectSettingsPage({
           repoUrl: project.repoUrl,
           repoDefaultBranch: project.repoDefaultBranch,
         }}
+      />
+
+      <h2 style={{ marginTop: '3rem' }}>{t('Estado del proyecto', 'Project status')}</h2>
+      <p style={{ color: 'var(--color-fg-muted)' }}>
+        {t(
+          'Activa, pausa, desactiva o marca como completado el proyecto. Solo OWNER o ADMIN pueden cambiar el estado o eliminarlo.',
+          'Set the project as active, paused, inactive or completed. Only OWNER or ADMIN can change the status or delete it.',
+        )}
+      </p>
+      <ProjectLifecyclePanel
+        projectSlug={slug}
+        projectName={project.name}
+        currentStatus={project.status}
       />
     </div>
   );

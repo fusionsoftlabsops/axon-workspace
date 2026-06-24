@@ -24,6 +24,14 @@ enum MemberRole {
   VIEWER
 }
 
+// Lifecycle state of a project. Only OWNER/ADMIN can change it.
+enum ProjectStatus {
+  ACTIVE      // en marcha
+  PAUSED      // pausado temporalmente
+  INACTIVE    // desactivado
+  COMPLETED   // completado / cerrado
+}
+
 enum StateCategory {
   OPEN
   IN_PROGRESS
@@ -196,6 +204,7 @@ model Project {
   slug        String   @unique
   name        String
   description String?
+  status      ProjectStatus @default(ACTIVE)
   ownerId     String
 
   // Repositorio asociado (lectura desde el filesystem del server)
