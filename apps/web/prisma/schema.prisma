@@ -230,6 +230,7 @@ model Project {
   files          ProjectFile[]
   sprints        Sprint[]
   plans          ProjectPlan[]
+  contextSummaries ContextSummary[]
 
   @@index([ownerId])
 }
@@ -740,4 +741,34 @@ model StoryDraft {
 
   @@index([projectId, createdAt])
   @@index([authorId, createdAt])
+}
+
+// Ámbito de un resumen de contexto generado por el modelo self-hosted (Ollama
+// en fusion-infra). PROJECT = visión global del proyecto; TASK = contexto de
+// una HU/tarea concreta (refId = Task.id).
+enum ContextScope {
+  PROJECT
+  TASK
+}
+
+// Resumen narrativo cacheado del grafo de contexto. Se regenera bajo demanda o
+// cuando queda obsoleto (p. ej. tras completarse tareas). `refId` = projectId
+// para scope PROJECT, o el id de la Task para scope TASK.
+model ContextSummary {
+  id        String       @id @default(cuid())
+  projectId String
+  scope     ContextScope
+  refId     String
+  body      String       @db.Text
+  model     String
+  // Señal de frescura: nº de nodos/aristas en el momento de generar, para saber
+  // si el grafo cambió lo suficiente como para regenerar.
+  signature String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([scope, refId])
+  @@index([projectId, scope])
 }

@@ -44,6 +44,7 @@ export default async function ProjectLayout({
           <Link href={`/projects/${slug}/plan`}>✦ {t('Plan', 'Plan')}</Link>
           <Link href={`/projects/${slug}/roadmap`}>⊞ {t('Roadmap', 'Roadmap')}</Link>
           <Link href={`/projects/${slug}/board`}>§ {t('Tablero', 'Board')}</Link>
+          <Link href={`/projects/${slug}/context`}>◆ {t('Contexto', 'Context')}</Link>
           <Link href={`/projects/${slug}/files`}>❏ {t('Archivos', 'Files')}</Link>
           <Link href={`/projects/${slug}/vault`}>※ Vault</Link>
           <Link href={`/projects/${slug}/brain`}>⁂ {t('Cerebro', 'Brain')}</Link>
