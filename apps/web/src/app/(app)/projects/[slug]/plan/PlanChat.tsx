@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Badge, Card } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import {
   planChatAction,
@@ -15,6 +15,7 @@ import {
 } from '@/lib/actions/planning';
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
 import { PlanTaskCard, PlanSprintHead } from './PlanEditors';
+import { PlanRepos } from './PlanRepos';
 import styles from './plan.module.scss';
 
 export function PlanChat({
@@ -349,6 +350,7 @@ export function PlanChat({
                         taskIndex={ti}
                         task={tk}
                         canEdit={canEdit}
+                        repoNames={generated.suggestedRepos?.map((r) => r.name) ?? []}
                         onChange={setPlan}
                         onError={(m) => setError(m || null)}
                       />
@@ -356,28 +358,7 @@ export function PlanChat({
                   </div>
                 </div>
               ))}
-              {generated.suggestedRepos?.length > 0 && (
-                <div>
-                  <h3>{t('Repositorios sugeridos', 'Suggested repositories')}</h3>
-                  <div className={styles.repos}>
-                    {generated.suggestedRepos.map((r, ri) => (
-                      <div key={ri} className={styles.repoCard}>
-                        <div className={styles.repoName}>
-                          {r.name} <Badge tone="neutral">{r.kind}</Badge>
-                        </div>
-                        {r.stack && <p className={styles.repoReason}>{r.stack}</p>}
-                        {r.reason && <p className={styles.repoReason}>{r.reason}</p>}
-                      </div>
-                    ))}
-                  </div>
-                  <p className={styles.repoReason}>
-                    {t(
-                      'Créalos y pega la URL en Ajustes → Repositorio.',
-                      'Create them and paste the URL in Settings → Repository.',
-                    )}
-                  </p>
-                </div>
-              )}
+              <PlanRepos slug={slug} canWrite={canWrite} />
               {canWrite && !published && (
                 <div className={styles.publishBar}>
                   <Button variant="primary" onClick={publish} disabled={publishing}>

@@ -141,6 +141,7 @@ model User {
   totpSecretEncrypted Bytes?  // TOTP secret envuelto con KEK
   totpNonce           Bytes?
   isMasterUser        Boolean @default(false)
+  githubLogin         String? // handle de GitHub (para verificar acceso a repos)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -231,8 +232,33 @@ model Project {
   sprints        Sprint[]
   plans          ProjectPlan[]
   contextSummaries ContextSummary[]
+  repos          ProjectRepo[]
 
   @@index([ownerId])
+}
+
+// Un proyecto puede tener varios repos / aplicativos. Fuente de verdad para la
+// sección de Repositorios del plan (crear en GitHub / vincular / verificar acceso)
+// y para que el plan de implementación lea el repo correcto por HU.
+model ProjectRepo {
+  id             String   @id @default(cuid())
+  projectId      String
+  name           String                 // identificador lógico dentro del proyecto
+  kind           String   @default("other") // backend|frontend|infra|mobile|shared|other
+  url            String?                // https://github.com/owner/repo
+  githubFullName String?                // owner/repo
+  defaultBranch  String?  @default("main")
+  private        Boolean  @default(true)
+  repoPath       String?                // ruta absoluta en el server para lectura de archivos
+  access         Json?                  // [{ userId, name, login, hasAccess, permission }]
+  accessCheckedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@index([projectId])
 }
 
 // Categoría de archivo derivada del mime-type al subir; usada para agrupar

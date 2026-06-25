@@ -55,6 +55,11 @@ const schema = z.object({
   // Optional: if unset, the graph still works and summaries are simply disabled.
   INFRA_LLM_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   INFRA_LLM_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // GitHub org PAT used to create repos and read collaborator access for the
+  // plan's Repositories section. Optional — if unset, those actions are disabled
+  // and the rest of the app is unaffected.
+  GITHUB_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  GITHUB_ORG: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });

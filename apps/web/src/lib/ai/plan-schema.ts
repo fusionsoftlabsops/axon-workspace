@@ -25,6 +25,8 @@ export const planTaskSchema = z.object({
   recommendedRoles: z.array(z.string()).default([]),
   priority: z.string().default('MEDIUM'),
   kind: z.string().default('TASK'),
+  // Repo objetivo (nombre de un suggestedRepo / ProjectRepo) al que pertenece la HU.
+  repo: z.string().default(''),
 });
 export type PlanTask = z.infer<typeof planTaskSchema>;
 
@@ -39,6 +41,11 @@ export const suggestedRepoSchema = z.object({
   kind: z.string().default('other'),
   stack: z.string().default(''),
   reason: z.string().default(''),
+  // Campos gestionados por la app (el modelo no los emite).
+  status: z.string().default('NEW'), // NEW | EXISTING
+  url: z.string().default(''),
+  githubFullName: z.string().default(''),
+  defaultBranch: z.string().default('main'),
 });
 
 export const generatedPlanSchema = z.object({
@@ -84,6 +91,10 @@ const PLAN_TASK_PROPERTIES = {
   recommendedRoles: { type: 'array', items: { type: 'string' } },
   priority: { type: 'string', enum: VALID_PRIORITY },
   kind: { type: 'string', enum: VALID_KIND },
+  repo: {
+    type: 'string',
+    description: 'Nombre del repo objetivo (uno de suggestedRepos) al que pertenece esta HU.',
+  },
 } as const;
 
 const PLAN_TASK_REQUIRED = ['title', 'description', 'acceptanceCriteria', 'estimate', 'category'];

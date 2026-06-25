@@ -103,10 +103,10 @@ function genSystem(lang: Lang): string {
 Llama a la herramienta EmitPlan con:
 - improvedIdea: la idea afinada (2-5 frases).
 - sprints: ordenados; cada uno con name, goal y tasks.
-- Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate ("4h","1d","3 pts"); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE).
-- suggestedRepos: repos a crear (backend, frontend, infra, etc.) con name, kind, stack y reason.
+- Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate ("4h","1d","3 pts"); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE); repo (nombre del repo objetivo, uno de suggestedRepos).
+- suggestedRepos: los repos/aplicativos del proyecto (backend, frontend, infra, etc.) con name, kind, stack y reason. Un proyecto puede tener VARIOS.
 ${estimateGuidance()}
-Reglas: realista y específico al dominio; usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}. Llama SOLO a la herramienta.`;
+Reglas: realista y específico al dominio; **asigna a CADA HU su repo objetivo en \`repo\`** (uno de los name de suggestedRepos, según su área/categoría); usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}. Llama SOLO a la herramienta.`;
 }
 
 function textOf(resp: Anthropic.Messages.Message): string {

@@ -493,6 +493,7 @@ export async function generateImplPlanAction(
   slug: string,
   sprintIndex: number,
   taskIndex: number,
+  repoId?: string,
 ): Promise<ActionResult<{ filename: string; markdown: string; fileId: string | null }>> {
   const ctx = await assertProjectMember(slug);
   if (!ctx.ok) return ctx;
@@ -511,11 +512,24 @@ export async function generateImplPlanAction(
     where: { id: ctx.projectId },
     select: { name: true, description: true, repoPath: true },
   });
-  const reader = await repoReaderFor({ repoPath: project?.repoPath ?? null });
+
+  // Resolve the repo to read for THIS story: explicit selection › the HU's
+  // assigned repo › a repo whose kind matches the HU category › legacy single repo.
+  const projectRepos = await prisma.projectRepo.findMany({ where: { projectId: ctx.projectId } });
+  let chosen = repoId ? projectRepos.find((r) => r.id === repoId) : undefined;
+  if (!chosen && task.repo)
+    chosen = projectRepos.find((r) => r.name.toLowerCase() === task.repo.toLowerCase());
+  if (!chosen && task.category)
+    chosen = projectRepos.find((r) => r.kind.toLowerCase() === task.category.toLowerCase());
+  const repoPath = chosen?.repoPath ?? project?.repoPath ?? null;
+
+  const reader = await repoReaderFor({ repoPath });
   if (!reader) {
     return {
       ok: false,
-      error: 'El proyecto no tiene un repositorio configurado o accesible (Ajustes → Repositorio).',
+      error: chosen
+        ? `El repo "${chosen.name}" no tiene una ruta local configurada (Ajustes → Repositorios).`
+        : 'No hay un repositorio configurado o accesible para esta HU (Ajustes → Repositorios).',
     };
   }
 
@@ -579,7 +593,8 @@ export async function generateImplPlanAction(
     return { ok: false, error: err instanceof Error ? err.message : 'Error de IA' };
   }
 
-  const filename = `IMPL-${slug}-S${sprintIndex + 1}T${taskIndex + 1}-${slugify(task.title)}.md`.slice(0, 120);
+  const repoTag = chosen ? `${slugify(chosen.name)}-` : '';
+  const filename = `IMPL-${slug}-${repoTag}S${sprintIndex + 1}T${taskIndex + 1}-${slugify(task.title)}.md`.slice(0, 120);
 
   // Persist to the project Files store (best-effort).
   let fileId: string | null = null;

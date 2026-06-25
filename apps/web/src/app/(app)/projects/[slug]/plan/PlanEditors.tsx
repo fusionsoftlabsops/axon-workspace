@@ -26,6 +26,7 @@ export function PlanTaskCard({
   taskIndex,
   task,
   canEdit,
+  repoNames = [],
   onChange,
   onError,
 }: {
@@ -34,6 +35,7 @@ export function PlanTaskCard({
   taskIndex: number;
   task: PlanTask;
   canEdit: boolean;
+  repoNames?: string[];
   onChange: (p: PlanView) => void;
   onError: (msg: string) => void;
 }) {
@@ -77,6 +79,7 @@ export function PlanTaskCard({
           priority: draft.priority,
           kind: draft.kind,
           recommendedRoles: draft.recommendedRoles,
+          repo: draft.repo,
         }),
       () => setMode('view'),
     );
@@ -205,6 +208,21 @@ export function PlanTaskCard({
               ))}
             </select>
           </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>{t('Repo', 'Repo')}</span>
+            <select
+              className={styles.editSelect}
+              value={draft.repo}
+              onChange={(e) => setDraft({ ...draft, repo: e.target.value })}
+            >
+              <option value="">{t('(sin asignar)', '(unassigned)')}</option>
+              {[...new Set([...(draft.repo ? [draft.repo] : []), ...repoNames])].map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>{t('Perfiles (separados por coma)', 'Roles (comma-separated)')}</span>
@@ -250,6 +268,7 @@ export function PlanTaskCard({
           </div>
           <div className={styles.taskMeta}>
             <span>{task.priority}</span>
+            {task.repo && <span>◆ {task.repo}</span>}
             {task.recommendedRoles?.length > 0 && <span>{task.recommendedRoles.join(', ')}</span>}
           </div>
           {canEdit && (

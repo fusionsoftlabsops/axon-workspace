@@ -4,6 +4,31 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { toBase64 } from '@/lib/crypto';
 
+const GITHUB_LOGIN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+
+/** Current user's GitHub handle (used to verify repo access). */
+export async function getMyGithubLogin(): Promise<string | null> {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) return null;
+  const u = await prisma.user.findUnique({ where: { id }, select: { githubLogin: true } });
+  return u?.githubLogin ?? null;
+}
+
+export async function setGithubLoginAction(
+  login: string,
+): Promise<{ ok: true; githubLogin: string | null } | { ok: false; error: string }> {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) return { ok: false, error: 'No autenticado' };
+  const value = login.trim().replace(/^@/, '');
+  if (value && !GITHUB_LOGIN_RE.test(value)) {
+    return { ok: false, error: 'Usuario de GitHub inválido' };
+  }
+  await prisma.user.update({ where: { id }, data: { githubLogin: value || null } });
+  return { ok: true, githubLogin: value || null };
+}
+
 export interface SelfKeyMaterial {
   publicKey: string;
   encryptedPrivateKey: string;

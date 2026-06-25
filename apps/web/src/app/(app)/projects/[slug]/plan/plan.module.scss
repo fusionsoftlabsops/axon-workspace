@@ -456,6 +456,74 @@
   font-size: 0.8rem;
   color: var(--ink-muted);
 }
+
+// ---- Repositories section (create/link/verify access) ----
+.repoList {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+}
+.repoSubhead {
+  margin: t.$space-lg 0 t.$space-sm;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-subtle);
+}
+.repoAdd {
+  margin-top: t.$space-md;
+}
+.accessList {
+  list-style: none;
+  margin: t.$space-sm 0 0;
+  padding: t.$space-sm 0 0;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.accessRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: t.$space-sm;
+  font-size: 0.8rem;
+}
+.accessWho {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  color: var(--ink);
+}
+.accessLogin {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-subtle);
+}
+.accessYes {
+  color: #10b981;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.accessNo {
+  color: var(--accent-stamp);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.accessUnknown {
+  color: var(--ink-subtle);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+.accessInvite {
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-size: 0.75rem;
+  &:hover {
+    text-decoration: underline;
+  }
+}
 .publishBar {
   display: flex;
   align-items: center;
