@@ -334,18 +334,20 @@ export function PlanChat({
                     onChange={setPlan}
                     onError={setError}
                   />
-                  {s.tasks.map((tk, ti) => (
-                    <PlanTaskCard
-                      key={ti}
-                      slug={slug}
-                      sprintIndex={si}
-                      taskIndex={ti}
-                      task={tk}
-                      canEdit={canEdit}
-                      onChange={setPlan}
-                      onError={(m) => setError(m || null)}
-                    />
-                  ))}
+                  <div className={styles.taskGrid}>
+                    {s.tasks.map((tk, ti) => (
+                      <PlanTaskCard
+                        key={ti}
+                        slug={slug}
+                        sprintIndex={si}
+                        taskIndex={ti}
+                        task={tk}
+                        canEdit={canEdit}
+                        onChange={setPlan}
+                        onError={(m) => setError(m || null)}
+                      />
+                    ))}
+                  </div>
                 </div>
               ))}
               {generated.suggestedRepos?.length > 0 && (

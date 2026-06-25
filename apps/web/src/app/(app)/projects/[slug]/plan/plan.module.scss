@@ -13,7 +13,9 @@
 
   @media (min-width: t.$bp-lg) {
     &.withPreview {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      // Give the generated-plan preview the larger share so its task tiles can
+      // use the horizontal space; keep the chat comfortably readable.
+      grid-template-columns: minmax(340px, 0.8fr) minmax(0, 1.7fr);
     }
   }
 }
@@ -237,10 +239,28 @@
   font-size: 0.85rem;
   color: var(--ink-muted);
 }
-.taskRow {
+// Tasks tile into a responsive grid so they use the horizontal space instead
+// of stacking in one tall column.
+.taskGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: t.$space-md;
   padding: t.$space-md t.$space-lg;
-  border-bottom: 1px solid var(--rule);
-  &:last-child { border-bottom: none; }
+  align-items: start;
+}
+.taskRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: t.$space-md;
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper);
+}
+// While editing or re-analyzing, the card needs room — span the whole grid row.
+.taskRow.editForm,
+.taskRow:has(.refineBox) {
+  grid-column: 1 / -1;
 }
 .taskTop {
   display: flex;
