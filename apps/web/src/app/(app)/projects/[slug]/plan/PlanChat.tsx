@@ -14,6 +14,7 @@ import {
   type PlanView,
 } from '@/lib/actions/planning';
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
+import { PlanTaskCard, PlanSprintHead } from './PlanEditors';
 import styles from './plan.module.scss';
 
 export function PlanChat({
@@ -41,6 +42,7 @@ export function PlanChat({
   const generated: GeneratedPlan | null = plan.generated;
   const published = plan.status === 'PUBLISHED';
   const showPreview = generating || !!generated;
+  const canEdit = canWrite && !published && plan.status === 'READY' && !generating;
 
   useEffect(() => {
     msgRef.current?.scrollTo({ top: msgRef.current.scrollHeight });
@@ -323,23 +325,26 @@ export function PlanChat({
               )}
               {generated.sprints.map((s, si) => (
                 <div key={si} className={styles.sprint}>
-                  <div className={styles.sprintHead}>
-                    <h4 className={styles.sprintName}>{s.name}</h4>
-                    {s.goal && <p className={styles.sprintGoal}>{s.goal}</p>}
-                  </div>
+                  <PlanSprintHead
+                    slug={slug}
+                    sprintIndex={si}
+                    name={s.name}
+                    goal={s.goal}
+                    canEdit={canEdit}
+                    onChange={setPlan}
+                    onError={setError}
+                  />
                   {s.tasks.map((tk, ti) => (
-                    <div key={ti} className={styles.taskRow}>
-                      <div className={styles.taskTop}>
-                        <span className={styles.taskTitle}>{tk.title}</span>
-                        {tk.category && <Badge tone="accent">{tk.category}</Badge>}
-                        {tk.estimate && <Badge tone="neutral">{tk.estimate}</Badge>}
-                      </div>
-                      {tk.acceptanceCriteria && <p className={styles.ac}>{tk.acceptanceCriteria}</p>}
-                      <div className={styles.taskMeta}>
-                        <span>{tk.priority}</span>
-                        {tk.recommendedRoles?.length > 0 && <span>{tk.recommendedRoles.join(', ')}</span>}
-                      </div>
-                    </div>
+                    <PlanTaskCard
+                      key={ti}
+                      slug={slug}
+                      sprintIndex={si}
+                      taskIndex={ti}
+                      task={tk}
+                      canEdit={canEdit}
+                      onChange={setPlan}
+                      onError={(m) => setError(m || null)}
+                    />
                   ))}
                 </div>
               ))}

@@ -73,6 +73,28 @@ export function normalizeKind(raw: string): 'TASK' | 'STORY' | 'EPIC' | 'BUG' | 
   return (VALID_KIND.includes(v) ? v : 'TASK') as 'TASK' | 'STORY' | 'EPIC' | 'BUG' | 'SPIKE';
 }
 
+/** The properties block for a single PlanTask — shared by the full-plan schema
+ *  and the single-task refinement schema. */
+const PLAN_TASK_PROPERTIES = {
+  title: { type: 'string' },
+  description: { type: 'string' },
+  acceptanceCriteria: { type: 'string', description: 'Markdown checklist or Given/When/Then.' },
+  estimate: { type: 'string', description: 'e.g. "2d", "5 pts".' },
+  category: { type: 'string', enum: PLAN_CATEGORIES as unknown as string[] },
+  recommendedRoles: { type: 'array', items: { type: 'string' } },
+  priority: { type: 'string', enum: VALID_PRIORITY },
+  kind: { type: 'string', enum: VALID_KIND },
+} as const;
+
+const PLAN_TASK_REQUIRED = ['title', 'description', 'acceptanceCriteria', 'estimate', 'category'];
+
+/** JSON Schema for re-analyzing/refining ONE task (forced tool-use). */
+export const PLAN_TASK_TOOL_SCHEMA = {
+  type: 'object',
+  properties: PLAN_TASK_PROPERTIES,
+  required: PLAN_TASK_REQUIRED,
+} as const;
+
 /** JSON Schema handed to Anthropic tool-use to force structured output. */
 export const PLAN_TOOL_SCHEMA = {
   type: 'object',
@@ -93,20 +115,8 @@ export const PLAN_TOOL_SCHEMA = {
             type: 'array',
             items: {
               type: 'object',
-              properties: {
-                title: { type: 'string' },
-                description: { type: 'string' },
-                acceptanceCriteria: {
-                  type: 'string',
-                  description: 'Markdown checklist or Given/When/Then.',
-                },
-                estimate: { type: 'string', description: 'e.g. "2d", "5 pts".' },
-                category: { type: 'string', enum: PLAN_CATEGORIES as unknown as string[] },
-                recommendedRoles: { type: 'array', items: { type: 'string' } },
-                priority: { type: 'string', enum: VALID_PRIORITY },
-                kind: { type: 'string', enum: VALID_KIND },
-              },
-              required: ['title', 'description', 'acceptanceCriteria', 'estimate', 'category'],
+              properties: PLAN_TASK_PROPERTIES,
+              required: PLAN_TASK_REQUIRED,
             },
           },
         },

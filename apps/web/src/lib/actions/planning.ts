@@ -8,6 +8,7 @@ import { getServerLang } from '@/lib/i18n/server';
 import {
   planChatReply,
   generatePlan,
+  refinePlanTask,
   type ChatMsg,
   type Lang,
   type PlanImage,
@@ -15,10 +16,12 @@ import {
 } from '@/lib/ai/planner';
 import {
   generatedPlanSchema,
+  planTaskSchema,
   normalizeCategory,
   normalizeKind,
   normalizePriority,
   type GeneratedPlan,
+  type PlanTask,
 } from '@/lib/ai/plan-schema';
 import { fetchUrlText } from '@/lib/ai/extract';
 import { getObjectBytes, deleteObject } from '@/lib/storage';
@@ -207,6 +210,144 @@ export async function removePlanAttachmentAction(slug: string, attId: string): P
   if (att.storageKey) await deleteObject(att.storageKey).catch(() => {});
   const updated = await loadPlan(ctx.projectId);
   return { ok: true, data: toView(updated!) };
+}
+
+// ---- Refine / edit a single HU (task) within the generated plan, pre-publish ----
+
+type EditableLoad =
+  | { ok: true; projectId: string; userId: string; planId: string; gen: GeneratedPlan }
+  | { ok: false; error: string };
+
+/** Load the latest plan, ensure the caller can edit it and it's in READY state,
+ *  and return its parsed (typed) generated content. */
+async function loadEditablePlan(slug: string): Promise<EditableLoad> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return { ok: false, error: ctx.error };
+  if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+  if (plan.status !== 'READY') return { ok: false, error: 'El plan no es editable en este estado' };
+  const parsed = generatedPlanSchema.safeParse(plan.generated);
+  if (!parsed.success) return { ok: false, error: 'Plan inválido' };
+  return { ok: true, projectId: ctx.projectId, userId: ctx.userId, planId: plan.id, gen: parsed.data };
+}
+
+/** Persist a mutated generated plan and return the refreshed PlanView. */
+async function saveGenerated(projectId: string, planId: string, gen: GeneratedPlan): Promise<PlanView> {
+  await prisma.projectPlan.update({
+    where: { id: planId },
+    data: {
+      generated: gen as unknown as Prisma.InputJsonValue,
+      improvedIdea: gen.improvedIdea || null,
+      suggestedRepos: gen.suggestedRepos as unknown as Prisma.InputJsonValue,
+    },
+  });
+  const updated = await loadPlan(projectId);
+  return toView(updated!);
+}
+
+function inBounds(gen: GeneratedPlan, si: number, ti?: number): boolean {
+  if (!Number.isInteger(si) || si < 0 || si >= gen.sprints.length) return false;
+  if (ti === undefined) return true;
+  const tasks = gen.sprints[si]!.tasks;
+  return Number.isInteger(ti) && ti >= 0 && ti < tasks.length;
+}
+
+export async function refinePlanTaskAction(
+  slug: string,
+  sprintIndex: number,
+  taskIndex: number,
+  focusNote: string,
+): Promise<ActionResult<PlanView>> {
+  const loaded = await loadEditablePlan(slug);
+  if (!loaded.ok) return loaded;
+  const { gen, projectId, userId, planId } = loaded;
+  if (!inBounds(gen, sprintIndex, taskIndex)) return { ok: false, error: 'HU no encontrada' };
+
+  const sprint = gen.sprints[sprintIndex]!;
+  const task = sprint.tasks[taskIndex]!;
+  const meta = await projectMeta(projectId);
+  const lang = await getServerLang();
+
+  let refined: PlanTask;
+  try {
+    refined = await refinePlanTask(
+      { name: meta?.name ?? '', description: meta?.description ?? null },
+      gen.improvedIdea,
+      {
+        name: sprint.name,
+        goal: sprint.goal,
+        siblingTitles: sprint.tasks.filter((_, i) => i !== taskIndex).map((t) => t.title),
+      },
+      task,
+      (focusNote ?? '').slice(0, 2000),
+      lang,
+      userId,
+      projectId,
+    );
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error de IA' };
+  }
+
+  sprint.tasks[taskIndex] = refined;
+  return { ok: true, data: await saveGenerated(projectId, planId, gen) };
+}
+
+export async function updatePlanTaskAction(
+  slug: string,
+  sprintIndex: number,
+  taskIndex: number,
+  patch: Partial<PlanTask>,
+): Promise<ActionResult<PlanView>> {
+  const loaded = await loadEditablePlan(slug);
+  if (!loaded.ok) return loaded;
+  const { gen, projectId, planId } = loaded;
+  if (!inBounds(gen, sprintIndex, taskIndex)) return { ok: false, error: 'HU no encontrada' };
+
+  const parsed = planTaskSchema.partial().safeParse(patch);
+  if (!parsed.success) return { ok: false, error: 'Datos inválidos' };
+
+  const current = gen.sprints[sprintIndex]!.tasks[taskIndex]!;
+  const merged = planTaskSchema.safeParse({ ...current, ...parsed.data });
+  if (!merged.success) return { ok: false, error: 'Datos inválidos' };
+  gen.sprints[sprintIndex]!.tasks[taskIndex] = merged.data;
+  return { ok: true, data: await saveGenerated(projectId, planId, gen) };
+}
+
+export async function removePlanTaskAction(
+  slug: string,
+  sprintIndex: number,
+  taskIndex: number,
+): Promise<ActionResult<PlanView>> {
+  const loaded = await loadEditablePlan(slug);
+  if (!loaded.ok) return loaded;
+  const { gen, projectId, planId } = loaded;
+  if (!inBounds(gen, sprintIndex, taskIndex)) return { ok: false, error: 'HU no encontrada' };
+
+  gen.sprints[sprintIndex]!.tasks.splice(taskIndex, 1);
+  // Drop the sprint if it has no tasks left.
+  if (gen.sprints[sprintIndex]!.tasks.length === 0) gen.sprints.splice(sprintIndex, 1);
+  return { ok: true, data: await saveGenerated(projectId, planId, gen) };
+}
+
+export async function updatePlanSprintAction(
+  slug: string,
+  sprintIndex: number,
+  patch: { name?: string; goal?: string },
+): Promise<ActionResult<PlanView>> {
+  const loaded = await loadEditablePlan(slug);
+  if (!loaded.ok) return loaded;
+  const { gen, projectId, planId } = loaded;
+  if (!inBounds(gen, sprintIndex)) return { ok: false, error: 'Sprint no encontrado' };
+
+  const sprint = gen.sprints[sprintIndex]!;
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) return { ok: false, error: 'El nombre del sprint no puede estar vacío' };
+    sprint.name = name.slice(0, 120);
+  }
+  if (patch.goal !== undefined) sprint.goal = patch.goal.slice(0, 2000);
+  return { ok: true, data: await saveGenerated(projectId, planId, gen) };
 }
 
 export async function startPlanGenerationAction(slug: string): Promise<ActionResult> {

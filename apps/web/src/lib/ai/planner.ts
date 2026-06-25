@@ -9,7 +9,14 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { env } from '@/lib/env';
-import { PLAN_TOOL_SCHEMA, generatedPlanSchema, type GeneratedPlan } from './plan-schema';
+import {
+  PLAN_TOOL_SCHEMA,
+  PLAN_TASK_TOOL_SCHEMA,
+  generatedPlanSchema,
+  planTaskSchema,
+  type GeneratedPlan,
+  type PlanTask,
+} from './plan-schema';
 
 export interface ChatMsg {
   role: 'user' | 'assistant';
@@ -184,4 +191,63 @@ export async function generatePlan(
   );
   if (!toolUse) throw new Error('El modelo no devolvió un plan estructurado');
   return generatedPlanSchema.parse(toolUse.input);
+}
+
+function refineSystem(lang: Lang): string {
+  return `Eres un Tech Lead senior afinando UNA historia de usuario (HU) de un plan ya generado.
+Mejórala manteniéndola consistente con la idea del proyecto, su sprint y las demás HUs.
+Reglas:
+- Responde llamando SOLO a la herramienta EmitTask con la versión mejorada de ESTA HU.
+- Conserva los campos: title, description, acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces),
+  estimate ("2d","5 pts"), category (infra|backend|frontend|design|qa|devops|docs|other),
+  recommendedRoles, priority (LOW|MEDIUM|HIGH|URGENT), kind (TASK|STORY|EPIC|BUG|SPIKE).
+- Aplica la instrucción de enfoque del usuario si la hay; si no, hazla más clara, accionable y bien estimada.
+- Todo el texto en ${langName(lang)}.`;
+}
+
+/** Re-analyze / refine a SINGLE task within the generated plan (Opus, forced tool-use). */
+export async function refinePlanTask(
+  project: { name: string; description: string | null },
+  improvedIdea: string,
+  sprint: { name: string; goal: string; siblingTitles: string[] },
+  task: PlanTask,
+  focusNote: string,
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<PlanTask> {
+  const model = env().AI_MODEL_DEEP;
+  const context =
+    `${brief(project.name, project.description)}\n` +
+    (improvedIdea ? `Idea afinada: ${improvedIdea}\n` : '') +
+    `Sprint: "${sprint.name}"${sprint.goal ? ` — ${sprint.goal}` : ''}.\n` +
+    (sprint.siblingTitles.length
+      ? `Otras HUs del sprint: ${sprint.siblingTitles.map((t) => `"${t}"`).join(', ')}.\n`
+      : '') +
+    `HU actual (JSON): ${JSON.stringify(task)}\n` +
+    (focusNote.trim()
+      ? `Instrucción de enfoque del usuario: ${focusNote.trim()}`
+      : 'Sin instrucción específica: mejórala (criterios SMART, estimación realista, alcance claro).');
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 2000,
+    system: refineSystem(lang),
+    tools: [
+      {
+        name: 'EmitTask',
+        description: 'Emit the improved version of this single user story.',
+        input_schema: PLAN_TASK_TOOL_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'EmitTask' },
+    messages: [{ role: 'user', content: context }],
+  });
+  await record('plan.refine', model, resp.usage, userId, projectId);
+
+  const toolUse = resp.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitTask',
+  );
+  if (!toolUse) throw new Error('El modelo no devolvió la HU refinada');
+  return planTaskSchema.parse(toolUse.input);
 }

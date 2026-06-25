@@ -268,6 +268,100 @@
   color: var(--ink-muted);
   white-space: pre-wrap;
 }
+// ---- Per-HU editing / refinement ----
+.sprintHeadTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: t.$space-sm;
+}
+.rowBusy {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-sm;
+  margin-top: t.$space-sm;
+}
+.miniBtn {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-elev);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: t.$radius-md;
+  cursor: pointer;
+  transition: all t.$dur-quick t.$ease-editorial;
+  &:hover:not(:disabled) {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+.miniDanger:hover:not(:disabled) {
+  border-color: var(--accent-stamp);
+  color: var(--accent-stamp);
+}
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-subtle);
+}
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: t.$space-sm;
+}
+.editInput,
+.editTextarea,
+.editSelect {
+  width: 100%;
+  border: 1px solid var(--rule-strong);
+  border-radius: t.$radius-md;
+  background: var(--paper-elev);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  padding: 0.4rem 0.55rem;
+  &:focus {
+    outline: none;
+    border-color: var(--accent-ink);
+    box-shadow: 0 0 0 3px var(--accent-ink-wash);
+  }
+}
+.editTextarea {
+  resize: vertical;
+  white-space: pre-wrap;
+}
+.refineBox {
+  margin-top: t.$space-sm;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  padding: t.$space-sm;
+  border: 1px dashed var(--rule-strong);
+  border-radius: t.$radius-md;
+  background: var(--paper-deep);
+}
+
 .repos {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
