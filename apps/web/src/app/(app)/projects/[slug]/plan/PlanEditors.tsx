@@ -333,13 +333,16 @@ export function PlanTaskCard({
   );
 }
 
-/** Editable sprint header (name + goal). */
+/** Editable, collapsible sprint header (name + goal + accordion toggle). */
 export function PlanSprintHead({
   slug,
   sprintIndex,
   name,
   goal,
   canEdit,
+  open,
+  onToggle,
+  taskCount,
   onChange,
   onError,
 }: {
@@ -348,6 +351,9 @@ export function PlanSprintHead({
   name: string;
   goal: string;
   canEdit: boolean;
+  open: boolean;
+  onToggle: () => void;
+  taskCount: number;
   onChange: (p: PlanView) => void;
   onError: (msg: string) => void;
 }) {
@@ -401,7 +407,18 @@ export function PlanSprintHead({
   return (
     <div className={styles.sprintHead}>
       <div className={styles.sprintHeadTop}>
-        <h4 className={styles.sprintName}>{name}</h4>
+        <button
+          type="button"
+          className={styles.sprintToggle}
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span className={styles.chevron} aria-hidden>
+            {open ? '▾' : '▸'}
+          </span>
+          <h4 className={styles.sprintName}>{name}</h4>
+          <span className={styles.sprintCount}>{taskCount}</span>
+        </button>
         {canEdit && (
           <button
             type="button"
@@ -416,7 +433,7 @@ export function PlanSprintHead({
           </button>
         )}
       </div>
-      {goal && <p className={styles.sprintGoal}>{goal}</p>}
+      {goal && open && <p className={styles.sprintGoal}>{goal}</p>}
     </div>
   );
 }

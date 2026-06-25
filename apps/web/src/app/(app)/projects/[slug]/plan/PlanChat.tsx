@@ -37,6 +37,7 @@ export function PlanChat({
   const [publishing, startPublish] = useTransition();
   const [linkUrl, setLinkUrl] = useState('');
   const [attaching, setAttaching] = useState(false);
+  const [openSprints, setOpenSprints] = useState<Set<number>>(new Set()); // accordion: all closed by default
   const msgRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -330,34 +331,49 @@ export function PlanChat({
                   'Estimates assume AI-assisted development (Axon + Qwen via MCP).',
                 )}
               </p>
-              {generated.sprints.map((s, si) => (
-                <div key={si} className={styles.sprint}>
-                  <PlanSprintHead
-                    slug={slug}
-                    sprintIndex={si}
-                    name={s.name}
-                    goal={s.goal}
-                    canEdit={canEdit}
-                    onChange={setPlan}
-                    onError={setError}
-                  />
-                  <div className={styles.taskGrid}>
-                    {s.tasks.map((tk, ti) => (
-                      <PlanTaskCard
-                        key={ti}
-                        slug={slug}
-                        sprintIndex={si}
-                        taskIndex={ti}
-                        task={tk}
-                        canEdit={canEdit}
-                        repoNames={generated.suggestedRepos?.map((r) => r.name) ?? []}
-                        onChange={setPlan}
-                        onError={(m) => setError(m || null)}
-                      />
-                    ))}
+              {generated.sprints.map((s, si) => {
+                const open = openSprints.has(si);
+                return (
+                  <div key={si} className={styles.sprint}>
+                    <PlanSprintHead
+                      slug={slug}
+                      sprintIndex={si}
+                      name={s.name}
+                      goal={s.goal}
+                      canEdit={canEdit}
+                      open={open}
+                      taskCount={s.tasks.length}
+                      onToggle={() =>
+                        setOpenSprints((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(si)) next.delete(si);
+                          else next.add(si);
+                          return next;
+                        })
+                      }
+                      onChange={setPlan}
+                      onError={setError}
+                    />
+                    {open && (
+                      <div className={styles.taskGrid}>
+                        {s.tasks.map((tk, ti) => (
+                          <PlanTaskCard
+                            key={ti}
+                            slug={slug}
+                            sprintIndex={si}
+                            taskIndex={ti}
+                            task={tk}
+                            canEdit={canEdit}
+                            repoNames={generated.suggestedRepos?.map((r) => r.name) ?? []}
+                            onChange={setPlan}
+                            onError={(m) => setError(m || null)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <PlanRepos slug={slug} canWrite={canWrite} />
               {canWrite && !published && (
                 <div className={styles.publishBar}>
