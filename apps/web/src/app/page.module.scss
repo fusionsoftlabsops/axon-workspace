@@ -27,6 +27,22 @@
   }
 }
 
+.topbar {
+  position: absolute;
+  top: t.$space-lg;
+  right: t.$space-lg;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: t.$space-md;
+}
+
+.topbarDivider {
+  width: 1px;
+  height: 0.9rem;
+  background: var(--rule-strong);
+}
+
 .hero {
   max-width: 720px;
   width: 100%;

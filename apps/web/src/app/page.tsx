@@ -1,12 +1,20 @@
 import Link from 'next/link';
 import { Eyebrow } from '@/components/ui';
 import { getServerT } from '@/lib/i18n/server';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { LocaleSwitcher } from '@/components/LocaleSwitcher';
 import styles from './page.module.scss';
 
 export default async function HomePage() {
   const t = await getServerT();
   return (
     <main className={styles.main}>
+      <div className={styles.topbar}>
+        <ThemeToggle />
+        <span aria-hidden className={styles.topbarDivider} />
+        <LocaleSwitcher />
+      </div>
+
       <div className={styles.hero}>
         <div className={styles.eyebrow}>
           <Eyebrow tone="muted">
