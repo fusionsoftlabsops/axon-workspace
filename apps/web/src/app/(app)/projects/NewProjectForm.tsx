@@ -39,7 +39,8 @@ export function NewProjectForm() {
         setError(res.error);
         return;
       }
-      router.push(`/projects/${finalSlug}/board`);
+      // New projects go to the AI-assisted planning stage first (skippable there).
+      router.push(`/projects/${finalSlug}/plan`);
       router.refresh();
     });
   }

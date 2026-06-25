@@ -1,0 +1,133 @@
+@use '@/styles/tokens' as t;
+
+.page {
+  padding: t.$space-xl;
+}
+
+.scroll {
+  overflow-x: auto;
+  padding-bottom: t.$space-md;
+}
+
+.grid {
+  display: grid;
+  gap: t.$space-sm;
+  min-width: max-content;
+}
+
+.corner {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.colHead {
+  padding: t.$space-sm t.$space-md;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+  border-bottom: 2px solid var(--rule-strong);
+  min-width: 240px;
+}
+.colHeadGoal {
+  display: block;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-top: 2px;
+}
+
+.laneLabel {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: t.$space-sm t.$space-md;
+  background: var(--paper);
+  border-right: 1px solid var(--rule);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.laneDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  padding: t.$space-sm;
+  min-width: 240px;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  min-height: 48px;
+}
+
+.card {
+  background: var(--paper-elev);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--lane, var(--rule-strong));
+  border-radius: t.$radius-md;
+  padding: 0.5rem 0.6rem;
+}
+.cardNum {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-subtle);
+}
+.cardTitle {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+  margin: 0.1rem 0;
+}
+.cardMeta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-muted);
+}
+
+.repos {
+  margin-top: t.$space-2xl;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: t.$space-md;
+}
+.repoCard {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper-elev);
+  padding: t.$space-md;
+}
+.repoName {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+.repoReason {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.empty {
+  text-align: center;
+  padding: t.$space-3xl;
+  color: var(--ink-muted);
+}

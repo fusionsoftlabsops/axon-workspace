@@ -107,6 +107,8 @@ export default async function BoardPage({
         subtaskCount: t._count.subtasks,
         commentCount: t._count.comments,
         dueDate: t.dueDate?.toISOString() ?? null,
+        category: t.category,
+        estimate: t.estimate,
       }))}
       />
     </>

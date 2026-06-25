@@ -18,6 +18,8 @@ export interface TaskView {
   subtaskCount: number;
   commentCount: number;
   dueDate: string | null;
+  category?: string | null;
+  estimate?: string | null;
 }
 
 const PRIORITY_LABEL: Record<Priority, string> = {
@@ -88,6 +90,8 @@ export function TaskCard({
       </div>
       <h4 className={styles.cardTitle}>{task.title}</h4>
       <div className={styles.cardFooter}>
+        {task.category && <span className={styles.cat}>{task.category}</span>}
+        {task.estimate && <span className={styles.meta}>{task.estimate}</span>}
         {task.assignee && (
           <span className={styles.assignee} title={task.assignee.name}>
             {initials(task.assignee.name)}

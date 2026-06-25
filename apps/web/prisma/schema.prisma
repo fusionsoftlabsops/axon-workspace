@@ -163,6 +163,7 @@ model User {
   llmCredentials   LlmCredential[]
   storyDrafts      StoryDraft[]
   uploadedFiles    ProjectFile[]    @relation("FileUploader")
+  authoredPlans    ProjectPlan[]    @relation("PlanAuthor")
   invitesSent      Invitation[]     @relation("InvitedBy")
 
   @@index([email])
@@ -227,6 +228,8 @@ model Project {
   llmCredentials LlmCredential[]
   storyDrafts    StoryDraft[]
   files          ProjectFile[]
+  sprints        Sprint[]
+  plans          ProjectPlan[]
 
   @@index([ownerId])
 }
@@ -335,12 +338,19 @@ model Task {
   dueDate      DateTime?
   positionInState Int   @default(0) // para preservar orden manual dentro de una columna
   kind         TaskKind @default(TASK)
+  // Planning fields (set by the AI planner; optional so manual tasks are unaffected).
+  acceptanceCriteria String?  @db.Text
+  estimate           String?  // p.ej. "3d", "5 pts"
+  category           String?  // infra/backend/frontend/design/qa/devops/docs/other (roadmap lanes)
+  recommendedRoles   String[] // perfiles sugeridos
+  sprintId           String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parent      Task?            @relation("Subtasks", fields: [parentTaskId], references: [id])
   subtasks    Task[]           @relation("Subtasks")
+  sprint      Sprint?          @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   state       WorkflowState    @relation(fields: [stateId], references: [id])
   assignee    User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
   reporter    User             @relation("TaskReporter", fields: [reporterId], references: [id])
@@ -356,6 +366,51 @@ model Task {
   @@index([projectId, stateId])
   @@index([assigneeId])
   @@index([parentTaskId])
+  @@index([sprintId])
+}
+
+// A sprint groups planned tasks; the roadmap lays sprints out as columns.
+model Sprint {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  goal      String?  @db.Text
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([projectId, order])
+}
+
+enum PlanStatus {
+  CHATTING
+  GENERATING
+  READY
+  PUBLISHED
+  FAILED
+}
+
+// AI-assisted planning session for a project: an interactive chat whose context
+// drives Opus to generate sprints + tasks. Mirrors StoryDraft's lifecycle.
+model ProjectPlan {
+  id             String     @id @default(cuid())
+  projectId      String
+  createdById    String
+  status         PlanStatus @default(CHATTING)
+  messages       Json       @default("[]") // [{ role: 'assistant'|'user', content }]
+  generated      Json?      // { sprints:[{name,goal,tasks:[...]}] }
+  suggestedRepos Json?      // [{ name, kind, stack, reason }]
+  improvedIdea   String?    @db.Text
+  error          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("PlanAuthor", fields: [createdById], references: [id])
+
+  @@index([projectId, createdAt])
 }
 
 model TaskComment {

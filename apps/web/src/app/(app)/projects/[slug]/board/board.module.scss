@@ -215,6 +215,21 @@
   font-family: var(--font-mono);
 }
 
+// Category chip (from the AI planner) on a task card.
+.cat {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  border-radius: t.$radius-full;
+  background: var(--accent-ink-wash);
+  color: var(--accent-ink);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 // Quick-move action (Reabrir / Desbloquear) on done/blocked cards.
 .quickAction {
   margin-top: t.$space-sm;

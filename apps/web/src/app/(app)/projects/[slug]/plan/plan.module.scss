@@ -1,0 +1,208 @@
+@use '@/styles/tokens' as t;
+
+.page {
+  padding: t.$space-xl;
+  max-width: t.$max-content-width;
+  margin: 0 auto;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: t.$space-xl;
+
+  @media (min-width: t.$bp-lg) {
+    &.withPreview {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    }
+  }
+}
+
+// ---- Chat ----
+.chat {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-lg;
+  background: var(--paper-elev);
+  min-height: 420px;
+  max-height: 70vh;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: t.$space-lg;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+}
+
+.msg {
+  max-width: 85%;
+  padding: 0.6rem 0.85rem;
+  border-radius: t.$radius-lg;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.assistant {
+  align-self: flex-start;
+  background: var(--paper-deep);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+}
+.user {
+  align-self: flex-end;
+  background: var(--accent-ink);
+  color: var(--color-accent-fg);
+}
+
+.composer {
+  display: flex;
+  gap: t.$space-sm;
+  padding: t.$space-md;
+  border-top: 1px solid var(--rule);
+}
+.input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--rule-strong);
+  border-radius: t.$radius-md;
+  background: var(--paper-elev);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  padding: 0.55rem 0.7rem;
+  &:focus {
+    outline: none;
+    border-color: var(--accent-ink);
+    box-shadow: 0 0 0 3px var(--accent-ink-wash);
+  }
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: t.$space-md;
+  margin-top: t.$space-md;
+  flex-wrap: wrap;
+}
+.skip {
+  color: var(--ink-subtle);
+  font-size: 0.85rem;
+  text-decoration: none;
+  &:hover { color: var(--ink); text-decoration: underline; }
+}
+.error {
+  color: var(--accent-stamp);
+  font-size: 0.85rem;
+}
+
+// ---- Preview ----
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-lg;
+}
+.generating {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  padding: t.$space-2xl;
+  justify-content: center;
+  color: var(--ink-muted);
+  border: 1px dashed var(--rule-strong);
+  border-radius: t.$radius-lg;
+}
+.idea {
+  font-style: normal;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+.sprint {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-lg;
+  background: var(--paper-elev);
+  overflow: hidden;
+}
+.sprintHead {
+  padding: t.$space-md t.$space-lg;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper-deep);
+}
+.sprintName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.sprintGoal {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+.taskRow {
+  padding: t.$space-md t.$space-lg;
+  border-bottom: 1px solid var(--rule);
+  &:last-child { border-bottom: none; }
+}
+.taskTop {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  flex-wrap: wrap;
+}
+.taskTitle {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.taskMeta {
+  display: flex;
+  gap: t.$space-sm;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+}
+.ac {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+}
+.repos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: t.$space-md;
+}
+.repoCard {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper-elev);
+  padding: t.$space-md;
+}
+.repoName {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.85rem;
+}
+.repoReason {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.publishBar {
+  display: flex;
+  align-items: center;
+  gap: t.$space-md;
+  position: sticky;
+  bottom: 0;
+  padding: t.$space-md 0;
+  background: linear-gradient(transparent, var(--paper) 40%);
+}
