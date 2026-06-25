@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { LANG_KEY, localeFor, persistLang, type Lang } from './lang';
 
 /* Global, dependency-free i18n. Default English; choice persisted to
@@ -45,6 +46,7 @@ function initialLang(): Lang {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [lang, setLangState] = useState<Lang>('en');
 
   useEffect(() => {
@@ -56,8 +58,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [lang]);
 
   function setLang(l: Lang) {
+    if (l === lang) return;
     setLangState(l);
     persistLang(l);
+    // Server components (landing, auth, RSC pages) render their text from the
+    // `axon_lang` cookie via getServerT(); refresh so they re-render in the
+    // newly chosen language without a manual reload.
+    router.refresh();
   }
 
   function t<T>(es: T, en: T): T {
