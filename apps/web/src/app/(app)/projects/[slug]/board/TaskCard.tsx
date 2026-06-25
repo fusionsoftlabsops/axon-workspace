@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Priority } from '@prisma/client';
+import { useI18n } from '@/lib/i18n/i18n';
 import styles from './board.module.scss';
 
 export interface TaskView {
@@ -38,12 +39,19 @@ export function TaskCard({
   projectSlug,
   canWrite,
   isOverlay,
+  stateCategory,
+  inProgressStateId,
+  onQuickMove,
 }: {
   task: TaskView;
   projectSlug: string;
   canWrite: boolean;
   isOverlay?: boolean;
+  stateCategory?: string;
+  inProgressStateId?: string | null;
+  onQuickMove?: (taskId: string, toStateId: string) => void;
 }) {
+  const { t } = useI18n();
   const sortable = useSortable({ id: task.id, disabled: !canWrite || isOverlay });
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = sortable;
 
@@ -52,6 +60,15 @@ export function TaskCard({
     transition,
     opacity: isDragging ? 0.4 : 1,
   };
+
+  // Quick-move: reopen a finished task / unblock a blocked one → back to Desarrollo.
+  const quickLabel =
+    stateCategory === 'DONE'
+      ? t('Reabrir', 'Reopen')
+      : stateCategory === 'BLOCKED'
+        ? t('Desbloquear', 'Unblock')
+        : null;
+  const showQuick = !isOverlay && canWrite && !!onQuickMove && !!inProgressStateId && !!quickLabel;
 
   const content = (
     <article
@@ -92,6 +109,21 @@ export function TaskCard({
           </span>
         )}
       </div>
+      {showQuick && (
+        <button
+          type="button"
+          className={styles.quickAction}
+          // Don't let the click start a drag or follow the card's link.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onQuickMove!(task.id, inProgressStateId!);
+          }}
+        >
+          ↩ {quickLabel}
+        </button>
+      )}
     </article>
   );
 

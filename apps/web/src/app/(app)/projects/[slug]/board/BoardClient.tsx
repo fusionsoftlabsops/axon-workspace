@@ -138,6 +138,47 @@ export function BoardClient({ projectSlug, canWrite, currentUserId, states, memb
     });
   }
 
+  // Target for "Reabrir" (DONE) / "Desbloquear" (BLOCKED): the in-progress column.
+  const inProgressStateId = useMemo(
+    () => states.find((s) => s.category === 'IN_PROGRESS')?.id ?? null,
+    [states],
+  );
+
+  /** Programmatic one-click move (reopen/unblock): send a task to `toStateId`,
+   *  appended at the end of that column. Mirrors the drag optimistic update. */
+  function quickMove(taskId: string, toStateId: string) {
+    const t = findTask(taskId);
+    if (!t || t.stateId === toStateId) return;
+
+    const grouped: Record<string, TaskView[]> = {};
+    for (const s of states) grouped[s.id] = [];
+    for (const x of tasks) {
+      if (x.id === taskId) continue;
+      (grouped[x.stateId] ??= []).push({ ...x });
+    }
+    (grouped[toStateId] ??= []).push({ ...t, stateId: toStateId });
+
+    const flat: TaskView[] = [];
+    for (const s of states) {
+      grouped[s.id]!.forEach((x, i) => {
+        x.positionInState = i;
+        flat.push(x);
+      });
+    }
+    setTasks(flat);
+
+    const siblingIds = grouped[toStateId]!.map((x) => x.id);
+    startTransition(async () => {
+      const r = await moveTaskAction(projectSlug, taskId, toStateId, siblingIds);
+      if (!r.ok) {
+        setTasks(initialTasks);
+        alert(r.error);
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
   const activeTask = activeId ? findTask(activeId) : null;
 
   return (
@@ -165,6 +206,9 @@ export function BoardClient({ projectSlug, canWrite, currentUserId, states, memb
                       task={t}
                       projectSlug={projectSlug}
                       canWrite={canWrite}
+                      stateCategory={state.category}
+                      inProgressStateId={inProgressStateId}
+                      onQuickMove={quickMove}
                     />
                   ))}
                 </div>

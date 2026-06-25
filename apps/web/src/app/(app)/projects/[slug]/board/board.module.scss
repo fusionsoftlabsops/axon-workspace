@@ -215,6 +215,30 @@
   font-family: var(--font-mono);
 }
 
+// Quick-move action (Reabrir / Desbloquear) on done/blocked cards.
+.quickAction {
+  margin-top: t.$space-sm;
+  padding: 0.3rem 0.6rem;
+  width: 100%;
+  border: 1px solid var(--rule-strong);
+  border-radius: t.$radius-md;
+  background: transparent;
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background t.$dur-quick t.$ease-editorial,
+    color t.$dur-quick t.$ease-editorial,
+    border-color t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    background: var(--accent-ink-wash);
+    border-color: var(--accent-ink);
+    color: var(--accent-ink);
+  }
+}
+
 // ---------- Add task affordance — a clear, visible CTA (audit F4) ----------
 .addBtn {
   display: inline-flex;
