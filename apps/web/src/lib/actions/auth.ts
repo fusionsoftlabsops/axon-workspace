@@ -50,7 +50,7 @@ export async function signupAction(input: SignupInput): Promise<SignupActionResu
     // Create the user and consume the invitation atomically. Invited users are
     // regular members (never master — the super-admin is seeded separately).
     await prisma.$transaction(async (tx) => {
-      await tx.user.create({
+      const user = await tx.user.create({
         data: {
           email,
           name: data.name.trim(),
@@ -72,6 +72,24 @@ export async function signupAction(input: SignupInput): Promise<SignupActionResu
         data: { acceptedAt: new Date() },
       });
       if (consumed.count === 0) throw new Error('INVITE_ALREADY_USED');
+
+      // Auto-join any project-scoped invitations for this email (incl. the one
+      // just consumed) so invited collaborators land in their project on signup.
+      const projInvites = await tx.invitation.findMany({
+        where: { email, projectId: { not: null } },
+        select: { id: true, projectId: true, projectRole: true },
+      });
+      for (const pi of projInvites) {
+        if (!pi.projectId || !pi.projectRole) continue;
+        await tx.projectMember.createMany({
+          data: { projectId: pi.projectId, userId: user.id, role: pi.projectRole },
+          skipDuplicates: true,
+        });
+      }
+      await tx.invitation.updateMany({
+        where: { email, acceptedAt: null },
+        data: { acceptedAt: new Date() },
+      });
     });
 
     return { ok: true };

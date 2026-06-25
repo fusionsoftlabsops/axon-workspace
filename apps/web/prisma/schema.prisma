@@ -181,6 +181,11 @@ model Invitation {
   expiresAt   DateTime
   acceptedAt  DateTime?
   createdAt   DateTime  @default(now())
+  // When set, accepting this invite (on signup) also joins the user to the
+  // project with the given role — lets a project OWNER/ADMIN invite someone who
+  // doesn't have an account yet.
+  projectId   String?
+  projectRole MemberRole?
 
   invitedBy   User @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
 

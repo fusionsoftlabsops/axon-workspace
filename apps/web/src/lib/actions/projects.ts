@@ -9,6 +9,10 @@ import { audit } from '@/lib/audit';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { ensureMcpServiceMembership } from '@/lib/mcp-service';
 import { ensureProjectFolder, isStorageConfigured } from '@/lib/storage';
+import { randomBytes } from 'node:crypto';
+import { hashInviteToken } from '@/lib/invite-token';
+import { env } from '@/lib/env';
+import { sendMail } from '@/lib/mailer';
 import {
   createProjectSchema,
   inviteMemberSchema,
@@ -111,7 +115,7 @@ export async function createProjectAction(
 export async function inviteMemberAction(
   projectSlug: string,
   input: InviteMemberInput,
-): Promise<ActionResult> {
+): Promise<ActionResult<{ pending: boolean; token?: string; email?: string; emailSent?: boolean }>> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: 'No autenticado' };
 
@@ -129,13 +133,54 @@ export async function inviteMemberAction(
     return { ok: false, error: 'Sin permisos para invitar miembros' };
   }
 
-  const invitee = await prisma.user.findUnique({
-    where: { email: parsed.data.email.toLowerCase().trim() },
-  });
-  if (!invitee) return { ok: false, error: 'No existe un usuario con ese email' };
-
   if (parsed.data.role === 'OWNER') {
     return { ok: false, error: 'Solo puede haber un OWNER. Usa "Transferir propiedad" en su lugar.' };
+  }
+
+  const email = parsed.data.email.toLowerCase().trim();
+  const invitee = await prisma.user.findUnique({ where: { email } });
+
+  // Not registered yet → create a project-scoped registration invite. On signup
+  // with the link, the new account auto-joins this project with the chosen role.
+  if (!invitee) {
+    await prisma.invitation.deleteMany({ where: { email, acceptedAt: null, projectId: project.id } });
+    const token = randomBytes(24).toString('base64url');
+    const expiresAt = new Date(Date.now() + 7 * 86_400_000);
+    await prisma.invitation.create({
+      data: {
+        email,
+        tokenHash: hashInviteToken(token),
+        invitedById: session.user.id,
+        expiresAt,
+        projectId: project.id,
+        projectRole: parsed.data.role,
+      },
+    });
+
+    let emailSent = false;
+    const base = env().AUTH_URL?.replace(/\/+$/, '');
+    if (base) {
+      const link = `${base}/signup?token=${token}`;
+      emailSent = await sendMail({
+        to: email,
+        subject: `Invitación a ${project.name} en Axon`,
+        html:
+          `<p>Te invitaron a colaborar en <b>${project.name}</b> en Axon.</p>` +
+          `<p>Creá tu cuenta con este enlace (válido 7 días, un solo uso): <a href="${link}">${link}</a></p>`,
+        text: `Te invitaron a colaborar en ${project.name} en Axon. Creá tu cuenta (válido 7 días): ${link}`,
+      });
+    }
+
+    await audit({
+      actorId: session.user.id,
+      action: 'member.invite',
+      resourceType: 'project',
+      resourceId: project.id,
+      projectId: project.id,
+      payload: { email, role: parsed.data.role, emailSent, pending: true },
+    });
+    revalidatePath(`/projects/${projectSlug}/settings`);
+    return { ok: true, data: { pending: true, token, email, emailSent } };
   }
 
   try {
@@ -163,7 +208,7 @@ export async function inviteMemberAction(
   });
 
   revalidatePath(`/projects/${projectSlug}/settings`);
-  return { ok: true };
+  return { ok: true, data: { pending: false } };
 }
 
 /** Change a member's role. Only OWNER/ADMIN. Cannot demote the OWNER. */

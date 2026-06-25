@@ -40,8 +40,8 @@ export default async function ProjectSettingsPage({
       <h2>{t('Miembros', 'Members')}</h2>
       <p style={{ color: 'var(--color-fg-muted)' }}>
         {t(
-          'Solo usuarios con cuenta pueden ser miembros. Invítalos por email después de que se registren.',
-          'Only users with an account can be members. Invite them by email after they sign up.',
+          'Invita por email. Si ya tiene cuenta se agrega al instante; si no, se crea una invitación con enlace para que se registre y se una automáticamente.',
+          'Invite by email. If they already have an account they are added instantly; if not, an invitation link is created so they can sign up and join automatically.',
         )}
       </p>
       <MembersPanel

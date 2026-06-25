@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { logoutAction } from '@/lib/actions/auth';
 import styles from './layout.module.scss';
 import { getServerT } from '@/lib/i18n/server';
 import { LocaleSwitcher } from '@/components/LocaleSwitcher';
@@ -32,12 +31,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <ThemeToggle />
           <LocaleSwitcher />
           <span className={styles.userEmail}>{session.user.email}</span>
-          <form
-            action={async () => {
-              'use server';
-              await logoutAction();
-            }}
-          >
+          <form action="/api/logout" method="post">
             <button type="submit" className={styles.logout}>
               {t('Salir', 'Sign out')}
             </button>

@@ -57,6 +57,10 @@ export function PlanChat({
     const id = setInterval(async () => {
       try {
         const r = await fetch(`/api/v1/projects/${slug}/plan`, { cache: 'no-store' });
+        if (r.status === 401) {
+          window.location.assign('/login'); // session expired while the page was open
+          return;
+        }
         const j = await r.json();
         const p = j.plan;
         if (!alive || !p) return;
