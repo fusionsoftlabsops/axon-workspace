@@ -74,7 +74,7 @@ export function PlanTaskCard({
           title: draft.title,
           description: draft.description,
           acceptanceCriteria: draft.acceptanceCriteria,
-          estimate: draft.estimate,
+          estimateBySeniority: draft.estimateBySeniority, // estimate range derived server-side
           category: draft.category,
           priority: draft.priority,
           kind: draft.kind,
@@ -158,12 +158,45 @@ export function PlanTaskCard({
         </label>
         <div className={styles.fieldGrid}>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>{t('Estimación', 'Estimate')}</span>
+            <span className={styles.fieldLabel}>{t('Junior (IA)', 'Junior (AI)')}</span>
             <input
               className={styles.editInput}
-              value={draft.estimate}
-              placeholder="2d / 5 pts"
-              onChange={(e) => setDraft({ ...draft, estimate: e.target.value })}
+              value={draft.estimateBySeniority?.junior ?? ''}
+              placeholder="1d"
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  estimateBySeniority: { ...draft.estimateBySeniority, junior: e.target.value },
+                })
+              }
+            />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>{t('Semi-senior (IA)', 'Semi-senior (AI)')}</span>
+            <input
+              className={styles.editInput}
+              value={draft.estimateBySeniority?.semiSenior ?? ''}
+              placeholder="6h"
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  estimateBySeniority: { ...draft.estimateBySeniority, semiSenior: e.target.value },
+                })
+              }
+            />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>{t('Senior (IA)', 'Senior (AI)')}</span>
+            <input
+              className={styles.editInput}
+              value={draft.estimateBySeniority?.senior ?? ''}
+              placeholder="3h"
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  estimateBySeniority: { ...draft.estimateBySeniority, senior: e.target.value },
+                })
+              }
             />
           </label>
           <label className={styles.field}>
@@ -263,9 +296,18 @@ export function PlanTaskCard({
         <div className={styles.taskAside}>
           <div className={styles.asideBadges}>
             {task.category && <Badge tone="accent">{task.category}</Badge>}
-            {task.estimate && <Badge tone="neutral">{task.estimate}</Badge>}
+            {task.estimate && <Badge tone="neutral">⏱ {task.estimate}</Badge>}
             <Badge tone="neutral">{task.kind}</Badge>
           </div>
+          {(task.estimateBySeniority?.junior ||
+            task.estimateBySeniority?.semiSenior ||
+            task.estimateBySeniority?.senior) && (
+            <div className={styles.seniority} title={t('Estimación asistida por IA por seniority', 'AI-assisted estimate by seniority')}>
+              <span>Jr {task.estimateBySeniority?.junior || '—'}</span>
+              <span>SSr {task.estimateBySeniority?.semiSenior || '—'}</span>
+              <span>Sr {task.estimateBySeniority?.senior || '—'}</span>
+            </div>
+          )}
           <div className={styles.taskMeta}>
             <span>{task.priority}</span>
             {task.repo && <span>◆ {task.repo}</span>}

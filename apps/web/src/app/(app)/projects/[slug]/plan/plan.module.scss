@@ -303,6 +303,32 @@
   color: var(--ink-subtle);
   font-style: italic;
 }
+.linkBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-ink);
+  font: inherit;
+  font-style: normal;
+  cursor: pointer;
+  text-decoration: underline;
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+.seniority {
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-sm;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+
+  span {
+    white-space: nowrap;
+  }
+}
 .implNote {
   margin: 0.25rem 0 0;
   font-size: 0.75rem;

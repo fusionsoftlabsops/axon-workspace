@@ -372,7 +372,8 @@ model Task {
   kind         TaskKind @default(TASK)
   // Planning fields (set by the AI planner; optional so manual tasks are unaffected).
   acceptanceCriteria String?  @db.Text
-  estimate           String?  // p.ej. "3d", "5 pts"
+  estimate           String?  // rango representativo "junior–senior" (asistido por IA)
+  estimateBySeniority Json?   // { junior, semiSenior, senior } esfuerzo asistido por IA
   category           String?  // infra/backend/frontend/design/qa/devops/docs/other (roadmap lanes)
   recommendedRoles   String[] // perfiles sugeridos
   sprintId           String?

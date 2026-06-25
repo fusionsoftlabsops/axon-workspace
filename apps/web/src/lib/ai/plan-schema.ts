@@ -15,12 +15,23 @@ export type PlanCategory = (typeof PLAN_CATEGORIES)[number];
 
 export const REPO_KINDS = ['backend', 'frontend', 'infra', 'mobile', 'shared', 'other'] as const;
 
+// AI-assisted effort per seniority (junior / semi-senior / senior).
+export const seniorityEstimateSchema = z.object({
+  junior: z.string().default(''),
+  semiSenior: z.string().default(''),
+  senior: z.string().default(''),
+});
+export type SeniorityEstimate = z.infer<typeof seniorityEstimateSchema>;
+
 // Lenient on enum-ish fields (the model may capitalize/drift); normalized at publish.
 export const planTaskSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().default(''),
   acceptanceCriteria: z.string().default(''),
+  // Representative range "junior–senior" (derived from estimateBySeniority).
   estimate: z.string().default(''),
+  // AI-assisted effort per seniority profile.
+  estimateBySeniority: seniorityEstimateSchema.default({ junior: '', semiSenior: '', senior: '' }),
   category: z.string().default('other'),
   recommendedRoles: z.array(z.string()).default([]),
   priority: z.string().default('MEDIUM'),
@@ -86,7 +97,16 @@ const PLAN_TASK_PROPERTIES = {
   title: { type: 'string' },
   description: { type: 'string' },
   acceptanceCriteria: { type: 'string', description: 'Markdown checklist or Given/When/Then.' },
-  estimate: { type: 'string', description: 'e.g. "2d", "5 pts".' },
+  estimate: { type: 'string', description: 'Rango representativo "junior–senior", p. ej. "4h–1d".' },
+  estimateBySeniority: {
+    type: 'object',
+    description: 'Esfuerzo asistido por IA por seniority (incluye revisión, pruebas, integración).',
+    properties: {
+      junior: { type: 'string', description: 'p. ej. "1d"' },
+      semiSenior: { type: 'string', description: 'p. ej. "6h"' },
+      senior: { type: 'string', description: 'p. ej. "3h"' },
+    },
+  },
   category: { type: 'string', enum: PLAN_CATEGORIES as unknown as string[] },
   recommendedRoles: { type: 'array', items: { type: 'string' } },
   priority: { type: 'string', enum: VALID_PRIORITY },
@@ -150,3 +170,63 @@ export const PLAN_TOOL_SCHEMA = {
   },
   required: ['improvedIdea', 'sprints', 'suggestedRepos'],
 } as const;
+
+/** Derive each task's representative `estimate` as the range "junior–senior"
+ *  whenever the per-seniority breakdown is present. Mutates and returns `gen`. */
+export function normalizeEstimates(gen: GeneratedPlan): GeneratedPlan {
+  for (const sprint of gen.sprints) {
+    for (const task of sprint.tasks) {
+      const e = task.estimateBySeniority;
+      const jr = (e?.junior ?? '').trim();
+      const sr = (e?.senior ?? '').trim();
+      if (jr && sr) task.estimate = jr === sr ? jr : `${jr}–${sr}`;
+      else if (jr || sr) task.estimate = jr || sr;
+      // else leave whatever estimate the model produced.
+    }
+  }
+  return gen;
+}
+
+/** Tool schema for the batch re-estimation pass: returns estimates keyed by
+ *  sprint/task index so the model doesn't have to re-emit the whole plan. */
+export const REESTIMATE_TOOL_SCHEMA = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          s: { type: 'integer', description: 'índice del sprint' },
+          t: { type: 'integer', description: 'índice de la HU dentro del sprint' },
+          estimate: { type: 'string', description: 'rango "junior–senior"' },
+          estimateBySeniority: {
+            type: 'object',
+            properties: {
+              junior: { type: 'string' },
+              semiSenior: { type: 'string' },
+              senior: { type: 'string' },
+            },
+            required: ['junior', 'semiSenior', 'senior'],
+          },
+        },
+        required: ['s', 't', 'estimateBySeniority'],
+      },
+    },
+  },
+  required: ['items'],
+} as const;
+
+export const reestimateResultSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        s: z.number().int(),
+        t: z.number().int(),
+        estimate: z.string().default(''),
+        estimateBySeniority: seniorityEstimateSchema,
+      }),
+    )
+    .default([]),
+});
+export type ReestimateItem = z.infer<typeof reestimateResultSchema>['items'][number];

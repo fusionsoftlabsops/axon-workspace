@@ -12,10 +12,13 @@ import { env } from '@/lib/env';
 import {
   PLAN_TOOL_SCHEMA,
   PLAN_TASK_TOOL_SCHEMA,
+  REESTIMATE_TOOL_SCHEMA,
   generatedPlanSchema,
   planTaskSchema,
+  reestimateResultSchema,
   type GeneratedPlan,
   type PlanTask,
+  type ReestimateItem,
 } from './plan-schema';
 
 export interface ChatMsg {
@@ -93,9 +96,13 @@ Reglas:
 - Cuando ya tengas contexto suficiente (típicamente 3-6 intercambios), PREGUNTA explícitamente al usuario si ya subió TODO el contexto que quería (imágenes, documentos y enlaces). Si confirma que sí, invítalo a pulsar el botón "Generar plan" y deja de hacer preguntas.`;
 }
 
-// Estimaciones asumiendo desarrollo asistido por IA con nuestra herramienta.
+// Reglas de estimación por seniority asumiendo desarrollo asistido por IA.
 function estimateGuidance(): string {
-  return `ESTIMACIONES (campo estimate): las HUs se implementarán con desarrolladores ASISTIDOS POR IA — la herramienta Axon + el modelo Qwen vía MCP (lectura de repositorio, generación de código y ejecución de tareas). Calcula cada estimate asumiendo ese flujo acelerado por IA (típicamente una fracción del tiempo de un dev sin IA), pero realista: incluye revisión humana, pruebas e integración. Usa unidades cortas ("4h", "1d", "3 pts").`;
+  return `REGLAS DE ESTIMACIÓN (campos estimate y estimateBySeniority): las HUs se implementan en NUESTRO stack por desarrolladores ASISTIDOS POR IA — el modelo Qwen vía MCP (lee el repositorio, genera código y ejecuta tareas) siguiendo el plan de trabajo generado con Opus. Para CADA HU entrega \`estimateBySeniority\` con el esfuerzo REALISTA (incluye revisión humana, pruebas e integración) con ese apoyo de IA para tres perfiles:
+- junior: tarda más (necesita más guía, iteración y revisión);
+- semiSenior: intermedio;
+- senior: el más rápido y autónomo.
+Adapta los tiempos al área/categoría y stack de la HU. Usa unidades cortas y consistentes ("3h","6h","1d","2d","3 pts"). Fija \`estimate\` al rango representativo "<junior>–<senior>" (p. ej. "3h–1d").`;
 }
 
 function genSystem(lang: Lang): string {
@@ -103,7 +110,7 @@ function genSystem(lang: Lang): string {
 Llama a la herramienta EmitPlan con:
 - improvedIdea: la idea afinada (2-5 frases).
 - sprints: ordenados; cada uno con name, goal y tasks.
-- Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate ("4h","1d","3 pts"); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE); repo (nombre del repo objetivo, uno de suggestedRepos).
+- Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate (rango "junior–senior"); estimateBySeniority ({junior, semiSenior, senior}); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE); repo (nombre del repo objetivo, uno de suggestedRepos).
 - suggestedRepos: los repos/aplicativos del proyecto (backend, frontend, infra, etc.) con name, kind, stack y reason. Un proyecto puede tener VARIOS.
 ${estimateGuidance()}
 Reglas: realista y específico al dominio; **asigna a CADA HU su repo objetivo en \`repo\`** (uno de los name de suggestedRepos, según su área/categoría); usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}. Llama SOLO a la herramienta.`;
@@ -205,7 +212,8 @@ Mejórala manteniéndola consistente con la idea del proyecto, su sprint y las d
 Reglas:
 - Responde llamando SOLO a la herramienta EmitTask con la versión mejorada de ESTA HU.
 - Conserva los campos: title, description, acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces),
-  estimate ("4h","1d","3 pts"), category (infra|backend|frontend|design|qa|devops|docs|other),
+  estimate (rango "junior–senior"), estimateBySeniority ({junior, semiSenior, senior}),
+  category (infra|backend|frontend|design|qa|devops|docs|other),
   recommendedRoles, priority (LOW|MEDIUM|HIGH|URGENT), kind (TASK|STORY|EPIC|BUG|SPIKE).
 - Aplica la instrucción de enfoque del usuario si la hay; si no, hazla más clara, accionable y bien estimada.
 - ${estimateGuidance()}
@@ -320,4 +328,66 @@ export async function generateImplementationPlan(
   const md = textOf(resp);
   if (!md) throw new Error('El modelo no devolvió el plan de implementación');
   return md;
+}
+
+export interface ReestimateItemInput {
+  s: number;
+  t: number;
+  title: string;
+  description: string;
+  category: string;
+  repo: string;
+}
+
+/** Batch-recompute per-seniority AI-assisted estimates for an existing plan's
+ *  HUs in one Opus call (output keyed by sprint/task index). */
+export async function reestimatePlan(
+  context: { projectName: string; description: string | null; improvedIdea: string; stack: string },
+  items: ReestimateItemInput[],
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<ReestimateItem[]> {
+  if (items.length === 0) return [];
+  const model = env().AI_MODEL_DEEP;
+  const system = `Eres un Tech Lead senior. Recalcula las estimaciones de las HUs dadas.
+${estimateGuidance()}
+Devuelve SOLO la herramienta EmitEstimates con un item por cada HU recibida (identificada por s y t), con estimateBySeniority {junior, semiSenior, senior} y estimate (rango). Todo en ${langName(lang)}.`;
+
+  const user =
+    `${brief(context.projectName, context.description)}\n` +
+    (context.improvedIdea ? `Idea afinada: ${context.improvedIdea}\n` : '') +
+    (context.stack ? `Stack / repos: ${context.stack}\n` : '') +
+    `\nHUs a estimar (JSON):\n${JSON.stringify(
+      items.map((i) => ({
+        s: i.s,
+        t: i.t,
+        title: i.title,
+        description: i.description.slice(0, 300),
+        category: i.category,
+        repo: i.repo,
+      })),
+    )}`;
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 8000,
+    system,
+    tools: [
+      {
+        name: 'EmitEstimates',
+        description: 'Emit per-seniority estimates keyed by sprint/task index.',
+        input_schema: REESTIMATE_TOOL_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'EmitEstimates' },
+    messages: [{ role: 'user', content: user }],
+  });
+  await record('plan.reestimate', model, resp.usage, userId, projectId);
+
+  const toolUse = resp.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitEstimates',
+  );
+  if (!toolUse) throw new Error('El modelo no devolvió las estimaciones');
+  return reestimateResultSchema.parse(toolUse.input).items;
 }

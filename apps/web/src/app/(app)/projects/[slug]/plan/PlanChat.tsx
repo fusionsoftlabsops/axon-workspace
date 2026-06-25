@@ -11,6 +11,7 @@ import {
   publishPlanAction,
   addPlanLinkAction,
   removePlanAttachmentAction,
+  reestimatePlanAction,
   type PlanView,
 } from '@/lib/actions/planning';
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
@@ -38,6 +39,7 @@ export function PlanChat({
   const [linkUrl, setLinkUrl] = useState('');
   const [attaching, setAttaching] = useState(false);
   const [openSprints, setOpenSprints] = useState<Set<number>>(new Set()); // accordion: all closed by default
+  const [reestimating, setReestimating] = useState(false);
   const msgRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -112,6 +114,17 @@ export function PlanChat({
       setPlan((prev) => ({ ...prev, status: 'GENERATING' }));
       setGenerating(true);
     });
+  }
+
+  function reestimate() {
+    setError(null);
+    setReestimating(true);
+    reestimatePlanAction(slug)
+      .then((r) => {
+        if (!r.ok) setError(r.error);
+        else if (r.data) setPlan(r.data);
+      })
+      .finally(() => setReestimating(false));
   }
 
   function publish() {
@@ -331,8 +344,18 @@ export function PlanChat({
               )}
               <p className={styles.estimateNote}>
                 {t(
-                  'Estimaciones calculadas asumiendo desarrollo asistido por IA (Axon + Qwen vía MCP).',
-                  'Estimates assume AI-assisted development (Axon + Qwen via MCP).',
+                  'Estimaciones por seniority (Jr · SSr · Sr) asumiendo desarrollo asistido por IA (Qwen vía MCP + el plan de Opus).',
+                  'Per-seniority estimates (Jr · SSr · Sr) assuming AI-assisted development (Qwen via MCP + the Opus plan).',
+                )}
+                {canEdit && (
+                  <>
+                    {' '}
+                    <button type="button" className={styles.linkBtn} onClick={reestimate} disabled={reestimating}>
+                      {reestimating
+                        ? t('Recalculando…', 'Recomputing…')
+                        : t('Recalcular estimaciones (IA)', 'Recompute estimates (AI)')}
+                    </button>
+                  </>
                 )}
               </p>
               {generated.sprints.map((s, si) => {

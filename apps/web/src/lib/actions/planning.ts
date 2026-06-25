@@ -15,6 +15,8 @@ import {
   type PlanImage,
   type PlanDocText,
   type ImplRepoFile,
+  reestimatePlan,
+  type ReestimateItemInput,
 } from '@/lib/ai/planner';
 import { repoReaderFor, type TreeNode } from '@/lib/repo/reader';
 import {
@@ -23,6 +25,7 @@ import {
   normalizeCategory,
   normalizeKind,
   normalizePriority,
+  normalizeEstimates,
   type GeneratedPlan,
   type PlanTask,
 } from '@/lib/ai/plan-schema';
@@ -237,6 +240,7 @@ async function loadEditablePlan(slug: string): Promise<EditableLoad> {
 
 /** Persist a mutated generated plan and return the refreshed PlanView. */
 async function saveGenerated(projectId: string, planId: string, gen: GeneratedPlan): Promise<PlanView> {
+  normalizeEstimates(gen); // derive each task's "junior–senior" range
   await prisma.projectPlan.update({
     where: { id: planId },
     data: {
@@ -423,6 +427,7 @@ async function runPlanGeneration(
       userId,
       projectId,
     );
+    normalizeEstimates(plan); // derive "junior–senior" range per HU
     await prisma.projectPlan.update({
       where: { id: planId },
       data: {
@@ -487,6 +492,55 @@ function slugify(s: string): string {
       .replace(/^-+|-+$/g, '')
       .slice(0, 60) || 'hu'
   );
+}
+
+/** Recompute per-seniority AI-assisted estimates for every HU in the plan (Opus, one pass). */
+export async function reestimatePlanAction(slug: string): Promise<ActionResult<PlanView>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+  const parsed = generatedPlanSchema.safeParse(plan.generated);
+  if (!parsed.success) return { ok: false, error: 'No hay un plan generado' };
+  const gen = parsed.data;
+
+  const items: ReestimateItemInput[] = [];
+  gen.sprints.forEach((sp, s) =>
+    sp.tasks.forEach((tk, t) =>
+      items.push({ s, t, title: tk.title, description: tk.description, category: tk.category, repo: tk.repo }),
+    ),
+  );
+  if (items.length === 0) return { ok: false, error: 'El plan no tiene HUs' };
+
+  const meta = await projectMeta(ctx.projectId);
+  const stack = gen.suggestedRepos
+    .map((r) => `${r.name} (${r.kind}${r.stack ? ': ' + r.stack : ''})`)
+    .join('; ');
+  const lang = await getServerLang();
+
+  let resultItems;
+  try {
+    resultItems = await reestimatePlan(
+      { projectName: meta?.name ?? '', description: meta?.description ?? null, improvedIdea: gen.improvedIdea, stack },
+      items,
+      lang,
+      ctx.userId,
+      ctx.projectId,
+    );
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error de IA' };
+  }
+
+  for (const it of resultItems) {
+    const tk = gen.sprints[it.s]?.tasks[it.t];
+    if (!tk) continue;
+    tk.estimateBySeniority = it.estimateBySeniority;
+    if (it.estimate) tk.estimate = it.estimate;
+  }
+  // saveGenerated normalizes the "junior–senior" range and persists.
+  return { ok: true, data: await saveGenerated(ctx.projectId, plan.id, gen) };
 }
 
 export async function generateImplPlanAction(
@@ -671,6 +725,7 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
             description: t.description || null,
             acceptanceCriteria: t.acceptanceCriteria || null,
             estimate: t.estimate || null,
+            estimateBySeniority: t.estimateBySeniority as unknown as Prisma.InputJsonValue,
             category: normalizeCategory(t.category),
             recommendedRoles: t.recommendedRoles ?? [],
             priority: normalizePriority(t.priority),
