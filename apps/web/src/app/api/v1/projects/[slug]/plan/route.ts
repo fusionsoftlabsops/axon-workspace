@@ -22,6 +22,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
       suggestedRepos: true,
       improvedIdea: true,
       error: true,
+      attachments: {
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, kind: true, name: true, mimeType: true, url: true },
+      },
     },
   });
   if (!plan) return NextResponse.json({ plan: null });

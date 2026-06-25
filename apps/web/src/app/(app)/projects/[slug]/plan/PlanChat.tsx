@@ -9,6 +9,8 @@ import {
   planChatAction,
   startPlanGenerationAction,
   publishPlanAction,
+  addPlanLinkAction,
+  removePlanAttachmentAction,
   type PlanView,
 } from '@/lib/actions/planning';
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
@@ -31,7 +33,10 @@ export function PlanChat({
   const [sending, startSend] = useTransition();
   const [generating, setGenerating] = useState(initialPlan.status === 'GENERATING');
   const [publishing, startPublish] = useTransition();
+  const [linkUrl, setLinkUrl] = useState('');
+  const [attaching, setAttaching] = useState(false);
   const msgRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const generated: GeneratedPlan | null = plan.generated;
   const published = plan.status === 'PUBLISHED';
@@ -113,6 +118,59 @@ export function PlanChat({
     });
   }
 
+  async function uploadFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError(null);
+    setAttaching(true);
+    try {
+      const fd = new FormData();
+      Array.from(files).forEach((f) => fd.append('file', f));
+      const r = await fetch(`/api/v1/projects/${slug}/plan/attachments`, { method: 'POST', body: fd });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        setError(j.error ?? t('No se pudo subir el archivo', 'Could not upload the file'));
+      } else {
+        const j = await fetch(`/api/v1/projects/${slug}/plan`, { cache: 'no-store' }).then((x) => x.json());
+        if (j.plan?.attachments) setPlan((prev) => ({ ...prev, attachments: j.plan.attachments }));
+      }
+    } finally {
+      setAttaching(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  function addLink() {
+    const url = linkUrl.trim();
+    if (!url || attaching) return;
+    setError(null);
+    setAttaching(true);
+    startSend(async () => {
+      const r = await addPlanLinkAction(slug, url);
+      setAttaching(false);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setLinkUrl('');
+      if (r.data) setPlan(r.data);
+    });
+  }
+
+  function removeAttachment(id: string) {
+    setError(null);
+    startSend(async () => {
+      const r = await removePlanAttachmentAction(slug, id);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      if (r.data) setPlan(r.data);
+    });
+  }
+
+  const attachIcon = (kind: PlanView['attachments'][number]['kind']) =>
+    kind === 'IMAGE' ? '🖼' : kind === 'LINK' ? '🔗' : '📄';
+
   return (
     <div className={`${styles.layout} ${showPreview ? styles.withPreview : ''}`}>
       {/* ---- Chat ---- */}
@@ -157,6 +215,81 @@ export function PlanChat({
             </div>
           )}
         </div>
+        {canWrite && !published && (
+          <div className={styles.attachments}>
+            <div className={styles.attachHead}>
+              <span className={styles.attachTitle}>{t('Contexto adjunto', 'Attached context')}</span>
+              <span className={styles.attachHint}>
+                {t(
+                  'Imágenes, PDF, texto y enlaces. El asistente los tendrá en cuenta.',
+                  'Images, PDF, text and links. The assistant will take them into account.',
+                )}
+              </span>
+            </div>
+
+            {plan.attachments.length > 0 && (
+              <ul className={styles.attachList}>
+                {plan.attachments.map((a) => (
+                  <li key={a.id} className={styles.attachItem}>
+                    <span className={styles.attachIcon}>{attachIcon(a.kind)}</span>
+                    {a.url ? (
+                      <a href={a.url} target="_blank" rel="noreferrer" className={styles.attachName}>
+                        {a.name}
+                      </a>
+                    ) : (
+                      <span className={styles.attachName}>{a.name}</span>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.attachRemove}
+                      onClick={() => removeAttachment(a.id)}
+                      disabled={sending}
+                      aria-label={t('Quitar', 'Remove')}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className={styles.attachActions}>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/*,.md,.csv,.json,.yaml,.yml,.log"
+                className={styles.fileInput}
+                onChange={(e) => uploadFiles(e.target.files)}
+                disabled={attaching}
+              />
+              <Button
+                variant="secondary"
+                onClick={() => fileRef.current?.click()}
+                disabled={attaching}
+              >
+                {attaching ? t('Subiendo…', 'Uploading…') : t('Añadir archivos', 'Add files')}
+              </Button>
+              <input
+                className={styles.linkInput}
+                type="url"
+                value={linkUrl}
+                placeholder={t('Pega un enlace (https://…)', 'Paste a link (https://…)')}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addLink();
+                  }
+                }}
+                disabled={attaching}
+              />
+              <Button variant="secondary" onClick={addLink} disabled={attaching || !linkUrl.trim()}>
+                {t('Añadir enlace', 'Add link')}
+              </Button>
+            </div>
+          </div>
+        )}
         {!published && (
           <div className={styles.toolbar}>
             {canWrite && (

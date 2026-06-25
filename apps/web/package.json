@@ -39,6 +39,7 @@
     "sass": "^1.81.0",
     "tweetnacl": "^1.0.3",
     "tweetnacl-sealedbox-js": "^1.2.0",
+    "unpdf": "^1.6.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {

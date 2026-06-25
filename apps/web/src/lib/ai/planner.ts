@@ -1,8 +1,9 @@
 /**
  * AI project planner — interactive chat + structured plan generation, using the
- * SERVER Anthropic key (no user LLM credential needed). Chat uses the balanced
- * model (Sonnet); the plan generation uses the deep model (Opus) with forced
- * tool-use JSON. Telemetry is recorded in AiInteraction like the rest of the app.
+ * SERVER Anthropic key. Chat uses the balanced model (Sonnet); the plan
+ * generation uses the deep model (Opus) with forced tool-use JSON. Follows the
+ * user's selected language and can consume attached context (images natively,
+ * documents/links as extracted text).
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { Prisma } from '@prisma/client';
@@ -14,6 +15,18 @@ export interface ChatMsg {
   role: 'user' | 'assistant';
   content: string;
 }
+export type Lang = 'es' | 'en';
+
+export interface PlanImage {
+  mediaType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+  base64: string;
+}
+export interface PlanDocText {
+  label: string;
+  text: string;
+}
+
+type PlanBlock = Anthropic.Messages.TextBlockParam | Anthropic.Messages.ImageBlockParam;
 
 const PRICING: Record<string, { in: number; out: number }> = {
   'claude-haiku-4-5-20251001': { in: 0.8, out: 4 },
@@ -30,6 +43,10 @@ function client(): Anthropic {
   return _client;
 }
 
+function langName(lang: Lang): string {
+  return lang === 'es' ? 'español' : 'inglés';
+}
+
 function brief(name: string, description: string | null): string {
   return `Proyecto: "${name}". Descripción: ${description?.trim() || '(sin descripción)'}.`;
 }
@@ -42,8 +59,7 @@ async function record(
   projectId?: string,
 ): Promise<void> {
   const p = PRICING[model] ?? { in: 0, out: 0 };
-  const cost =
-    (usage.input_tokens / 1_000_000) * p.in + (usage.output_tokens / 1_000_000) * p.out;
+  const cost = (usage.input_tokens / 1_000_000) * p.in + (usage.output_tokens / 1_000_000) * p.out;
   await prisma.aiInteraction
     .create({
       data: {
@@ -59,22 +75,26 @@ async function record(
     .catch(() => {});
 }
 
-const CHAT_SYSTEM = `Eres un Product/Tech Lead senior facilitando una sesión de planeación de un nuevo proyecto de software.
+function chatSystem(lang: Lang): string {
+  return `Eres un Product/Tech Lead senior facilitando una sesión de planeación de un nuevo proyecto de software.
 Tu trabajo en esta fase de chat: entender bien el proyecto y AFILAR la idea.
 Reglas:
-- Responde SIEMPRE en el mismo idioma en que escribe el usuario (por defecto español).
+- Responde SIEMPRE en ${langName(lang)}, sin importar el idioma en que escriba el usuario.
 - Haz UNA sola pregunta enfocada por turno (la más valiosa que falte): audiencia, problema, alcance MVP, stack/restricciones técnicas, integraciones, plazos, equipo.
 - Sé breve (1-3 frases). Si el usuario es vago, ofrece opciones concretas.
-- Cuando ya tengas contexto suficiente (típicamente 3-6 intercambios), dilo explícitamente e invita a pulsar "Generar plan" — no sigas preguntando de más.
-- No generes el plan aquí; eso lo hace otro paso.`;
+- Si hay contexto adjunto (imágenes, documentos, enlaces), tenlo en cuenta y referéncialo en tus preguntas.
+- Cuando ya tengas contexto suficiente (típicamente 3-6 intercambios), PREGUNTA explícitamente al usuario si ya subió TODO el contexto que quería (imágenes, documentos y enlaces). Si confirma que sí, invítalo a pulsar el botón "Generar plan" y deja de hacer preguntas.`;
+}
 
-const GEN_SYSTEM = `Eres un Tech Lead senior. Con TODO el contexto de la conversación, genera un plan de entrega accionable para el proyecto.
-Debes llamar a la herramienta EmitPlan con:
+function genSystem(lang: Lang): string {
+  return `Eres un Tech Lead senior. Con TODO el contexto de la conversación y los adjuntos, genera un plan de entrega accionable.
+Llama a la herramienta EmitPlan con:
 - improvedIdea: la idea afinada (2-5 frases).
-- sprints: ordenados del primero al último. Cada sprint con name, goal y tasks.
-- Cada task: title claro; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate (p.ej. "2d", "5 pts"); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles, p.ej. ["Backend dev","DevOps"]); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE).
-- suggestedRepos: los repositorios que recomiendas crear (backend, frontend, infra, etc.) con name, kind, stack y reason.
-Reglas: sé realista y específico al dominio; cubre infra/devops, backend, frontend, diseño y QA cuando apliquen; tareas concretas y verificables; en el idioma de la conversación (por defecto español). Llama SOLO a la herramienta.`;
+- sprints: ordenados; cada uno con name, goal y tasks.
+- Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate ("2d","5 pts"); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE).
+- suggestedRepos: repos a crear (backend, frontend, infra, etc.) con name, kind, stack y reason.
+Reglas: realista y específico al dominio; usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}. Llama SOLO a la herramienta.`;
+}
 
 function textOf(resp: Anthropic.Messages.Message): string {
   return resp.content
@@ -88,37 +108,61 @@ function textOf(resp: Anthropic.Messages.Message): string {
 export async function planChatReply(
   project: { name: string; description: string | null },
   messages: ChatMsg[],
+  lang: Lang,
+  attachmentManifest: string,
   userId: string,
   projectId: string,
 ): Promise<string> {
   const model = env().AI_MODEL_BALANCED;
   const lead =
     brief(project.name, project.description) +
-    (messages.length === 0
-      ? ' Inicia la planeación: salúdame brevemente y hazme la primera pregunta clave.'
-      : '');
+    (attachmentManifest ? `\n\nContexto adjunto:\n${attachmentManifest}` : '') +
+    (messages.length === 0 ? ' Inicia la planeación: salúdame brevemente y hazme la primera pregunta clave.' : '');
   const resp = await client().messages.create({
     model,
     max_tokens: 700,
-    system: CHAT_SYSTEM,
+    system: chatSystem(lang),
     messages: [{ role: 'user', content: lead }, ...messages],
   });
   await record('plan.chat', model, resp.usage, userId, projectId);
-  return textOf(resp) || '¿Podrías contarme un poco más sobre el proyecto?';
+  return textOf(resp) || (lang === 'es' ? '¿Podrías contarme un poco más?' : 'Could you tell me a bit more?');
 }
 
-/** Generate the structured plan (Opus, forced tool-use JSON). */
+/** Generate the structured plan (Opus, forced tool-use JSON) with attached context. */
 export async function generatePlan(
   project: { name: string; description: string | null },
   messages: ChatMsg[],
+  lang: Lang,
+  images: PlanImage[],
+  docs: PlanDocText[],
   userId: string,
   projectId: string,
 ): Promise<GeneratedPlan> {
   const model = env().AI_MODEL_DEEP;
+
+  const docContext = docs.length
+    ? '\n\nDocumentos/enlaces adjuntos:\n' +
+      docs.map((d) => `=== ${d.label} ===\n${d.text}`).join('\n\n')
+    : '';
+  const finalBlocks: PlanBlock[] = [
+    {
+      type: 'text',
+      text:
+        'Con todo el contexto anterior y los adjuntos, genera el plan completo llamando a EmitPlan.' +
+        docContext,
+    },
+    ...images.map(
+      (img): PlanBlock => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+      }),
+    ),
+  ];
+
   const resp = await client().messages.create({
     model,
     max_tokens: 8000,
-    system: GEN_SYSTEM,
+    system: genSystem(lang),
     tools: [
       {
         name: 'EmitPlan',
@@ -130,11 +174,7 @@ export async function generatePlan(
     messages: [
       { role: 'user', content: brief(project.name, project.description) },
       ...messages,
-      {
-        role: 'user',
-        content:
-          'Con todo el contexto anterior, genera el plan completo llamando a la herramienta EmitPlan.',
-      },
+      { role: 'user', content: finalBlocks },
     ],
   });
   await record('plan.generate', model, resp.usage, userId, projectId);

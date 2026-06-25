@@ -407,10 +407,36 @@ model ProjectPlan {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy User    @relation("PlanAuthor", fields: [createdById], references: [id])
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User    @relation("PlanAuthor", fields: [createdById], references: [id])
+  attachments PlanAttachment[]
 
   @@index([projectId, createdAt])
+}
+
+enum AttachmentKind {
+  IMAGE
+  DOCUMENT
+  LINK
+}
+
+// Context the user attaches to a plan (images/docs in MinIO, or fetched web links).
+// Images feed the generator as native image blocks; docs/links as extracted text.
+model PlanAttachment {
+  id            String         @id @default(cuid())
+  planId        String
+  kind          AttachmentKind
+  name          String
+  mimeType      String?
+  size          Int?
+  storageKey    String?        // MinIO key for IMAGE/DOCUMENT
+  url           String?        // for LINK
+  extractedText String?        @db.Text // DOCUMENT + LINK
+  createdAt     DateTime       @default(now())
+
+  plan ProjectPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
 }
 
 model TaskComment {
