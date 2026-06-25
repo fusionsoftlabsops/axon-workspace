@@ -9,11 +9,14 @@ import {
   planChatReply,
   generatePlan,
   refinePlanTask,
+  generateImplementationPlan,
   type ChatMsg,
   type Lang,
   type PlanImage,
   type PlanDocText,
+  type ImplRepoFile,
 } from '@/lib/ai/planner';
+import { repoReaderFor, type TreeNode } from '@/lib/repo/reader';
 import {
   generatedPlanSchema,
   planTaskSchema,
@@ -24,7 +27,7 @@ import {
   type PlanTask,
 } from '@/lib/ai/plan-schema';
 import { fetchUrlText } from '@/lib/ai/extract';
-import { getObjectBytes, deleteObject } from '@/lib/storage';
+import { getObjectBytes, deleteObject, putObject, buildKey, isStorageConfigured } from '@/lib/storage';
 import type { ActionResult } from './projects';
 
 export interface AttachmentView {
@@ -440,6 +443,171 @@ async function runPlanGeneration(
       })
       .catch(() => {});
   }
+}
+
+// ---- Generate a repo-grounded implementation plan for a single HU ----
+
+function outlineTree(nodes: TreeNode[], depth = 0, acc: string[] = []): string[] {
+  for (const n of nodes) {
+    acc.push(`${'  '.repeat(depth)}${n.kind === 'dir' ? '📁' : '·'} ${n.name}`);
+    if (n.children?.length) outlineTree(n.children, depth + 1, acc);
+  }
+  return acc;
+}
+function flattenFiles(nodes: TreeNode[], acc: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.kind === 'file') acc.push(n.path);
+    else if (n.children) flattenFiles(n.children, acc);
+  }
+  return acc;
+}
+const KW_STOP = new Set([
+  'para', 'con', 'los', 'las', 'una', 'unos', 'unas', 'del', 'que', 'por', 'como', 'sobre', 'desde',
+  'hacia', 'este', 'esta', 'esto', 'cada', 'todo', 'todos', 'debe', 'poder', 'permitir', 'sistema',
+  'aplicacion', 'aplicación', 'usuario', 'usuarios', 'pagina', 'página', 'datos', 'this', 'that',
+  'with', 'from', 'your', 'user', 'users', 'story', 'feature', 'should', 'able', 'into', 'when',
+]);
+function keywordsFrom(task: PlanTask): string[] {
+  const text = `${task.title} ${task.description} ${task.category}`.toLowerCase();
+  const words = text.match(/[a-z0-9áéíóúñ]{4,}/gi) ?? [];
+  const freq = new Map<string, number>();
+  for (const w of words) {
+    const k = w.toLowerCase();
+    if (!KW_STOP.has(k)) freq.set(k, (freq.get(k) ?? 0) + 1);
+  }
+  return [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map((e) => e[0]);
+}
+function slugify(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'hu'
+  );
+}
+
+export async function generateImplPlanAction(
+  slug: string,
+  sprintIndex: number,
+  taskIndex: number,
+): Promise<ActionResult<{ filename: string; markdown: string; fileId: string | null }>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+  const parsed = generatedPlanSchema.safeParse(plan.generated);
+  if (!parsed.success) return { ok: false, error: 'No hay un plan generado' };
+  const gen = parsed.data;
+  if (!inBounds(gen, sprintIndex, taskIndex)) return { ok: false, error: 'HU no encontrada' };
+  const sprint = gen.sprints[sprintIndex]!;
+  const task = sprint.tasks[taskIndex]!;
+
+  const project = await prisma.project.findUnique({
+    where: { id: ctx.projectId },
+    select: { name: true, description: true, repoPath: true },
+  });
+  const reader = await repoReaderFor({ repoPath: project?.repoPath ?? null });
+  if (!reader) {
+    return {
+      ok: false,
+      error: 'El proyecto no tiene un repositorio configurado o accesible (Ajustes → Repositorio).',
+    };
+  }
+
+  // Outline + automatic relevant-file selection.
+  let tree: TreeNode[] = [];
+  try {
+    tree = await reader.tree({ maxDepth: 3 });
+  } catch {
+    /* repo unreadable — outline stays empty */
+  }
+  const outline = outlineTree(tree).slice(0, 400).join('\n');
+  const allFiles = flattenFiles(tree);
+
+  const kws = keywordsFrom(task);
+  const candidates = new Set<string>();
+  for (const kw of kws.slice(0, 6)) {
+    if (candidates.size >= 30) break;
+    try {
+      const hits = await reader.grep(kw);
+      for (const h of hits) {
+        candidates.add(h.path);
+        if (candidates.size >= 30) break;
+      }
+    } catch {
+      /* skip this keyword */
+    }
+  }
+  for (const p of allFiles) {
+    if (candidates.size >= 30) break;
+    if (kws.some((k) => p.toLowerCase().includes(k))) candidates.add(p);
+  }
+  if (candidates.size < 5) for (const p of allFiles.slice(0, 20)) candidates.add(p);
+
+  let repoFiles: ImplRepoFile[] = [];
+  try {
+    const { files } = await reader.readFiles([...candidates].slice(0, 25), {
+      maxFiles: 25,
+      maxBytesTotal: 140_000,
+      maxPerFile: 20_000,
+    });
+    repoFiles = files.map((f) => ({ path: f.path, content: f.content, language: f.language, truncated: f.truncated }));
+  } catch {
+    /* proceed with outline only */
+  }
+
+  const lang = await getServerLang();
+  let markdown: string;
+  try {
+    markdown = await generateImplementationPlan(
+      { name: project?.name ?? '', description: project?.description ?? null },
+      task,
+      { name: sprint.name, goal: sprint.goal },
+      gen.improvedIdea,
+      outline,
+      repoFiles,
+      lang,
+      ctx.userId,
+      ctx.projectId,
+    );
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Error de IA' };
+  }
+
+  const filename = `IMPL-${slug}-S${sprintIndex + 1}T${taskIndex + 1}-${slugify(task.title)}.md`.slice(0, 120);
+
+  // Persist to the project Files store (best-effort).
+  let fileId: string | null = null;
+  if (isStorageConfigured()) {
+    try {
+      const id = crypto.randomUUID();
+      const buf = Buffer.from(markdown, 'utf8');
+      const key = buildKey(slug, 'DOCUMENT', id, filename, new Date());
+      await putObject(key, buf, 'text/markdown');
+      await prisma.projectFile.create({
+        data: {
+          id,
+          projectId: ctx.projectId,
+          name: filename,
+          mimeType: 'text/markdown',
+          size: buf.byteLength,
+          category: 'DOCUMENT',
+          storageKey: key,
+          uploadedById: ctx.userId,
+        },
+      });
+      fileId = id;
+    } catch {
+      fileId = null; // download still works even if persistence fails
+    }
+  }
+
+  return { ok: true, data: { filename, markdown, fileId } };
 }
 
 export async function publishPlanAction(slug: string): Promise<ActionResult<{ tasks: number; sprints: number }>> {

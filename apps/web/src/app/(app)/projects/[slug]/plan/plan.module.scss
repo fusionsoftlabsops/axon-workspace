@@ -297,6 +297,23 @@
   flex-wrap: wrap;
   gap: t.$space-sm;
 }
+.estimateNote {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-subtle);
+  font-style: italic;
+}
+.implNote {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+
+  a {
+    color: var(--accent-ink);
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
 .taskTop {
   display: flex;
   align-items: center;

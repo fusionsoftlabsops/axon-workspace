@@ -93,13 +93,19 @@ Reglas:
 - Cuando ya tengas contexto suficiente (típicamente 3-6 intercambios), PREGUNTA explícitamente al usuario si ya subió TODO el contexto que quería (imágenes, documentos y enlaces). Si confirma que sí, invítalo a pulsar el botón "Generar plan" y deja de hacer preguntas.`;
 }
 
+// Estimaciones asumiendo desarrollo asistido por IA con nuestra herramienta.
+function estimateGuidance(): string {
+  return `ESTIMACIONES (campo estimate): las HUs se implementarán con desarrolladores ASISTIDOS POR IA — la herramienta Axon + el modelo Qwen vía MCP (lectura de repositorio, generación de código y ejecución de tareas). Calcula cada estimate asumiendo ese flujo acelerado por IA (típicamente una fracción del tiempo de un dev sin IA), pero realista: incluye revisión humana, pruebas e integración. Usa unidades cortas ("4h", "1d", "3 pts").`;
+}
+
 function genSystem(lang: Lang): string {
   return `Eres un Tech Lead senior. Con TODO el contexto de la conversación y los adjuntos, genera un plan de entrega accionable.
 Llama a la herramienta EmitPlan con:
 - improvedIdea: la idea afinada (2-5 frases).
 - sprints: ordenados; cada uno con name, goal y tasks.
-- Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate ("2d","5 pts"); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE).
+- Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate ("4h","1d","3 pts"); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE).
 - suggestedRepos: repos a crear (backend, frontend, infra, etc.) con name, kind, stack y reason.
+${estimateGuidance()}
 Reglas: realista y específico al dominio; usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}. Llama SOLO a la herramienta.`;
 }
 
@@ -199,9 +205,10 @@ Mejórala manteniéndola consistente con la idea del proyecto, su sprint y las d
 Reglas:
 - Responde llamando SOLO a la herramienta EmitTask con la versión mejorada de ESTA HU.
 - Conserva los campos: title, description, acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces),
-  estimate ("2d","5 pts"), category (infra|backend|frontend|design|qa|devops|docs|other),
+  estimate ("4h","1d","3 pts"), category (infra|backend|frontend|design|qa|devops|docs|other),
   recommendedRoles, priority (LOW|MEDIUM|HIGH|URGENT), kind (TASK|STORY|EPIC|BUG|SPIKE).
 - Aplica la instrucción de enfoque del usuario si la hay; si no, hazla más clara, accionable y bien estimada.
+- ${estimateGuidance()}
 - Todo el texto en ${langName(lang)}.`;
 }
 
@@ -250,4 +257,67 @@ export async function refinePlanTask(
   );
   if (!toolUse) throw new Error('El modelo no devolvió la HU refinada');
   return planTaskSchema.parse(toolUse.input);
+}
+
+export interface ImplRepoFile {
+  path: string;
+  content: string;
+  language?: string | null;
+  truncated?: boolean;
+}
+
+function implSystem(lang: Lang): string {
+  return `Eres un Staff Engineer. Escribe un PLAN DE IMPLEMENTACIÓN accionable, en Markdown, para UNA historia de usuario (HU). El plan lo EJECUTARÁ un desarrollador con el modelo Qwen (coding) + el MCP de Axon, leyendo el repositorio real que se te entrega.
+Estructura (usa encabezados Markdown):
+1. Resumen — qué se construye y por qué (2-4 frases).
+2. Archivos a tocar — lista \`ruta\` → cambio/razón. Usa RUTAS REALES del repo provisto; no inventes.
+3. Pasos de implementación — numerados, concretos y en orden; menciona módulos/funciones reales del repo.
+4. Cómo ejecutarlo con Qwen + MCP — qué herramientas MCP usar (\`recall\`, \`grep_repo\`, \`list_repo_tree\`, \`pull_project_brain\`, \`create_task\`, \`update_task_status\`, \`cite_memory\`) y prompts sugeridos para guiar a Qwen.
+5. Pruebas — qué probar y cómo (reusa el stack de pruebas del repo si se ve).
+6. Riesgos y consideraciones.
+7. Estimación — tiempo asumiendo desarrollo asistido por IA (Axon + Qwen vía MCP), realista (incluye revisión, pruebas e integración).
+Reglas: específico al repositorio real (usa el árbol y los archivos provistos); conciso pero completo; TODO en ${langName(lang)}. Devuelve SOLO el Markdown del plan, sin texto adicional ni vallas de código alrededor del documento.`;
+}
+
+/** Generate a downloadable implementation-plan markdown for ONE story, grounded
+ *  in the project's repository (Opus). Repo outline + files are prepared by the caller. */
+export async function generateImplementationPlan(
+  project: { name: string; description: string | null },
+  task: PlanTask,
+  sprint: { name: string; goal: string },
+  improvedIdea: string,
+  repoOutline: string,
+  repoFiles: ImplRepoFile[],
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<string> {
+  const model = env().AI_MODEL_DEEP;
+  const filesText = repoFiles.length
+    ? repoFiles
+        .map(
+          (f) =>
+            `### \`${f.path}\`${f.truncated ? ' (truncado)' : ''}\n\`\`\`${f.language ?? ''}\n${f.content}\n\`\`\``,
+        )
+        .join('\n\n')
+    : '(sin archivos del repositorio incluidos)';
+
+  const user =
+    `${brief(project.name, project.description)}\n` +
+    (improvedIdea ? `Idea afinada del proyecto: ${improvedIdea}\n` : '') +
+    `Sprint: "${sprint.name}"${sprint.goal ? ` — ${sprint.goal}` : ''}.\n\n` +
+    `## Historia de usuario\n${JSON.stringify(task, null, 2)}\n\n` +
+    `## Árbol del repositorio (parcial)\n${repoOutline}\n\n` +
+    `## Archivos del repositorio\n${filesText}`;
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 4500,
+    system: implSystem(lang),
+    messages: [{ role: 'user', content: user }],
+  });
+  await record('plan.implplan', model, resp.usage, userId, projectId);
+  const md = textOf(resp);
+  if (!md) throw new Error('El modelo no devolvió el plan de implementación');
+  return md;
 }

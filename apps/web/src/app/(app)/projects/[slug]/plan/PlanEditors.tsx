@@ -8,6 +8,7 @@ import {
   updatePlanTaskAction,
   removePlanTaskAction,
   updatePlanSprintAction,
+  generateImplPlanAction,
   type PlanView,
 } from '@/lib/actions/planning';
 import { PLAN_CATEGORIES, type GeneratedPlan } from '@/lib/ai/plan-schema';
@@ -41,6 +42,8 @@ export function PlanTaskCard({
   const [refineOpen, setRefineOpen] = useState(false);
   const [focus, setFocus] = useState('');
   const [busy, start] = useTransition();
+  const [implBusy, setImplBusy] = useState(false);
+  const [implDone, setImplDone] = useState<{ filename: string; fileId: string | null } | null>(null);
 
   // Local draft for the edit form.
   const [draft, setDraft] = useState<PlanTask>(task);
@@ -92,6 +95,33 @@ export function PlanTaskCard({
   function remove() {
     if (!confirm(t('¿Quitar esta HU del plan?', 'Remove this story from the plan?'))) return;
     run(() => removePlanTaskAction(slug, sprintIndex, taskIndex));
+  }
+
+  async function genImplPlan() {
+    setImplBusy(true);
+    onError('');
+    try {
+      const r = await generateImplPlanAction(slug, sprintIndex, taskIndex);
+      if (!r.ok) {
+        onError(r.error ?? t('Acción fallida', 'Action failed'));
+        return;
+      }
+      if (r.data) {
+        // Trigger a client-side download of the generated markdown.
+        const blob = new Blob([r.data.markdown], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = r.data.filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setImplDone({ filename: r.data.filename, fileId: r.data.fileId });
+      }
+    } finally {
+      setImplBusy(false);
+    }
   }
 
   if (mode === 'edit') {
@@ -238,7 +268,22 @@ export function PlanTaskCard({
               <button type="button" className={`${styles.miniBtn} ${styles.miniDanger}`} onClick={remove} disabled={busy}>
                 🗑 {t('Quitar', 'Remove')}
               </button>
+              <button
+                type="button"
+                className={styles.miniBtn}
+                onClick={genImplPlan}
+                disabled={busy || implBusy}
+                title={t('Lee el repo y genera un plan de implementación descargable', 'Reads the repo and generates a downloadable implementation plan')}
+              >
+                ⚙ {implBusy ? t('Generando… (puede tardar)', 'Generating… (may take a while)') : t('Plan de implementación', 'Implementation plan')}
+              </button>
             </div>
+          )}
+          {implDone && (
+            <p className={styles.implNote}>
+              ✓ {t('Descargado', 'Downloaded')} ·{' '}
+              <a href={`/projects/${slug}/files`}>{t('guardado en Archivos', 'saved to Files')}</a>
+            </p>
           )}
         </div>
       </div>

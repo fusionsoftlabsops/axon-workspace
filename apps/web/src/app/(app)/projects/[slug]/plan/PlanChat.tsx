@@ -323,6 +323,12 @@ export function PlanChat({
                   <p className={styles.idea}>{generated.improvedIdea}</p>
                 </div>
               )}
+              <p className={styles.estimateNote}>
+                {t(
+                  'Estimaciones calculadas asumiendo desarrollo asistido por IA (Axon + Qwen vía MCP).',
+                  'Estimates assume AI-assisted development (Axon + Qwen via MCP).',
+                )}
+              </p>
               {generated.sprints.map((s, si) => (
                 <div key={si} className={styles.sprint}>
                   <PlanSprintHead
