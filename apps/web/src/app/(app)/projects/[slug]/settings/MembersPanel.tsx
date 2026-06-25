@@ -2,11 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import type { MemberRole } from '@prisma/client';
+import type { MemberRole, Seniority } from '@prisma/client';
 import {
   inviteMemberAction,
   removeMemberAction,
   updateMemberRoleAction,
+  setMemberSeniorityAction,
 } from '@/lib/actions/projects';
 import { useI18n } from '@/lib/i18n/i18n';
 
@@ -14,12 +15,18 @@ interface MemberView {
   id: string;
   userId: string;
   role: MemberRole;
+  seniority: Seniority | null;
   name: string;
   email: string;
   joinedAt: string;
 }
 
 const ROLES: MemberRole[] = ['ADMIN', 'MEMBER', 'VIEWER'];
+const SENIORITIES: { value: Seniority; label: string }[] = [
+  { value: 'JUNIOR', label: 'Junior' },
+  { value: 'SEMI_SENIOR', label: 'Semi-senior' },
+  { value: 'SENIOR', label: 'Senior' },
+];
 
 export function MembersPanel({
   projectSlug,
@@ -69,6 +76,14 @@ export function MembersPanel({
   function changeRole(userId: string, newRole: MemberRole) {
     startTransition(async () => {
       const r = await updateMemberRoleAction(projectSlug, userId, newRole);
+      if (!r.ok) setError(r.error);
+      else router.refresh();
+    });
+  }
+
+  function changeSeniority(userId: string, value: string) {
+    startTransition(async () => {
+      const r = await setMemberSeniorityAction(projectSlug, userId, value || null);
       if (!r.ok) setError(r.error);
       else router.refresh();
     });
@@ -220,6 +235,7 @@ export function MembersPanel({
             <th style={{ padding: '0.65rem 0.5rem' }}>{t('Nombre', 'Name')}</th>
             <th style={{ padding: '0.65rem 0.5rem' }}>{t('Email', 'Email')}</th>
             <th style={{ padding: '0.65rem 0.5rem' }}>{t('Rol', 'Role')}</th>
+            <th style={{ padding: '0.65rem 0.5rem' }}>{t('Seniority', 'Seniority')}</th>
             <th style={{ padding: '0.65rem 0.5rem' }}></th>
           </tr>
         </thead>
@@ -266,6 +282,27 @@ export function MembersPanel({
                       ))}
                     </select>
                   )}
+                </td>
+                <td style={{ padding: '0.65rem 0.5rem' }}>
+                  <select
+                    value={m.seniority ?? ''}
+                    disabled={pending}
+                    onChange={(e) => changeSeniority(m.userId, e.target.value)}
+                    style={{
+                      padding: '0.3rem',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: '4px',
+                      background: 'var(--color-bg)',
+                      color: 'var(--color-fg)',
+                    }}
+                  >
+                    <option value="">{t('—', '—')}</option>
+                    {SENIORITIES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>
                   {!isOwner && !isSelf && (

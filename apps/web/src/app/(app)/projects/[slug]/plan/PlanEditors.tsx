@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button, Badge } from '@/components/ui';
+import { Button, Badge, Modal } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import {
   refinePlanTaskAction,
@@ -9,6 +9,9 @@ import {
   removePlanTaskAction,
   updatePlanSprintAction,
   generateImplPlanAction,
+  getProjectMembersForAssignAction,
+  assignTaskMemberAction,
+  clearTaskAssignmentAction,
   type PlanView,
 } from '@/lib/actions/planning';
 import { PLAN_CATEGORIES, type GeneratedPlan } from '@/lib/ai/plan-schema';
@@ -18,6 +21,9 @@ type PlanTask = GeneratedPlan['sprints'][number]['tasks'][number];
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 const KINDS = ['TASK', 'STORY', 'EPIC', 'BUG', 'SPIKE'];
+const SENIORITY_SHORT: Record<string, string> = { JUNIOR: 'Jr', SEMI_SENIOR: 'SSr', SENIOR: 'Sr' };
+
+type AssignMember = { userId: string; name: string; seniority: string | null };
 
 /** A single generated HU (user story) with inline edit, AI re-analysis, and remove. */
 export function PlanTaskCard({
@@ -46,6 +52,35 @@ export function PlanTaskCard({
   const [busy, start] = useTransition();
   const [implBusy, setImplBusy] = useState(false);
   const [implDone, setImplDone] = useState<{ filename: string; fileId: string | null } | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [members, setMembers] = useState<AssignMember[] | null>(null);
+  const [assigning, setAssigning] = useState<string | null>(null);
+
+  function openAssign() {
+    setAssignOpen(true);
+    if (members === null) {
+      getProjectMembersForAssignAction(slug).then((r) => {
+        if (r.ok && r.data) setMembers(r.data.members);
+        else setMembers([]);
+      });
+    }
+  }
+  function assignMember(memberId: string) {
+    setAssigning(memberId);
+    onError('');
+    assignTaskMemberAction(slug, sprintIndex, taskIndex, memberId)
+      .then((r) => {
+        if (!r.ok) onError(r.error ?? t('Acción fallida', 'Action failed'));
+        else if (r.data) {
+          onChange(r.data);
+          setAssignOpen(false);
+        }
+      })
+      .finally(() => setAssigning(null));
+  }
+  function clearAssign() {
+    run(() => clearTaskAssignmentAction(slug, sprintIndex, taskIndex));
+  }
 
   // Local draft for the edit form.
   const [draft, setDraft] = useState<PlanTask>(task);
@@ -296,7 +331,19 @@ export function PlanTaskCard({
         <div className={styles.taskAside}>
           <div className={styles.asideBadges}>
             {task.category && <Badge tone="accent">{task.category}</Badge>}
-            {task.estimate && <Badge tone="neutral">⏱ {task.estimate}</Badge>}
+            {task.estimate &&
+              (canEdit ? (
+                <button
+                  type="button"
+                  className={styles.estimateBtn}
+                  onClick={openAssign}
+                  title={t('Elegir encargado y recalcular', 'Pick assignee and recompute')}
+                >
+                  ⏱ {task.estimate}
+                </button>
+              ) : (
+                <Badge tone="neutral">⏱ {task.estimate}</Badge>
+              ))}
             <Badge tone="neutral">{task.kind}</Badge>
           </div>
           {(task.estimateBySeniority?.junior ||
@@ -306,6 +353,16 @@ export function PlanTaskCard({
               <span>Jr {task.estimateBySeniority?.junior || '—'}</span>
               <span>SSr {task.estimateBySeniority?.semiSenior || '—'}</span>
               <span>Sr {task.estimateBySeniority?.senior || '—'}</span>
+            </div>
+          )}
+          {task.assignment && (
+            <div className={styles.assignedTag}>
+              👤 {task.assignment.memberName} · {SENIORITY_SHORT[task.assignment.seniority] ?? task.assignment.seniority} · ⏱ {task.assignment.estimate}
+              {canEdit && (
+                <button type="button" className={styles.assignedClear} onClick={clearAssign} disabled={busy} aria-label={t('Quitar', 'Remove')}>
+                  ×
+                </button>
+              )}
             </div>
           )}
           <div className={styles.taskMeta}>
@@ -371,6 +428,45 @@ export function PlanTaskCard({
           </div>
         </div>
       )}
+
+      <Modal
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        title={t('¿Quién ejecuta esta HU?', 'Who executes this story?')}
+      >
+        <p className={styles.assignHint}>
+          {t(
+            'Elige el miembro encargado. El tiempo se recalcula para su seniority asumiendo apoyo de Qwen.',
+            'Pick the assignee. The time is recomputed for their seniority assuming Qwen support.',
+          )}
+        </p>
+        {members === null ? (
+          <p className={styles.assignHint}>{t('Cargando…', 'Loading…')}</p>
+        ) : members.length === 0 ? (
+          <p className={styles.assignHint}>{t('No hay miembros en el proyecto.', 'No project members.')}</p>
+        ) : (
+          <ul className={styles.memberList}>
+            {members.map((m) => (
+              <li key={m.userId}>
+                <button
+                  type="button"
+                  className={styles.memberBtn}
+                  onClick={() => assignMember(m.userId)}
+                  disabled={assigning !== null}
+                >
+                  <span className={styles.memberName}>{m.name}</span>
+                  <span className={styles.memberSen}>
+                    {m.seniority
+                      ? SENIORITY_SHORT[m.seniority] ?? m.seniority
+                      : t('sin seniority → SSr', 'no seniority → SSr')}
+                  </span>
+                  {assigning === m.userId && <span className={styles.memberSpin}>…</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
     </div>
   );
 }

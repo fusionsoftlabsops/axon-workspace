@@ -38,6 +38,17 @@ export const planTaskSchema = z.object({
   kind: z.string().default('TASK'),
   // Repo objetivo (nombre de un suggestedRepo / ProjectRepo) al que pertenece la HU.
   repo: z.string().default(''),
+  // Miembro encargado elegido + tiempo recalculado para su seniority (Qwen).
+  // Gestionado por la app (el modelo no lo emite).
+  assignment: z
+    .object({
+      memberId: z.string(),
+      memberName: z.string(),
+      seniority: z.string(), // JUNIOR | SEMI_SENIOR | SENIOR
+      estimate: z.string(),
+    })
+    .nullable()
+    .default(null),
 });
 export type PlanTask = z.infer<typeof planTaskSchema>;
 

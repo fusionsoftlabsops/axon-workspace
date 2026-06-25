@@ -9,6 +9,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { env } from '@/lib/env';
+import { infraChat } from './infra-llm';
 import {
   PLAN_TOOL_SCHEMA,
   PLAN_TASK_TOOL_SCHEMA,
@@ -390,4 +391,31 @@ Devuelve SOLO la herramienta EmitEstimates con un item por cada HU recibida (ide
   );
   if (!toolUse) throw new Error('El modelo no devolvió las estimaciones');
   return reestimateResultSchema.parse(toolUse.input).items;
+}
+
+function seniorityLabel(s: string): string {
+  if (s === 'JUNIOR') return 'junior';
+  if (s === 'SENIOR') return 'senior';
+  return 'semi-senior';
+}
+
+/** Recompute a single AI-assisted estimate for a given seniority profile using
+ *  the self-hosted Qwen model. Returns a short duration string (e.g. "4h"). */
+export async function estimateTaskForSeniority(
+  task: { title: string; description: string; category: string; repo: string },
+  context: { stack: string; improvedIdea: string },
+  seniority: string,
+  lang: Lang,
+): Promise<string> {
+  const label = seniorityLabel(seniority);
+  const system = `Eres un Tech Lead. Estima el tiempo de desarrollo para que un desarrollador ${label} implemente la HU en NUESTRO stack CON apoyo del modelo Qwen (lee el repo, genera código y ejecuta tareas) siguiendo el plan de trabajo. Incluye revisión humana, pruebas e integración. Responde SOLO con una duración corta ("4h", "1d", "3 pts"), sin ninguna otra palabra. Idioma: ${langName(lang)}.`;
+  const user =
+    `HU: ${task.title}\n${task.description}\n` +
+    `Área: ${task.category}${task.repo ? ` · repo: ${task.repo}` : ''}\n` +
+    (context.improvedIdea ? `Idea: ${context.improvedIdea}\n` : '') +
+    (context.stack ? `Stack: ${context.stack}` : '');
+  const raw = await infraChat(system, user, { maxTokens: 24, timeoutMs: 30_000 });
+  const line = (raw.trim().split(/\n/)[0] ?? '').trim();
+  const m = line.match(/\d+(?:[.,]\d+)?\s*(?:h|hr?s?|d|d[ií]as?|sem(?:ana)?s?|w|pts?|sp)\b/i);
+  return (m ? m[0] : line).slice(0, 16);
 }

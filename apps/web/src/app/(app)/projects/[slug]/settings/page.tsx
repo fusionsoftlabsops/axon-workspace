@@ -52,6 +52,7 @@ export default async function ProjectSettingsPage({
           id: m.id,
           userId: m.userId,
           role: m.role,
+          seniority: m.seniority,
           name: m.user.name,
           email: m.user.email,
           joinedAt: m.joinedAt.toISOString(),

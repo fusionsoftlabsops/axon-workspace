@@ -311,11 +311,18 @@ model ProjectTaskCounter {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
+enum Seniority {
+  JUNIOR
+  SEMI_SENIOR
+  SENIOR
+}
+
 model ProjectMember {
   id        String     @id @default(cuid())
   projectId String
   userId    String
   role      MemberRole
+  seniority Seniority? // perfil de seniority en el proyecto (para estimar tiempos)
   joinedAt  DateTime   @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)

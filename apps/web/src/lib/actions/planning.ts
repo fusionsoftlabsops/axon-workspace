@@ -17,7 +17,9 @@ import {
   type ImplRepoFile,
   reestimatePlan,
   type ReestimateItemInput,
+  estimateTaskForSeniority,
 } from '@/lib/ai/planner';
+import { isInfraLlmConfigured } from '@/lib/ai/infra-llm';
 import { repoReaderFor, type TreeNode } from '@/lib/repo/reader';
 import {
   generatedPlanSchema,
@@ -543,6 +545,99 @@ export async function reestimatePlanAction(slug: string): Promise<ActionResult<P
   return { ok: true, data: await saveGenerated(ctx.projectId, plan.id, gen) };
 }
 
+// ---- Assign a member to a HU and recompute the time for their seniority (Qwen) ----
+
+const SENIORITY_KEY: Record<string, 'junior' | 'semiSenior' | 'senior'> = {
+  JUNIOR: 'junior',
+  SEMI_SENIOR: 'semiSenior',
+  SENIOR: 'senior',
+};
+
+export async function getProjectMembersForAssignAction(
+  slug: string,
+): Promise<ActionResult<{ members: { userId: string; name: string; seniority: string | null }[] }>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  const rows = await prisma.projectMember.findMany({
+    where: { projectId: ctx.projectId },
+    select: { userId: true, seniority: true, user: { select: { name: true } } },
+    orderBy: { joinedAt: 'asc' },
+  });
+  return {
+    ok: true,
+    data: { members: rows.map((m) => ({ userId: m.userId, name: m.user.name, seniority: m.seniority })) },
+  };
+}
+
+export async function assignTaskMemberAction(
+  slug: string,
+  sprintIndex: number,
+  taskIndex: number,
+  memberId: string,
+): Promise<ActionResult<PlanView>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+  const parsed = generatedPlanSchema.safeParse(plan.generated);
+  if (!parsed.success) return { ok: false, error: 'No hay un plan generado' };
+  const gen = parsed.data;
+  if (!inBounds(gen, sprintIndex, taskIndex)) return { ok: false, error: 'HU no encontrada' };
+  const tk = gen.sprints[sprintIndex]!.tasks[taskIndex]!;
+
+  const member = await prisma.projectMember.findFirst({
+    where: { projectId: ctx.projectId, userId: memberId },
+    select: { userId: true, seniority: true, user: { select: { name: true } } },
+  });
+  if (!member) return { ok: false, error: 'Miembro no encontrado' };
+
+  const seniority = member.seniority ?? 'SEMI_SENIOR';
+  const fallback = (tk.estimateBySeniority?.[SENIORITY_KEY[seniority]!] ?? '').trim();
+
+  let estimate = fallback;
+  if (isInfraLlmConfigured()) {
+    const stack = gen.suggestedRepos
+      .map((r) => `${r.name} (${r.kind}${r.stack ? ': ' + r.stack : ''})`)
+      .join('; ');
+    const lang = await getServerLang();
+    try {
+      estimate =
+        (await estimateTaskForSeniority(
+          { title: tk.title, description: tk.description, category: tk.category, repo: tk.repo },
+          { stack, improvedIdea: gen.improvedIdea },
+          seniority,
+          lang,
+        )) || fallback;
+    } catch {
+      estimate = fallback;
+    }
+  }
+  if (!estimate) estimate = tk.estimate;
+
+  tk.assignment = { memberId: member.userId, memberName: member.user.name, seniority, estimate };
+  return { ok: true, data: await saveGenerated(ctx.projectId, plan.id, gen) };
+}
+
+export async function clearTaskAssignmentAction(
+  slug: string,
+  sprintIndex: number,
+  taskIndex: number,
+): Promise<ActionResult<PlanView>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+  const parsed = generatedPlanSchema.safeParse(plan.generated);
+  if (!parsed.success) return { ok: false, error: 'No hay un plan generado' };
+  const gen = parsed.data;
+  if (!inBounds(gen, sprintIndex, taskIndex)) return { ok: false, error: 'HU no encontrada' };
+  gen.sprints[sprintIndex]!.tasks[taskIndex]!.assignment = null;
+  return { ok: true, data: await saveGenerated(ctx.projectId, plan.id, gen) };
+}
+
 export async function generateImplPlanAction(
   slug: string,
   sprintIndex: number,
@@ -726,6 +821,7 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
             acceptanceCriteria: t.acceptanceCriteria || null,
             estimate: t.estimate || null,
             estimateBySeniority: t.estimateBySeniority as unknown as Prisma.InputJsonValue,
+            assigneeId: t.assignment?.memberId || null,
             category: normalizeCategory(t.category),
             recommendedRoles: t.recommendedRoles ?? [],
             priority: normalizePriority(t.priority),

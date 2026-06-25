@@ -8,6 +8,7 @@ export { SearchInput } from './SearchInput';
 export { Toolbar } from './Toolbar';
 export { Stat } from './Stat';
 export { Tag } from './Tag';
+export { Modal } from './Modal';
 
 // Label + divider primitives (now flat/sans — kept in the kit).
 export { Eyebrow } from './Eyebrow';

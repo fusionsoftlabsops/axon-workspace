@@ -329,6 +329,92 @@
     white-space: nowrap;
   }
 }
+
+// ⏱ estimate acts as a button (opens the assignee picker).
+.estimateBtn {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  cursor: pointer;
+  &:hover {
+    border-color: var(--accent-ink);
+    color: var(--accent-ink);
+  }
+}
+.assignedTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: var(--ink);
+  background: var(--accent-ink-wash);
+  border: 1px solid var(--accent-ink);
+  border-radius: t.$radius-md;
+  padding: 0.15rem 0.45rem;
+  width: fit-content;
+}
+.assignedClear {
+  border: none;
+  background: none;
+  color: var(--ink-subtle);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+  &:hover {
+    color: var(--accent-stamp);
+  }
+}
+.assignHint {
+  margin: 0 0 t.$space-md;
+  font-size: 0.83rem;
+  color: var(--ink-muted);
+}
+.memberList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.memberBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  &:hover:not(:disabled) {
+    border-color: var(--accent-ink);
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+.memberName {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.memberSen {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+}
+.memberSpin {
+  color: var(--ink-subtle);
+}
 .implNote {
   margin: 0.25rem 0 0;
   font-size: 0.75rem;

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { Prisma, type MemberRole, type ProjectStatus } from '@prisma/client';
+import { Prisma, type MemberRole, type ProjectStatus, type Seniority } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { audit } from '@/lib/audit';
@@ -209,6 +209,34 @@ export async function inviteMemberAction(
 
   revalidatePath(`/projects/${projectSlug}/settings`);
   return { ok: true, data: { pending: false } };
+}
+
+/** Set a member's seniority (for AI time estimation). Only OWNER/ADMIN. */
+export async function setMemberSeniorityAction(
+  projectSlug: string,
+  userId: string,
+  seniority: string | null,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'No autenticado' };
+
+  const valid = ['JUNIOR', 'SEMI_SENIOR', 'SENIOR'];
+  const value = seniority && valid.includes(seniority) ? (seniority as Seniority) : null;
+
+  const project = await prisma.project.findUnique({
+    where: { slug: projectSlug },
+    select: { id: true, members: { where: { userId: session.user.id }, select: { role: true } } },
+  });
+  if (!project) return { ok: false, error: 'Proyecto no encontrado' };
+  const myRole = project.members[0]?.role;
+  if (myRole !== 'OWNER' && myRole !== 'ADMIN') return { ok: false, error: 'Sin permisos' };
+
+  await prisma.projectMember.updateMany({
+    where: { projectId: project.id, userId },
+    data: { seniority: value },
+  });
+  revalidatePath(`/projects/${projectSlug}/settings`);
+  return { ok: true };
 }
 
 /** Change a member's role. Only OWNER/ADMIN. Cannot demote the OWNER. */
