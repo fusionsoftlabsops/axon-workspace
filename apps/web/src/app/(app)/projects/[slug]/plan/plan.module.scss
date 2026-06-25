@@ -7,17 +7,11 @@
 }
 
 .layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  // Single column: the chat sits on top and the generated plan flows full-width
+  // below it, so the plan and its task cards use the whole content width.
+  display: flex;
+  flex-direction: column;
   gap: t.$space-xl;
-
-  @media (min-width: t.$bp-lg) {
-    &.withPreview {
-      // Give the generated-plan preview the larger share so its task tiles can
-      // use the horizontal space; keep the chat comfortably readable.
-      grid-template-columns: minmax(340px, 0.8fr) minmax(0, 1.7fr);
-    }
-  }
 }
 
 // ---- Chat ----
@@ -239,28 +233,69 @@
   font-size: 0.85rem;
   color: var(--ink-muted);
 }
-// Tasks tile into a responsive grid so they use the horizontal space instead
-// of stacking in one tall column.
+// Single column of full-width task cards.
 .taskGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: t.$space-md;
   padding: t.$space-md t.$space-lg;
-  align-items: start;
 }
 .taskRow {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: t.$space-sm;
   padding: t.$space-md;
   border: 1px solid var(--rule);
   border-radius: t.$radius-md;
   background: var(--paper);
 }
-// While editing or re-analyzing, the card needs room — span the whole grid row.
-.taskRow.editForm,
-.taskRow:has(.refineBox) {
-  grid-column: 1 / -1;
+// Each full-width card splits into main content + a meta/actions sidebar so the
+// horizontal space is used instead of leaving the right half empty.
+.taskBody {
+  display: flex;
+  align-items: flex-start;
+  gap: t.$space-lg;
+
+  @media (max-width: t.$bp-md) {
+    flex-direction: column;
+    gap: t.$space-sm;
+  }
+}
+.taskMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.taskDesc {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+.taskAside {
+  flex: 0 0 auto;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  align-items: flex-start;
+  padding-left: t.$space-lg;
+  border-left: 1px solid var(--rule);
+
+  @media (max-width: t.$bp-md) {
+    width: 100%;
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid var(--rule);
+    padding-top: t.$space-sm;
+  }
+}
+.asideBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-sm;
 }
 .taskTop {
   display: flex;

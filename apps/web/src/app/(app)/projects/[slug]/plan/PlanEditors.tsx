@@ -206,35 +206,42 @@ export function PlanTaskCard({
 
   return (
     <div className={`${styles.taskRow} ${busy ? styles.rowBusy : ''}`}>
-      <div className={styles.taskTop}>
-        <span className={styles.taskTitle}>{task.title}</span>
-        {task.category && <Badge tone="accent">{task.category}</Badge>}
-        {task.estimate && <Badge tone="neutral">{task.estimate}</Badge>}
-      </div>
-      {task.acceptanceCriteria && <p className={styles.ac}>{task.acceptanceCriteria}</p>}
-      <div className={styles.taskMeta}>
-        <span>{task.priority}</span>
-        {task.recommendedRoles?.length > 0 && <span>{task.recommendedRoles.join(', ')}</span>}
-      </div>
-
-      {canEdit && (
-        <div className={styles.rowActions}>
-          <button type="button" className={styles.miniBtn} onClick={openEdit} disabled={busy}>
-            ✎ {t('Editar', 'Edit')}
-          </button>
-          <button
-            type="button"
-            className={styles.miniBtn}
-            onClick={() => setRefineOpen((v) => !v)}
-            disabled={busy}
-          >
-            ↻ {busy ? t('Analizando…', 'Analyzing…') : t('Re-analizar', 'Re-analyze')}
-          </button>
-          <button type="button" className={`${styles.miniBtn} ${styles.miniDanger}`} onClick={remove} disabled={busy}>
-            🗑 {t('Quitar', 'Remove')}
-          </button>
+      <div className={styles.taskBody}>
+        <div className={styles.taskMain}>
+          <span className={styles.taskTitle}>{task.title}</span>
+          {task.description && <p className={styles.taskDesc}>{task.description}</p>}
+          {task.acceptanceCriteria && <p className={styles.ac}>{task.acceptanceCriteria}</p>}
         </div>
-      )}
+        <div className={styles.taskAside}>
+          <div className={styles.asideBadges}>
+            {task.category && <Badge tone="accent">{task.category}</Badge>}
+            {task.estimate && <Badge tone="neutral">{task.estimate}</Badge>}
+            <Badge tone="neutral">{task.kind}</Badge>
+          </div>
+          <div className={styles.taskMeta}>
+            <span>{task.priority}</span>
+            {task.recommendedRoles?.length > 0 && <span>{task.recommendedRoles.join(', ')}</span>}
+          </div>
+          {canEdit && (
+            <div className={styles.rowActions}>
+              <button type="button" className={styles.miniBtn} onClick={openEdit} disabled={busy}>
+                ✎ {t('Editar', 'Edit')}
+              </button>
+              <button
+                type="button"
+                className={styles.miniBtn}
+                onClick={() => setRefineOpen((v) => !v)}
+                disabled={busy}
+              >
+                ↻ {busy ? t('Analizando…', 'Analyzing…') : t('Re-analizar', 'Re-analyze')}
+              </button>
+              <button type="button" className={`${styles.miniBtn} ${styles.miniDanger}`} onClick={remove} disabled={busy}>
+                🗑 {t('Quitar', 'Remove')}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {canEdit && refineOpen && (
         <div className={styles.refineBox}>
