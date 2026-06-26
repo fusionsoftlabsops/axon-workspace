@@ -1,0 +1,8 @@
+# graphify-svc runtime deps.
+# graphifyy is the PyPI distribution of the `graphify` package (imports as `graphify`).
+# The [openai] extra pulls the OpenAI-compatible client + tiktoken, which the
+# deepseek / openai / gemini / ollama extraction backends use.
+graphifyy[openai]==0.8.18
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4

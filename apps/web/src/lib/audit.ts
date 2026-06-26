@@ -43,6 +43,7 @@ export type AuditAction =
   | 'story.draft.error'
   | 'story.publish'
   | 'repo.read'
+  | 'analysis.start'
   | 'llm_credential.create'
   | 'llm_credential.revoke';
 

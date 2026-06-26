@@ -58,6 +58,17 @@ async function projectMeta(projectId: string) {
   return prisma.project.findUnique({ where: { id: projectId }, select: { name: true, description: true } });
 }
 
+/** The code knowledge-graph brief, when a READY analysis exists, so the planner
+ *  can plan in brownfield mode (over the real existing code). Undefined → the
+ *  planner stays in its original greenfield behavior. */
+async function codeContext(projectId: string): Promise<string | undefined> {
+  const row = await prisma.codeAnalysis.findUnique({
+    where: { projectId },
+    select: { status: true, summary: true },
+  });
+  return row?.status === 'READY' && row.summary ? row.summary : undefined;
+}
+
 function toView(p: {
   id: string;
   status: string;
@@ -147,6 +158,7 @@ export async function planChatAction(slug: string, userMessage: string): Promise
 
   const meta = await projectMeta(ctx.projectId);
   const lang = await getServerLang();
+  const code = await codeContext(ctx.projectId);
   let reply: string;
   try {
     reply = await planChatReply(
@@ -156,6 +168,7 @@ export async function planChatAction(slug: string, userMessage: string): Promise
       buildManifest(plan.attachments),
       ctx.userId,
       ctx.projectId,
+      code,
     );
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error de IA' };
@@ -420,6 +433,7 @@ async function runPlanGeneration(
   try {
     const meta = await projectMeta(projectId);
     const { images, docs } = await resolveAttachments(planId);
+    const code = await codeContext(projectId);
     const plan = await generatePlan(
       { name: meta?.name ?? '', description: meta?.description ?? null },
       messages,
@@ -428,6 +442,7 @@ async function runPlanGeneration(
       docs,
       userId,
       projectId,
+      code,
     );
     normalizeEstimates(plan); // derive "junior–senior" range per HU
     await prisma.projectPlan.update({
