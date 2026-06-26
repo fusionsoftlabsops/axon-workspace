@@ -10,11 +10,13 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# Build context is the repo ROOT (fusion-infra / the monorepo build), so paths
+# are repo-relative — matching apps/web/Dockerfile's convention.
 # Install deps first for layer caching.
-COPY requirements.txt ./
+COPY apps/graphify-svc/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py ./
+COPY apps/graphify-svc/app.py ./
 
 # Run as non-root.
 RUN useradd --create-home --uid 10001 svc \
