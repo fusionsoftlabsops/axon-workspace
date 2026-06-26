@@ -238,6 +238,10 @@ export function PlanChat({
           )}
         </div>
         <AnalysisPanel slug={slug} canWrite={canWrite} />
+        {/* Link repos BEFORE a plan exists so an existing project can be analyzed
+            (brownfield). Once a plan is generated, the repos section also appears
+            in the preview pane below. */}
+        {!generated && !generating && <PlanRepos slug={slug} canWrite={canWrite} />}
         {canWrite && !published && (
           <div className={styles.attachments}>
             <div className={styles.attachHead}>
