@@ -43,6 +43,17 @@ def test_resolve_repo_allowlist(monkeypatch):
         svc.resolve_repo(svc.RepoIn(name="x", githubFullName="someoneelse/repo"))
 
 
+def test_resolve_repo_honors_authenticated_clone_url(monkeypatch):
+    # When the caller (Axon) supplies an already-authenticated URL, use it as-is
+    # (so the service needs no token of its own) — but still enforce the allowlist.
+    monkeypatch.setattr(svc, "ALLOWED_ORGS", {"fusionsoftlabsops"})
+    monkeypatch.setattr(svc, "GITHUB_TOKEN", "")
+    authed = "https://x-access-token:ghp_abc@github.com/fusionsoftlabsops/idea-forge-web.git"
+    url, full = svc.resolve_repo(svc.RepoIn(name="web", cloneUrl=authed))
+    assert url == authed
+    assert full == "fusionsoftlabsops/idea-forge-web"
+
+
 def test_parse_stats():
     line = "tokens: 43,356 in / 7,443 out, est. cost (~deepseek): $0.0082"
     s = svc.parse_stats(line)
