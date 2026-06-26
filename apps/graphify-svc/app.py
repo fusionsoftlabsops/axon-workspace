@@ -91,11 +91,17 @@ def resolve_repo(repo: RepoIn) -> tuple[str, str]:
     if ALLOWED_ORGS and owner not in ALLOWED_ORGS:
         raise HTTPException(403, f"repo owner '{owner}' is not in the allowlist")
     base = full if not full.endswith(".git") else full[:-4]
+    clone = (repo.cloneUrl or "").strip()
+    # 1) Caller supplied an ALREADY-AUTHENTICATED clone URL (e.g. Axon embeds its
+    #    own GITHUB_TOKEN as https://x-access-token:<tok>@github.com/...). Use it
+    #    as-is so this service needs no GitHub token of its own.
+    if clone and "@" in clone.split("github.com", 1)[0]:
+        return clone, base
+    # 2) This service has its own token.
     if GITHUB_TOKEN:
-        url = f"https://x-access-token:{GITHUB_TOKEN}@github.com/{base}.git"
-    else:
-        url = f"https://github.com/{base}.git"
-    return url, base
+        return f"https://x-access-token:{GITHUB_TOKEN}@github.com/{base}.git", base
+    # 3) Public repo.
+    return f"https://github.com/{base}.git", base
 
 
 def clone_repo(url: str, branch: Optional[str], dest: Path) -> None:

@@ -11,6 +11,7 @@ import { prisma } from '@/lib/db';
 import { analyzeRepos, type GraphifyRepoInput } from './graphify-client';
 import { describeCodeGraph, type RepoRef } from './describe';
 import { seedBrainFromAnalysis } from './seed-brain';
+import { env } from '@/lib/env';
 
 /** Build the graphify-svc repo payload + the human-facing repo refs from the
  *  project's linked ProjectRepo rows. Skips repos with no GitHub identity. */
@@ -21,19 +22,26 @@ export async function collectAnalyzableRepos(
     where: { projectId },
     select: { name: true, kind: true, url: true, githubFullName: true, defaultBranch: true },
   });
+  const token = env().GITHUB_TOKEN;
   const inputs: GraphifyRepoInput[] = [];
   const refs: RepoRef[] = [];
   for (const r of repos) {
     // graphify-svc needs a GitHub identity to clone.
-    if (!r.githubFullName && !(r.url && /github\.com/i.test(r.url))) continue;
+    const full = r.githubFullName ?? r.url?.match(/github\.com[/:]+([^/\s]+\/[^/\s.]+)/i)?.[1];
+    if (!full) continue;
+    // Embed Axon's own token so graphify-svc needs NO GitHub token of its own
+    // (it uses the authenticated URL as-is over the internal `fusion` network).
+    const cloneUrl = token
+      ? `https://x-access-token:${token}@github.com/${full}.git`
+      : (r.url ?? `https://github.com/${full}.git`);
     inputs.push({
       name: r.name,
       kind: r.kind,
-      githubFullName: r.githubFullName,
-      cloneUrl: r.url,
+      githubFullName: r.githubFullName ?? full,
+      cloneUrl,
       branch: r.defaultBranch ?? 'main',
     });
-    refs.push({ name: r.name, kind: r.kind, githubFullName: r.githubFullName });
+    refs.push({ name: r.name, kind: r.kind, githubFullName: r.githubFullName ?? full });
   }
   return { inputs, refs };
 }
