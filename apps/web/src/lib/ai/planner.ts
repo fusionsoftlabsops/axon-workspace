@@ -86,12 +86,31 @@ async function record(
     .catch(() => {});
 }
 
-function chatSystem(lang: Lang): string {
-  return `Eres un Product/Tech Lead senior facilitando una sesión de planeación de un nuevo proyecto de software.
-Tu trabajo en esta fase de chat: entender bien el proyecto y AFILAR la idea.
+/** When a code knowledge-graph brief is available, the project is EXISTING
+ *  (brownfield): the planner must plan evolution over the real code, not a
+ *  rebuild. Returns the framing block to prepend, or '' for greenfield. */
+export function codeMapBlock(codeContext?: string): string {
+  if (!codeContext?.trim()) return '';
+  return `\n\nEste proyecto YA EXISTE y está EN PRODUCCIÓN. A continuación, el MAPA DE SU CÓDIGO REAL (grafo de conocimiento generado por graphify sobre sus repos):
+<<<CODE_MAP
+${codeContext.trim()}
+CODE_MAP
+Usa este mapa como verdad sobre lo que ya está construido: NO propongas reconstruir ni reinventar lo que ya existe; planifica MEJORAS, evoluciones, deuda técnica, nuevas capacidades e integraciones SOBRE el código real. Referencia módulos/áreas/conceptos reales del mapa cuando sea relevante.`;
+}
+
+export function chatSystem(lang: Lang, codeContext?: string): string {
+  const brownfield = Boolean(codeContext?.trim());
+  const intro = brownfield
+    ? 'Eres un Product/Tech Lead senior facilitando una sesión de planeación de tareas futuras sobre un proyecto de software YA EXISTENTE y desplegado.'
+    : 'Eres un Product/Tech Lead senior facilitando una sesión de planeación de un nuevo proyecto de software.';
+  const focusLine = brownfield
+    ? '- Haz UNA sola pregunta enfocada por turno (la más valiosa que falte): qué objetivos/áreas se quieren evolucionar, prioridades, nuevas capacidades, deuda técnica o problemas a resolver sobre lo ya construido.'
+    : '- Haz UNA sola pregunta enfocada por turno (la más valiosa que falte): audiencia, problema, alcance MVP, stack/restricciones técnicas, integraciones, plazos, equipo.';
+  return `${intro}
+Tu trabajo en esta fase de chat: entender bien ${brownfield ? 'qué se quiere construir/mejorar a continuación' : 'el proyecto'} y AFILAR la idea.${codeMapBlock(codeContext)}
 Reglas:
 - Responde SIEMPRE en ${langName(lang)}, sin importar el idioma en que escriba el usuario.
-- Haz UNA sola pregunta enfocada por turno (la más valiosa que falte): audiencia, problema, alcance MVP, stack/restricciones técnicas, integraciones, plazos, equipo.
+${focusLine}
 - Sé breve (1-3 frases). Si el usuario es vago, ofrece opciones concretas.
 - Si hay contexto adjunto (imágenes, documentos, enlaces), tenlo en cuenta y referéncialo en tus preguntas.
 - Cuando ya tengas contexto suficiente (típicamente 3-6 intercambios), PREGUNTA explícitamente al usuario si ya subió TODO el contexto que quería (imágenes, documentos y enlaces). Si confirma que sí, invítalo a pulsar el botón "Generar plan" y deja de hacer preguntas.`;
@@ -106,15 +125,19 @@ function estimateGuidance(): string {
 Adapta los tiempos al área/categoría y stack de la HU. Usa unidades cortas y consistentes ("3h","6h","1d","2d","3 pts"). Fija \`estimate\` al rango representativo "<junior>–<senior>" (p. ej. "3h–1d").`;
 }
 
-function genSystem(lang: Lang): string {
-  return `Eres un Tech Lead senior. Con TODO el contexto de la conversación y los adjuntos, genera un plan de entrega accionable.
+export function genSystem(lang: Lang, codeContext?: string): string {
+  const brownfield = Boolean(codeContext?.trim());
+  const brownfieldRule = brownfield
+    ? ' Como el proyecto YA EXISTE (ver el MAPA DEL CÓDIGO), las HUs deben ser MEJORAS/evoluciones sobre el código real (no reconstruir lo existente) y referirse a los módulos/áreas/repos reales del mapa; en suggestedRepos refleja los repos REALES ya analizados.'
+    : '';
+  return `Eres un Tech Lead senior. Con TODO el contexto de la conversación y los adjuntos, genera un plan de entrega accionable.${codeMapBlock(codeContext)}
 Llama a la herramienta EmitPlan con:
 - improvedIdea: la idea afinada (2-5 frases).
 - sprints: ordenados; cada uno con name, goal y tasks.
 - Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate (rango "junior–senior"); estimateBySeniority ({junior, semiSenior, senior}); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE); repo (nombre del repo objetivo, uno de suggestedRepos).
 - suggestedRepos: los repos/aplicativos del proyecto (backend, frontend, infra, etc.) con name, kind, stack y reason. Un proyecto puede tener VARIOS.
 ${estimateGuidance()}
-Reglas: realista y específico al dominio; **asigna a CADA HU su repo objetivo en \`repo\`** (uno de los name de suggestedRepos, según su área/categoría); usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}. Llama SOLO a la herramienta.`;
+Reglas: realista y específico al dominio; **asigna a CADA HU su repo objetivo en \`repo\`** (uno de los name de suggestedRepos, según su área/categoría); usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}.${brownfieldRule} Llama SOLO a la herramienta.`;
 }
 
 function textOf(resp: Anthropic.Messages.Message): string {
@@ -133,6 +156,7 @@ export async function planChatReply(
   attachmentManifest: string,
   userId: string,
   projectId: string,
+  codeContext?: string,
 ): Promise<string> {
   const model = env().AI_MODEL_BALANCED;
   const lead =
@@ -142,7 +166,7 @@ export async function planChatReply(
   const resp = await client().messages.create({
     model,
     max_tokens: 700,
-    system: chatSystem(lang),
+    system: chatSystem(lang, codeContext),
     messages: [{ role: 'user', content: lead }, ...messages],
   });
   await record('plan.chat', model, resp.usage, userId, projectId);
@@ -158,6 +182,7 @@ export async function generatePlan(
   docs: PlanDocText[],
   userId: string,
   projectId: string,
+  codeContext?: string,
 ): Promise<GeneratedPlan> {
   const model = env().AI_MODEL_DEEP;
 
@@ -183,7 +208,7 @@ export async function generatePlan(
   const resp = await client().messages.create({
     model,
     max_tokens: 8000,
-    system: genSystem(lang),
+    system: genSystem(lang, codeContext),
     tools: [
       {
         name: 'EmitPlan',

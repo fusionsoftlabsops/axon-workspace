@@ -238,8 +238,38 @@ model Project {
   plans          ProjectPlan[]
   contextSummaries ContextSummary[]
   repos          ProjectRepo[]
+  analysis       CodeAnalysis?
 
   @@index([ownerId])
+}
+
+// Lifecycle of a project's code knowledge-graph analysis (graphify over its repos).
+enum AnalysisStatus {
+  PENDING    // creada, aún no corre
+  ANALYZING  // graphify-svc clonando/analizando
+  READY      // grafo listo
+  FAILED     // falló (ver error)
+}
+
+// Grafo de conocimiento del CÓDIGO real del proyecto, producido por graphify-svc
+// (clona los repos y corre `graphify extract`). Uno por proyecto; el grafo combina
+// todos sus repos. Alimenta la planeación brownfield (lib/ai/planner.ts) y siembra
+// el cerebro. Ver apps/graphify-svc y lib/analysis/.
+model CodeAnalysis {
+  id        String         @id @default(cuid())
+  projectId String         @unique
+  status    AnalysisStatus @default(PENDING)
+  graph     Json?          // node-link { nodes, edges/links, communities en nodos }
+  summary   String?        @db.Text // brief narrativo (describeCodeGraph)
+  godNodes  Json?          // top nodos por grado (conceptos centrales)
+  stats     Json?          // { nodes, edges, communities, tokensIn, tokensOut, costUsd }
+  backend   String?        // motor de extracción usado (deepseek|claude|…)
+  repos     Json?          // repos analizados [{ name, githubFullName }]
+  error     String?        @db.Text
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 // Un proyecto puede tener varios repos / aplicativos. Fuente de verdad para la

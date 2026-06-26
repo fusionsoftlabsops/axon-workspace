@@ -17,6 +17,7 @@ import {
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
 import { PlanTaskCard, PlanSprintHead } from './PlanEditors';
 import { PlanRepos } from './PlanRepos';
+import { AnalysisPanel } from './AnalysisPanel';
 import styles from './plan.module.scss';
 
 export function PlanChat({
@@ -236,6 +237,7 @@ export function PlanChat({
             </div>
           )}
         </div>
+        <AnalysisPanel slug={slug} canWrite={canWrite} />
         {canWrite && !published && (
           <div className={styles.attachments}>
             <div className={styles.attachHead}>

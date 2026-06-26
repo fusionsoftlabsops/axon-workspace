@@ -55,6 +55,16 @@ const schema = z.object({
   // Optional: if unset, the graph still works and summaries are simply disabled.
   INFRA_LLM_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   INFRA_LLM_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // graphify-svc (self-hosted, reachable on the internal `fusion` network) that
+  // clones a project's repos and returns a code knowledge graph. Optional: if
+  // unset, isGraphifyConfigured() is false and "Analyze existing project" is
+  // disabled, leaving greenfield planning untouched. See apps/graphify-svc.
+  GRAPHIFY_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  // Bearer token Axon forwards to graphify-svc (matches its GRAPHIFY_AUTH_TOKEN).
+  GRAPHIFY_AUTH_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Default extraction backend for graphify-svc (deepseek|claude|…). Optional —
+  // the service has its own default when this is unset.
+  GRAPHIFY_BACKEND: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // GitHub org PAT used to create repos and read collaborator access for the
   // plan's Repositories section. Optional — if unset, those actions are disabled
   // and the rest of the app is unaffected.

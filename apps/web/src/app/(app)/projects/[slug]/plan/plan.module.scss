@@ -598,6 +598,19 @@
   color: var(--ink-muted);
 }
 
+// Code-analysis brief (graphify summary) — compact, scrollable.
+.analysisSummary {
+  margin: 0.5rem 0 0;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
+  background: var(--surface-2, rgba(127, 127, 127, 0.06));
+  border-radius: 0.5rem;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
 // ---- Repositories section (create/link/verify access) ----
 .repoList {
   display: flex;
