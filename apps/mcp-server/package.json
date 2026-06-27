@@ -12,7 +12,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "start:http": "node dist/http.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage"
   },
   "dependencies": {
     "@admin/shared": "workspace:*",
@@ -23,7 +25,9 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "2.1.9",
     "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "2.1.9"
   }
 }
