@@ -68,6 +68,7 @@ class RepoIn(BaseModel):
 class AnalyzeIn(BaseModel):
     repos: list[RepoIn]
     backend: Optional[str] = None
+    jobId: Optional[str] = None  # caller-supplied id to poll /progress/{jobId}
 
 
 # --------------------------------------------------------------------------- #
@@ -124,17 +125,67 @@ def clone_repo(url: str, branch: Optional[str], dest: Path) -> None:
     raise RuntimeError(f"git clone failed: {last_err.strip()[:500]}")
 
 
-def run_extract(scan_root: Path, out_dir: Path, backend: str) -> str:
+def run_extract(scan_root: Path, out_dir: Path, backend: str, on_line=None) -> str:
     """Run `python -m graphify extract <scan_root> --backend <backend>` writing
-    its output under `out_dir`. Returns the captured stdout. Raises RuntimeError."""
+    its output under `out_dir`. Streams stdout line-by-line to `on_line` (for live
+    progress) and returns the full captured stdout. Raises RuntimeError on failure."""
     env = {**os.environ, "GRAPHIFY_OUT": str(out_dir)}
     cmd = [sys.executable, "-m", "graphify", "extract", str(scan_root), "--backend", backend]
-    proc = subprocess.run(
-        cmd, cwd=str(scan_root), env=env, capture_output=True, text=True, timeout=EXTRACT_TIMEOUT
+    proc = subprocess.Popen(
+        cmd, cwd=str(scan_root), env=env, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, bufsize=1,
     )
+    lines: list[str] = []
+    try:
+        assert proc.stdout is not None
+        for raw in proc.stdout:
+            line = raw.rstrip("\n")
+            lines.append(line)
+            if on_line:
+                try:
+                    on_line(line)
+                except Exception:
+                    pass
+        proc.wait(timeout=EXTRACT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raise
     if proc.returncode != 0:
-        raise RuntimeError(f"graphify extract failed: {_scrub(proc.stderr or proc.stdout).strip()[:800]}")
-    return proc.stdout or ""
+        tail = _scrub("\n".join(lines[-20:])).strip()[:800]
+        raise RuntimeError(f"graphify extract failed: {tail}")
+    return "\n".join(lines)
+
+
+# ---- live progress (keyed by the caller's jobId) --------------------------- #
+PROGRESS: dict[str, dict] = {}
+_CHUNK_RE = re.compile(r"chunk\s+(\d+)\s*/\s*(\d+)", re.IGNORECASE)
+_FOUND_RE = re.compile(r"found\s+(\d+)\s+code", re.IGNORECASE)
+_SEM_RE = re.compile(r"semantic extraction on\s+(\d+)\s+files", re.IGNORECASE)
+_WROTE_RE = re.compile(r"wrote.*?(\d[\d,]*)\s+nodes,\s*(\d[\d,]*)\s+edges", re.IGNORECASE)
+
+
+def parse_progress(line: str, state: dict) -> dict:
+    """Fold one graphify stdout line into the progress state {phase, percent, …}."""
+    low = line.lower()
+    m = _FOUND_RE.search(line)
+    if m:
+        state.update(phase="extracting", codeFiles=int(m.group(1)), percent=max(state.get("percent", 0), 15))
+    m = _SEM_RE.search(line)
+    if m:
+        state.update(phase="extracting", semanticFiles=int(m.group(1)), percent=max(state.get("percent", 0), 20))
+    m = _CHUNK_RE.search(line)
+    if m:
+        done, total = int(m.group(1)), max(1, int(m.group(2)))
+        # chunks span 20%→90% of the bar.
+        state.update(phase="extracting", chunksDone=done, chunksTotal=total,
+                     percent=20 + int(70 * done / total))
+    if "deduplicat" in low:
+        state.update(phase="building", percent=max(state.get("percent", 0), 92))
+    m = _WROTE_RE.search(line)
+    if m:
+        state.update(phase="done", percent=100,
+                     nodes=int(m.group(1).replace(",", "")), edges=int(m.group(2).replace(",", "")))
+    return state
 
 
 def _scrub(text: str) -> str:
@@ -214,13 +265,22 @@ def analyze(body: AnalyzeIn, authorization: Optional[str] = Header(default=None)
         raise HTTPException(400, f"too many repos (max {MAX_REPOS})")
 
     backend = (body.backend or DEFAULT_BACKEND).strip()
+    job = body.jobId
+    prog: dict = {"phase": "cloning", "percent": 2}
+    if job:
+        PROGRESS[job] = prog
+
     workdir = Path(tempfile.mkdtemp(prefix="graphify-svc-"))
     cloned: list[str] = []
     try:
         scan_root = workdir / "repos"
         scan_root.mkdir(parents=True, exist_ok=True)
-        for repo in body.repos:
+        total = len(body.repos)
+        for i, repo in enumerate(body.repos):
             url, full = resolve_repo(repo)
+            if job:
+                prog.update(phase="cloning", repo=repo.name,
+                            percent=2 + int(12 * i / max(1, total)))
             dest = scan_root / re.sub(r"[^A-Za-z0-9._-]", "-", repo.name)
             try:
                 clone_repo(url, repo.branch, dest)
@@ -229,15 +289,22 @@ def analyze(body: AnalyzeIn, authorization: Optional[str] = Header(default=None)
             cloned.append(full)
 
         out_dir = workdir / "graphify-out"
+        on_line = (lambda ln: parse_progress(ln, prog)) if job else None
         try:
-            stdout = run_extract(scan_root, out_dir, backend)
+            stdout = run_extract(scan_root, out_dir, backend, on_line=on_line)
         except subprocess.TimeoutExpired:
+            if job:
+                prog.update(phase="failed", error="timed out")
             raise HTTPException(504, "graphify extract timed out")
         except RuntimeError as exc:
+            if job:
+                prog.update(phase="failed", error=str(exc)[:200])
             raise HTTPException(500, str(exc))
 
         graph = load_graph(out_dir)
         stats = {**summarize_graph(graph), **parse_stats(stdout), "backend": backend}
+        if job:
+            prog.update(phase="done", percent=100, **{k: stats[k] for k in ("nodes", "edges", "communities") if k in stats})
         return {
             "graph": graph,
             "stats": stats,
@@ -247,3 +314,10 @@ def analyze(body: AnalyzeIn, authorization: Optional[str] = Header(default=None)
         }
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+
+
+@app.get("/progress/{job_id}")
+def progress(job_id: str) -> dict:
+    """Live progress for an in-flight /analyze call (by jobId). Returns
+    {phase, percent, chunksDone, chunksTotal, …} or {phase:'unknown'}."""
+    return PROGRESS.get(job_id) or {"phase": "unknown", "percent": 0}
