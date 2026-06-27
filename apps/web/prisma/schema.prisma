@@ -239,6 +239,7 @@ model Project {
   contextSummaries ContextSummary[]
   repos          ProjectRepo[]
   analysis       CodeAnalysis?
+  deployTarget   DeployTarget?
 
   @@index([ownerId])
 }
@@ -290,10 +291,56 @@ model ProjectRepo {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deployments Deployment[]
 
   @@unique([projectId, name])
   @@index([projectId])
+}
+
+// Binding de un proyecto Axon a fusion-infra (el PaaS): el proyecto/entorno
+// fusion-infra auto-creado donde se despliegan sus repos. Uno por proyecto. Ver
+// lib/deploy/fusion-client.ts y lib/actions/deploy.ts.
+model DeployTarget {
+  id              String @id @default(cuid())
+  projectId       String @unique
+  fusionTeamId    String
+  fusionProjectId String // proyecto fusion-infra auto-creado (POST /projects)
+  environmentId   String // su entorno "production" por defecto (o elegido)
+  serverId        String // host fusion-infra elegido
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deployments Deployment[]
+}
+
+// Un despliegue concreto = una application en fusion-infra (un repo desplegado o
+// una app/DB importada). Espeja el estado del control-plane (status/hostname) para
+// que Axon lo muestre sin re-consultar en cada render.
+model Deployment {
+  id               String  @id @default(cuid())
+  deployTargetId   String
+  projectRepoId    String? // repo Axon origen (null si importada/standalone)
+  fusionAppId      String  // id de la application en fusion-infra
+  kind             String  @default("APP") // APP|DATABASE
+  name             String
+  hostname         String? // URL pública viva (auto-domain de fusion-infra)
+  buildPack        String  @default("DOCKERFILE") // DOCKERFILE|DOCKER_IMAGE|STATIC
+  exposedPort      Int?
+  status           String  @default("PENDING") // mirror de latestDeployment.status
+  lastDeploymentId String? // deploymentId fusion para polling de estado
+  error            String? @db.Text
+  imported         Boolean @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  deployTarget DeployTarget @relation(fields: [deployTargetId], references: [id], onDelete: Cascade)
+  projectRepo  ProjectRepo? @relation(fields: [projectRepoId], references: [id], onDelete: SetNull)
+
+  @@unique([deployTargetId, fusionAppId])
+  @@index([deployTargetId])
+  @@index([projectRepoId])
 }
 
 // Categoría de archivo derivada del mime-type al subir; usada para agrupar

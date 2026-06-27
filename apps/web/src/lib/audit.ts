@@ -44,6 +44,18 @@ export type AuditAction =
   | 'story.publish'
   | 'repo.read'
   | 'analysis.start'
+  | 'deploy.connect'
+  | 'deploy.create'
+  | 'deploy.redeploy'
+  | 'deploy.stop'
+  | 'deploy.start'
+  | 'deploy.recreate'
+  | 'deploy.rollback'
+  | 'deploy.env'
+  | 'deploy.db.create'
+  | 'deploy.import'
+  | 'deploy.unlink'
+  | 'deploy.destroy'
   | 'llm_credential.create'
   | 'llm_credential.revoke';
 

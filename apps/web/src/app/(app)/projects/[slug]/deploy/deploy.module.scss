@@ -1,0 +1,239 @@
+@use '@/styles/tokens' as t;
+
+.page {
+  padding: t.$space-xl;
+  max-width: t.$max-content-width;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-lg;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: t.$space-sm;
+  flex-wrap: wrap;
+}
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+}
+
+.card {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper-elev);
+  padding: t.$space-md;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+}
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  flex-wrap: wrap;
+}
+.name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.reason {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.link {
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-size: 0.8rem;
+  &:hover { text-decoration: underline; }
+}
+.error {
+  color: var(--accent-stamp);
+  font-size: 0.85rem;
+}
+.notice {
+  color: var(--accent-ink);
+  font-size: 0.85rem;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-sm;
+  margin-top: t.$space-sm;
+}
+.miniBtn {
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-elev);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: t.$radius-md;
+  cursor: pointer;
+  &:hover:not(:disabled) {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+.miniDanger:hover:not(:disabled) {
+  border-color: var(--accent-stamp);
+  color: var(--accent-stamp);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  padding: t.$space-sm;
+  border: 1px dashed var(--rule-strong);
+  border-radius: t.$radius-md;
+  background: var(--paper-deep);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-subtle);
+}
+.input,
+.select {
+  width: 100%;
+  border: 1px solid var(--rule-strong);
+  border-radius: t.$radius-md;
+  background: var(--paper-elev);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  padding: 0.4rem 0.55rem;
+  &:focus {
+    outline: none;
+    border-color: var(--accent-ink);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 2px solid var(--rule-strong);
+  border-top-color: var(--accent-ink);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.logs {
+  margin: 0;
+  max-height: 50vh;
+  overflow: auto;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  padding: t.$space-sm;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.logErr {
+  color: var(--accent-stamp);
+}
+
+.creds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.credRow {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  font-size: 0.8rem;
+}
+.credKey {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-subtle);
+  width: 5.5rem;
+  flex: none;
+}
+.credVal {
+  font-family: var(--font-mono);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--ink);
+}
+
+.envRow {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+}
+.keyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-sm;
+}
+.modalActions {
+  display: flex;
+  gap: t.$space-sm;
+  margin-top: t.$space-md;
+  flex-wrap: wrap;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.importItem {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  padding: t.$space-sm;
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+}

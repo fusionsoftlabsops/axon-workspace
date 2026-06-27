@@ -70,6 +70,19 @@ const schema = z.object({
   // and the rest of the app is unaffected.
   GITHUB_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   GITHUB_ORG: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // fusion-infra control-plane (the user's PaaS). axon-web runs as an app ON
+  // fusion-infra (the internal `fusion` network), so this is the internal API
+  // base: http://control-plane:3030/api. Optional: if unset, isFusionConfigured()
+  // is false and the project "Deploy" tab shows a friendly "not configured"
+  // notice, leaving the rest of the app untouched. See lib/deploy/fusion-client.ts.
+  FUSION_INFRA_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  // Platform `fapi_` API token Axon presents to the control-plane (Bearer). Mint
+  // it once in the fusion-infra Settings UI. Required (with the URL) to deploy.
+  FUSION_INFRA_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Optional overrides. TEAM_ID skips the /context defaultTeam lookup; SERVER_ID
+  // pins which host new apps deploy to (auto-picked when there's exactly one).
+  FUSION_INFRA_TEAM_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  FUSION_INFRA_SERVER_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });

@@ -49,6 +49,7 @@ export default async function ProjectLayout({
           <Link href={`/projects/${slug}/vault`}>※ Vault</Link>
           <Link href={`/projects/${slug}/brain`}>⁂ {t('Cerebro', 'Brain')}</Link>
           <Link href={`/projects/${slug}/stories`}>✎ {t('HUs', 'Stories')}</Link>
+          <Link href={`/projects/${slug}/deploy`}>⚡ {t('Deploy', 'Deploy')}</Link>
           {canManage && <Link href={`/projects/${slug}/settings`}>¶ {t('Ajustes', 'Settings')}</Link>}
           {canManage && <Link href={`/projects/${slug}/settings/audit`}>☞ {t('Auditoría', 'Audit')}</Link>}
         </nav>
