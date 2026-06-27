@@ -301,7 +301,14 @@ def analyze(body: AnalyzeIn, authorization: Optional[str] = Header(default=None)
                 prog.update(phase="failed", error=str(exc)[:200])
             raise HTTPException(500, str(exc))
 
-        graph = load_graph(out_dir)
+        try:
+            graph = load_graph(out_dir)
+        except Exception as exc:
+            # Surface the real cause + the last extract output instead of a bare 500.
+            tail = _scrub("\n".join((stdout or "").splitlines()[-20:])).strip()[:800]
+            if job:
+                prog.update(phase="failed", error=str(exc)[:200])
+            raise HTTPException(500, f"{exc} · last output: {tail}")
         stats = {**summarize_graph(graph), **parse_stats(stdout), "backend": backend}
         if job:
             prog.update(phase="done", percent=100, **{k: stats[k] for k in ("nodes", "edges", "communities") if k in stats})
