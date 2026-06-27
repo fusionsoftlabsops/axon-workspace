@@ -72,7 +72,7 @@ def test_analyze_happy_path(monkeypatch):
         dest.mkdir(parents=True, exist_ok=True)
         (dest / "README.md").write_text("hi", encoding="utf-8")
 
-    def fake_extract(scan_root: Path, out_dir: Path, backend: str) -> str:
+    def fake_extract(scan_root: Path, out_dir: Path, backend: str, on_line=None) -> str:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "graph.json").write_text(json.dumps(FIXTURE_GRAPH), encoding="utf-8")
         (out_dir / "GRAPH_REPORT.md").write_text("# Report", encoding="utf-8")
@@ -93,6 +93,24 @@ def test_analyze_happy_path(monkeypatch):
     assert body["stats"]["costUsd"] == 0.0001
     assert body["graph"]["edges"]  # normalized from links
     assert body["report"].startswith("# Report")
+
+
+def test_parse_progress():
+    st = {}
+    svc.parse_progress("[graphify extract] found 53 code, 4 docs", st)
+    assert st["phase"] == "extracting" and st["codeFiles"] == 53
+    svc.parse_progress("[graphify extract] chunk 3/4 done", st)
+    assert st["chunksDone"] == 3 and st["chunksTotal"] == 4
+    assert 20 < st["percent"] < 95
+    svc.parse_progress("[graphify] Deduplicated 53 node(s).", st)
+    assert st["phase"] == "building"
+    svc.parse_progress("[graphify extract] wrote out/graph.json: 542 nodes, 503 edges, 47 communities", st)
+    assert st["phase"] == "done" and st["percent"] == 100 and st["nodes"] == 542 and st["edges"] == 503
+
+
+def test_progress_endpoint_unknown():
+    r = client.get("/progress/nope")
+    assert r.status_code == 200 and r.json()["phase"] == "unknown"
 
 
 def test_analyze_rejects_disallowed_org(monkeypatch):

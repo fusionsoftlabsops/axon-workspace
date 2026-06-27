@@ -8,7 +8,8 @@
  */
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { analyzeRepos, type GraphifyRepoInput } from './graphify-client';
+import { randomUUID } from 'node:crypto';
+import { analyzeRepos, getProgress, type GraphifyRepoInput } from './graphify-client';
 import { describeCodeGraph, type RepoRef } from './describe';
 import { seedBrainFromAnalysis } from './seed-brain';
 import { env } from '@/lib/env';
@@ -76,7 +77,30 @@ export async function runProjectAnalysis(params: {
       return;
     }
 
-    const result = await analyzeRepos(inputs, { backend });
+    // Live progress: poll graphify-svc and mirror it into CodeAnalysis.stats
+    // (the UI reads it while status is ANALYZING). Overwritten by final stats below.
+    const jobId = randomUUID();
+    let polling = true;
+    const poller = (async () => {
+      while (polling) {
+        await new Promise((r) => setTimeout(r, 3000));
+        if (!polling) break;
+        const p = await getProgress(jobId);
+        if (p && p.phase && p.phase !== 'unknown') {
+          await prisma.codeAnalysis
+            .update({ where: { projectId }, data: { stats: { progress: true, ...p } as unknown as Prisma.InputJsonValue } })
+            .catch(() => {});
+        }
+      }
+    })();
+
+    let result;
+    try {
+      result = await analyzeRepos(inputs, { backend, jobId });
+    } finally {
+      polling = false;
+      await poller.catch(() => {});
+    }
     const { summary, godNodes } = describeCodeGraph(result.graph, refs);
 
     await prisma.codeAnalysis.update({

@@ -40,9 +40,18 @@ export function isGraphifyConfigured(): boolean {
 
 /** Call graphify-svc /analyze. Long timeout: extraction clones + runs an LLM
  *  pass over the repos and can take minutes. Throws on transport/HTTP errors. */
+export interface GraphifyProgress {
+  phase: 'cloning' | 'extracting' | 'building' | 'done' | 'failed' | 'unknown';
+  percent: number;
+  repo?: string;
+  chunksDone?: number;
+  chunksTotal?: number;
+  codeFiles?: number;
+}
+
 export async function analyzeRepos(
   repos: GraphifyRepoInput[],
-  opts?: { backend?: string; timeoutMs?: number },
+  opts?: { backend?: string; timeoutMs?: number; jobId?: string },
 ): Promise<GraphifyResult> {
   const e = env();
   if (!e.GRAPHIFY_URL) throw new Error('graphify-svc no está configurado (GRAPHIFY_URL)');
@@ -58,7 +67,7 @@ export async function analyzeRepos(
     const res = await fetch(`${base}/analyze`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ repos, ...(backend ? { backend } : {}) }),
+      body: JSON.stringify({ repos, ...(backend ? { backend } : {}), ...(opts?.jobId ? { jobId: opts.jobId } : {}) }),
       signal: controller.signal,
     });
     if (!res.ok) {
@@ -68,6 +77,24 @@ export async function analyzeRepos(
     return (await res.json()) as GraphifyResult;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+/** Poll the live progress of an in-flight analysis (by jobId). Best-effort. */
+export async function getProgress(jobId: string): Promise<GraphifyProgress | null> {
+  const e = env();
+  if (!e.GRAPHIFY_URL) return null;
+  const headers: Record<string, string> = {};
+  if (e.GRAPHIFY_AUTH_TOKEN) headers.authorization = `Bearer ${e.GRAPHIFY_AUTH_TOKEN}`;
+  try {
+    const res = await fetch(`${e.GRAPHIFY_URL.replace(/\/+$/, '')}/progress/${jobId}`, {
+      headers,
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as GraphifyProgress;
+  } catch {
+    return null;
   }
 }
 

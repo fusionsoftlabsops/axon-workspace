@@ -62,6 +62,22 @@ export function AnalysisPanel({ slug, canWrite }: { slug: string; canWrite: bool
   const failed = view.status === 'FAILED';
   const stats = view.stats ?? {};
 
+  // Live progress (mirrored into stats while ANALYZING).
+  const phase = analyzing ? (stats.phase as string | undefined) : undefined;
+  const pct = analyzing && typeof stats.percent === 'number' ? Math.min(100, Math.max(0, stats.percent as number)) : null;
+  const phaseLabel =
+    phase === 'cloning'
+      ? t('Clonando repos…', 'Cloning repos…')
+      : phase === 'extracting'
+        ? t('Extrayendo y analizando con IA…', 'Extracting & analyzing with AI…')
+        : phase === 'building'
+          ? t('Construyendo el grafo…', 'Building the graph…')
+          : t('Analizando…', 'Analyzing…');
+  const chunkInfo =
+    typeof stats.chunksTotal === 'number'
+      ? ` (${Number(stats.chunksDone ?? 0)}/${Number(stats.chunksTotal)})`
+      : '';
+
   async function run() {
     setBusy(true);
     setError(null);
@@ -94,6 +110,33 @@ export function AnalysisPanel({ slug, canWrite }: { slug: string; canWrite: bool
             'Link at least one repo with a GitHub identity (below) to analyze.',
           )}
         </p>
+      )}
+
+      {analyzing && (
+        <div style={{ marginTop: '0.6rem' }}>
+          <div
+            style={{ height: 6, borderRadius: 4, background: 'rgba(127,127,127,0.18)', overflow: 'hidden' }}
+            role="progressbar"
+            aria-valuenow={pct ?? undefined}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${pct ?? 6}%`,
+                background: 'var(--accent, #6ea8fe)',
+                transition: 'width .5s ease',
+              }}
+            />
+          </div>
+          <p className={styles.repoReason}>
+            {phaseLabel}
+            {chunkInfo}
+            {pct !== null ? ` · ${pct}%` : ''}
+            {stats.repo ? ` · ${String(stats.repo)}` : ''}
+          </p>
+        </div>
       )}
 
       {ready && (
