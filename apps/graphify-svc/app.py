@@ -240,6 +240,42 @@ def load_report(out_dir: Path) -> Optional[str]:
     return rp.read_text(encoding="utf-8") if rp.exists() else None
 
 
+def merge_graph(combined: dict, graph: dict, repo: str, comm_base: int) -> int:
+    """Append one repo's node-link graph into `combined`, namespacing node ids by
+    repo (avoids cross-repo collisions) and offsetting community ids so each repo
+    keeps distinct communities. Returns the next free community base."""
+    def pid(nid):
+        return f"{repo}::{nid}"
+
+    nodes = graph.get("nodes") or []
+    edges = graph.get("links") or graph.get("edges") or []
+    next_base = comm_base
+    for n in nodes:
+        if not isinstance(n, dict):
+            continue
+        n2 = dict(n)
+        n2["id"] = pid(n.get("id"))
+        n2["repo"] = repo
+        c = n.get("community")
+        if c is not None:
+            try:
+                n2["community"] = comm_base + int(c)
+                next_base = max(next_base, comm_base + int(c) + 1)
+            except (TypeError, ValueError):
+                pass
+        combined["nodes"].append(n2)
+    for e in edges:
+        if not isinstance(e, dict):
+            continue
+        s, t = e.get("source"), e.get("target")
+        s = s if isinstance(s, str) else (s.get("id") if isinstance(s, dict) else s)
+        t = t if isinstance(t, str) else (t.get("id") if isinstance(t, dict) else t)
+        e2 = dict(e)
+        e2["source"], e2["target"] = pid(s), pid(t)
+        combined["links"].append(e2)
+    return next_base
+
+
 # --------------------------------------------------------------------------- #
 # Routes
 # --------------------------------------------------------------------------- #
@@ -272,50 +308,83 @@ def analyze(body: AnalyzeIn, authorization: Optional[str] = Header(default=None)
 
     workdir = Path(tempfile.mkdtemp(prefix="graphify-svc-"))
     cloned: list[str] = []
+    combined: dict = {"directed": True, "nodes": [], "links": []}
+    total = len(body.repos)
+    comm_base = 0
+    tok_in = tok_out = 0
+    cost = 0.0
+    errors: list[str] = []
     try:
-        scan_root = workdir / "repos"
-        scan_root.mkdir(parents=True, exist_ok=True)
-        total = len(body.repos)
+        # Process ONE repo at a time (clone → extract → merge → free) so the peak
+        # memory is a single repo's worth, not all of them — the host can't hold
+        # the AST/graph of every repo at once.
         for i, repo in enumerate(body.repos):
             url, full = resolve_repo(repo)
             if job:
-                prog.update(phase="cloning", repo=repo.name,
-                            percent=2 + int(12 * i / max(1, total)))
-            dest = scan_root / re.sub(r"[^A-Za-z0-9._-]", "-", repo.name)
+                prog.update(phase="cloning", repo=repo.name, repoIndex=i + 1,
+                            repoTotal=total, percent=int(i * 100 / total))
+            repo_dir = workdir / f"r{i}"
+            repo_out = workdir / f"out{i}"
             try:
-                clone_repo(url, repo.branch, dest)
+                clone_repo(url, repo.branch, repo_dir)
             except RuntimeError as exc:
                 raise HTTPException(502, f"clone of {full} failed: {exc}")
             cloned.append(full)
 
-        out_dir = workdir / "graphify-out"
-        on_line = (lambda ln: parse_progress(ln, prog)) if job else None
-        try:
-            stdout = run_extract(scan_root, out_dir, backend, on_line=on_line)
-        except subprocess.TimeoutExpired:
-            if job:
-                prog.update(phase="failed", error="timed out")
-            raise HTTPException(504, "graphify extract timed out")
-        except RuntimeError as exc:
-            if job:
-                prog.update(phase="failed", error=str(exc)[:200])
-            raise HTTPException(500, str(exc))
+            rstate: dict = {}
 
-        try:
-            graph = load_graph(out_dir)
-        except Exception as exc:
-            # Surface the real cause + the last extract output instead of a bare 500.
-            tail = _scrub("\n".join((stdout or "").splitlines()[-20:])).strip()[:800]
+            def on_line(ln, _rs=rstate, _i=i, _rn=repo.name):
+                parse_progress(ln, _rs)
+                if job:
+                    rp = _rs.get("percent", 0)
+                    prog.update(phase=_rs.get("phase", "extracting"), repo=_rn,
+                                repoIndex=_i + 1, repoTotal=total,
+                                chunksDone=_rs.get("chunksDone"), chunksTotal=_rs.get("chunksTotal"),
+                                percent=int((_i * 100 + rp) / total))
+
+            stdout = ""
+            try:
+                stdout = run_extract(repo_dir, repo_out, backend, on_line=on_line if job else None)
+                graph = load_graph(repo_out)
+            except subprocess.TimeoutExpired:
+                errors.append(f"{repo.name}: timed out")
+                continue
+            except Exception as exc:
+                tail = _scrub("\n".join((stdout or "").splitlines()[-10:])).strip()[:400]
+                errors.append(f"{repo.name}: {exc} · {tail}")
+                continue
+
+            comm_base = merge_graph(combined, graph, repo.name, comm_base)
+            s = parse_stats(stdout)
+            tok_in += s.get("tokensIn", 0)
+            tok_out += s.get("tokensOut", 0)
+            cost += s.get("costUsd", 0.0)
+
+            # Free this repo's clone + output before the next one.
+            del graph
+            shutil.rmtree(repo_dir, ignore_errors=True)
+            shutil.rmtree(repo_out, ignore_errors=True)
+
+        combined["edges"] = combined["links"]
+        if not combined["nodes"]:
+            detail = ("; ".join(errors))[:600] or "no graph produced"
             if job:
-                prog.update(phase="failed", error=str(exc)[:200])
-            raise HTTPException(500, f"{exc} · last output: {tail}")
-        stats = {**summarize_graph(graph), **parse_stats(stdout), "backend": backend}
+                prog.update(phase="failed", error=detail[:200])
+            raise HTTPException(500, f"all repos failed: {detail}")
+
+        stats = {
+            **summarize_graph(combined), "backend": backend,
+            "tokensIn": tok_in, "tokensOut": tok_out, "costUsd": round(cost, 4),
+        }
+        if errors:
+            stats["skipped"] = errors
         if job:
-            prog.update(phase="done", percent=100, **{k: stats[k] for k in ("nodes", "edges", "communities") if k in stats})
+            prog.update(phase="done", percent=100,
+                        **{k: stats[k] for k in ("nodes", "edges", "communities") if k in stats})
         return {
-            "graph": graph,
+            "graph": combined,
             "stats": stats,
-            "report": load_report(out_dir),
+            "report": None,
             "backend": backend,
             "repos": cloned,
         }

@@ -92,7 +92,9 @@ def test_analyze_happy_path(monkeypatch):
     assert body["stats"]["communities"] == 2
     assert body["stats"]["costUsd"] == 0.0001
     assert body["graph"]["edges"]  # normalized from links
-    assert body["report"].startswith("# Report")
+    assert body["report"] is None  # per-repo merge has no single report
+    # node ids are namespaced by repo to avoid cross-repo collisions
+    assert all("::" in n["id"] for n in body["graph"]["nodes"])
 
 
 def test_parse_progress():
@@ -106,6 +108,22 @@ def test_parse_progress():
     assert st["phase"] == "building"
     svc.parse_progress("[graphify extract] wrote out/graph.json: 542 nodes, 503 edges, 47 communities", st)
     assert st["phase"] == "done" and st["percent"] == 100 and st["nodes"] == 542 and st["edges"] == 503
+
+
+def test_merge_graph_namespaces_and_offsets():
+    combined = {"directed": True, "nodes": [], "links": []}
+    g1 = {"nodes": [{"id": "a", "community": 0}, {"id": "b", "community": 1}],
+          "links": [{"source": "a", "target": "b"}]}
+    g2 = {"nodes": [{"id": "a", "community": 0}], "links": []}
+    base = svc.merge_graph(combined, g1, "backend", 0)
+    assert base == 2  # communities 0,1 → next free is 2
+    base = svc.merge_graph(combined, g2, "web", base)
+    ids = {n["id"] for n in combined["nodes"]}
+    assert ids == {"backend::a", "backend::b", "web::a"}  # no collision on 'a'
+    # web's community 0 offset to 2 (distinct from backend's 0)
+    web_a = next(n for n in combined["nodes"] if n["id"] == "web::a")
+    assert web_a["community"] == 2
+    assert combined["links"][0] == {"source": "backend::a", "target": "backend::b"}
 
 
 def test_progress_endpoint_unknown():
