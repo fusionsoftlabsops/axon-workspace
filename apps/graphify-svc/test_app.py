@@ -73,9 +73,10 @@ def test_analyze_happy_path(monkeypatch):
         (dest / "README.md").write_text("hi", encoding="utf-8")
 
     def fake_extract(scan_root: Path, out_dir: Path, backend: str, on_line=None) -> str:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "graph.json").write_text(json.dumps(FIXTURE_GRAPH), encoding="utf-8")
-        (out_dir / "GRAPH_REPORT.md").write_text("# Report", encoding="utf-8")
+        # graphify writes under <out_dir>/graphify-out/ (extract --out behavior)
+        gdir = out_dir / "graphify-out"
+        gdir.mkdir(parents=True, exist_ok=True)
+        (gdir / "graph.json").write_text(json.dumps(FIXTURE_GRAPH), encoding="utf-8")
         return "tokens: 100 in / 50 out, est. cost (~deepseek): $0.0001"
 
     monkeypatch.setattr(svc, "clone_repo", fake_clone)

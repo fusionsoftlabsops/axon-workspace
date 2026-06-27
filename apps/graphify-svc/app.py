@@ -126,11 +126,13 @@ def clone_repo(url: str, branch: Optional[str], dest: Path) -> None:
 
 
 def run_extract(scan_root: Path, out_dir: Path, backend: str, on_line=None) -> str:
-    """Run `python -m graphify extract <scan_root> --backend <backend>` writing
-    its output under `out_dir`. Streams stdout line-by-line to `on_line` (for live
-    progress) and returns the full captured stdout. Raises RuntimeError on failure."""
-    env = {**os.environ, "GRAPHIFY_OUT": str(out_dir)}
-    cmd = [sys.executable, "-m", "graphify", "extract", str(scan_root), "--backend", backend]
+    """Run `python -m graphify extract <scan_root> --out <out_dir> --backend <x>`.
+    graphify writes the result to <out_dir>/graphify-out/graph.json (the `extract`
+    command derives its output from --out, NOT from GRAPHIFY_OUT). Streams stdout
+    to `on_line` for live progress; returns full stdout. Raises on failure."""
+    env = {**os.environ}
+    cmd = [sys.executable, "-m", "graphify", "extract", str(scan_root),
+           "--out", str(out_dir), "--backend", backend]
     proc = subprocess.Popen(
         cmd, cwd=str(scan_root), env=env, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT, text=True, bufsize=1,
@@ -345,13 +347,19 @@ def analyze(body: AnalyzeIn, authorization: Optional[str] = Header(default=None)
             stdout = ""
             try:
                 stdout = run_extract(repo_dir, repo_out, backend, on_line=on_line if job else None)
-                graph = load_graph(repo_out)
+                # `extract --out <repo_out>` writes to <repo_out>/graphify-out/graph.json
+                graph = load_graph(repo_out / "graphify-out")
             except subprocess.TimeoutExpired:
                 errors.append(f"{repo.name}: timed out")
                 continue
             except Exception as exc:
-                tail = _scrub("\n".join((stdout or "").splitlines()[-10:])).strip()[:400]
-                errors.append(f"{repo.name}: {exc} · {tail}")
+                gdir = repo_out / "graphify-out"
+                try:
+                    listing = ", ".join(p.name for p in gdir.iterdir())[:300] if gdir.exists() else "(graphify-out missing)"
+                except Exception:
+                    listing = "(listing failed)"
+                tail = _scrub("\n".join((stdout or "").splitlines()[-8:])).strip()[:900]
+                errors.append(f"{repo.name}: {exc} | out=[{listing}] | {tail}")
                 continue
 
             comm_base = merge_graph(combined, graph, repo.name, comm_base)
