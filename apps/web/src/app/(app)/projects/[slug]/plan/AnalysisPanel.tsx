@@ -17,9 +17,13 @@ import styles from './plan.module.scss';
 export function AnalysisPanelView({
   controller,
   canWrite,
+  hideHeading = false,
 }: {
   controller: AnalysisController;
   canWrite: boolean;
+  /** When the surrounding UI already labels this panel (e.g. an accordion
+   *  header), drop the internal title/badges row. */
+  hideHeading?: boolean;
 }) {
   const { t } = useI18n();
   const { view, busy, error, run } = controller;
@@ -30,7 +34,7 @@ export function AnalysisPanelView({
   if (!view.configured) {
     return (
       <div className={styles.repoCard}>
-        <h3>{t('Análisis del código', 'Code analysis')}</h3>
+        {!hideHeading && <h3>{t('Análisis del código', 'Code analysis')}</h3>}
         <p className={styles.repoReason}>
           {t(
             'El análisis de código (grafo de conocimiento) no está configurado en esta instancia.',
@@ -64,12 +68,14 @@ export function AnalysisPanelView({
 
   return (
     <div className={styles.repoCard}>
-      <div className={styles.repoName}>
-        <span>{t('Análisis del código', 'Code analysis')}</span>{' '}
-        {ready && <Badge tone="accent">{t('Plan anclado en el código real', 'Plan grounded in real code')}</Badge>}
-        {analyzing && <Badge tone="neutral">{t('Analizando…', 'Analyzing…')}</Badge>}
-        {failed && <Badge tone="bad">{t('Falló', 'Failed')}</Badge>}
-      </div>
+      {!hideHeading && (
+        <div className={styles.repoName}>
+          <span>{t('Análisis del código', 'Code analysis')}</span>{' '}
+          {ready && <Badge tone="accent">{t('Plan anclado en el código real', 'Plan grounded in real code')}</Badge>}
+          {analyzing && <Badge tone="neutral">{t('Analizando…', 'Analyzing…')}</Badge>}
+          {failed && <Badge tone="bad">{t('Falló', 'Failed')}</Badge>}
+        </div>
+      )}
 
       <p className={styles.repoReason}>
         {t(

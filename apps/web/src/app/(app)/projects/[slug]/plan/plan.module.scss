@@ -695,15 +695,51 @@
   color: var(--ink);
 }
 .ctxSecLink {
-  margin-left: auto;
+  align-self: flex-end;
   color: var(--accent-ink);
   text-decoration: none;
   font-weight: 600;
   font-size: 0.76rem;
   &:hover { text-decoration: underline; }
 }
-// Status chip (graph state, or N/M files in context).
+// Each context source is a collapsible accordion card.
+.ctxAcc {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper);
+  overflow: hidden;
+}
+.ctxAccHeading {
+  margin: 0;
+}
+.ctxAccHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  padding: t.$space-sm t.$space-md;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: background t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    background: var(--paper-deep);
+  }
+}
+.ctxAccBody {
+  padding: t.$space-sm t.$space-md t.$space-md;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+}
+
+// Status chip (graph state, or N/M files in context) — right-aligned in the head.
 .ctxChip {
+  margin-left: auto;
   font-family: var(--font-mono);
   font-size: 0.64rem;
   letter-spacing: 0.03em;
