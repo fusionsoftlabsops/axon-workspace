@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MAX_FILE_BYTES } from '@/lib/files';
 
@@ -44,6 +44,12 @@ function fileInput() {
   return document.querySelector('input[type="file"]') as HTMLInputElement;
 }
 
+// Category sections are accordions, collapsed by default — expand them so the
+// file rows (and their controls) are in the DOM.
+function expandAll() {
+  screen.queryAllByRole('button', { expanded: false }).forEach((b) => fireEvent.click(b));
+}
+
 describe('FilesClient', () => {
   beforeEach(() => {
     nav.refresh.mockReset();
@@ -55,6 +61,7 @@ describe('FilesClient', () => {
 
   it('renders grouped files with image thumbnail and download links', () => {
     render(<FilesClient {...baseProps()} />);
+    expandAll();
     expect(screen.getByText('photo.png')).toBeInTheDocument();
     expect(screen.getByText('doc.pdf')).toBeInTheDocument();
     expect(screen.getByAltText('photo.png')).toBeInTheDocument();
@@ -112,6 +119,7 @@ describe('FilesClient', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     render(<FilesClient {...baseProps()} />);
+    expandAll();
     await user.click(screen.getAllByText('Delete')[0]!);
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/projects/proj/files/f1', { method: 'DELETE' }),
@@ -123,6 +131,7 @@ describe('FilesClient', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: () => Promise.resolve({ error: 'del-fail' }) }));
     const user = userEvent.setup();
     render(<FilesClient {...baseProps()} />);
+    expandAll();
     await user.click(screen.getAllByText('Delete')[0]!);
     expect(await screen.findByText('del-fail')).toBeInTheDocument();
   });
@@ -133,12 +142,14 @@ describe('FilesClient', () => {
     vi.stubGlobal('confirm', vi.fn(() => false));
     const user = userEvent.setup();
     render(<FilesClient {...baseProps()} />);
+    expandAll();
     await user.click(screen.getAllByText('Delete')[0]!);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('hides delete for non-owners on files they do not own', () => {
     render(<FilesClient {...baseProps({ role: 'MEMBER', currentUserId: 'u1' })} />);
+    expandAll();
     // f1 owned by u1 -> deletable; f2 owned by u2 -> not deletable for a MEMBER
     expect(screen.getAllByText('Delete').length).toBe(1);
   });
@@ -147,6 +158,7 @@ describe('FilesClient', () => {
     h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'f1', isContext: true, contextStatus: 'NONE' } });
     const user = userEvent.setup();
     render(<FilesClient {...baseProps({ files: [file()] })} />); // f1 = image
+    expandAll();
     await user.click(screen.getByRole('button', { name: /Use as context/i }));
     expect(h.setFileContextAction).toHaveBeenCalledWith('proj', 'f1', true);
     expect(await screen.findByText(/feed AI planning|feeds AI planning/i)).toBeInTheDocument();
@@ -158,6 +170,7 @@ describe('FilesClient', () => {
     const user = userEvent.setup();
     const doc = file({ id: 'd1', name: 'spec.pdf', mimeType: 'application/pdf', category: 'PDF', contextStatus: 'NONE' });
     render(<FilesClient {...baseProps({ files: [doc] })} />);
+    expandAll();
     await user.click(screen.getByRole('button', { name: /Generate context/i }));
     expect(h.generateFileContextAction).toHaveBeenCalledWith('proj', 'd1');
     // optimistic GENERATING label
@@ -169,6 +182,7 @@ describe('FilesClient', () => {
     const user = userEvent.setup();
     const doc = file({ id: 'd1', name: 'spec.pdf', mimeType: 'application/pdf', category: 'PDF', contextStatus: 'READY' });
     render(<FilesClient {...baseProps({ files: [doc] })} />);
+    expandAll();
     const dl = screen.getByRole('link', { name: /Download \.md/i });
     expect(dl).toHaveAttribute('href', '/api/v1/projects/proj/files/d1/context');
     await user.click(screen.getByRole('checkbox', { name: /Use in the plan/i }));
@@ -178,6 +192,7 @@ describe('FilesClient', () => {
   it('shows a retry button for a FAILED document', () => {
     const doc = file({ id: 'd1', name: 'spec.pdf', mimeType: 'application/pdf', category: 'PDF', contextStatus: 'FAILED' });
     render(<FilesClient {...baseProps({ files: [doc] })} />);
+    expandAll();
     expect(screen.getByRole('button', { name: /Retry context/i })).toBeInTheDocument();
   });
 

@@ -58,6 +58,15 @@ export function FilesClient({
   const [ctxOverride, setCtxOverride] = useState<Record<string, boolean>>({});
   const [genOverride, setGenOverride] = useState<Record<string, ContextStatus>>({});
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  // Category accordions — all collapsed by default.
+  const [openCats, setOpenCats] = useState<Set<FileCategory>>(() => new Set());
+  const toggleCat = (cat: FileCategory) =>
+    setOpenCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
 
   const canWrite = role !== 'VIEWER';
   const canManage = role === 'OWNER' || role === 'ADMIN';
@@ -235,6 +244,52 @@ export function FilesClient({
         )
       )}
 
+      {/* How the context system works — a compact, horizontal explainer. */}
+      <aside className={styles.howto}>
+        <p className={styles.howtoTitle}>
+          <span aria-hidden className={styles.ctxStar}>✦</span>{' '}
+          {t('Cómo funciona el contexto', 'How context works')}
+        </p>
+        <ol className={styles.howtoSteps}>
+          <li className={styles.step}>
+            <span className={styles.stepNum}>1</span>
+            <span className={styles.stepBody}>
+              <span className={styles.stepTitle}>{t('Genera el contexto', 'Generate the context')}</span>
+              <span className={styles.stepText}>
+                {t(
+                  'Convierte un documento a Markdown una sola vez, en tu propio servidor — sin gastar tokens. Queda guardado.',
+                  'Turns a document into Markdown once, on your own server — no token cost. It stays saved.',
+                )}
+              </span>
+            </span>
+          </li>
+          <li className={styles.step}>
+            <span className={styles.stepNum}>2</span>
+            <span className={styles.stepBody}>
+              <span className={styles.stepTitle}>{t('Úsalo en el plan', 'Use it in the plan')}</span>
+              <span className={styles.stepText}>
+                {t(
+                  'Márcalo y la planeación con IA y el chat lo tendrán en cuenta. Las imágenes se usan directamente.',
+                  'Mark it and AI planning plus the chat take it into account. Images are used directly.',
+                )}
+              </span>
+            </span>
+          </li>
+          <li className={styles.step}>
+            <span className={styles.stepNum}>3</span>
+            <span className={styles.stepBody}>
+              <span className={styles.stepTitle}>{t('Descárgalo o ajústalo', 'Download or adjust it')}</span>
+              <span className={styles.stepText}>
+                {t(
+                  'Baja el .md generado cuando lo necesites, o deselecciona archivos desde el chat del plan.',
+                  'Download the generated .md anytime, or deselect files from the plan chat.',
+                )}
+              </span>
+            </span>
+          </li>
+        </ol>
+      </aside>
+
       {grouped.length === 0 ? (
         <EmptyState
           title={t('Aún no hay archivos', 'No files yet')}
@@ -245,14 +300,30 @@ export function FilesClient({
           }
         />
       ) : (
-        grouped.map(({ cat, items }) => (
-          <section key={cat} className={styles.group}>
-            <header className={styles.groupHeader}>
-              <span aria-hidden className={styles.groupGlyph}>{CATEGORY_GLYPH[cat]}</span>
-              <h2 className={styles.groupTitle}>{t(CATEGORY_LABEL[cat].es, CATEGORY_LABEL[cat].en)}</h2>
-              <span className={styles.groupCount}>{items.length}</span>
-              <span aria-hidden className={styles.groupRule} />
-            </header>
+        grouped.map(({ cat, items }) => {
+          const open = openCats.has(cat);
+          const usedHere = items.filter(isContext).length;
+          return (
+          <section key={cat} className={`${styles.group} ${open ? styles.groupOpen : ''}`}>
+            <h2 className={styles.groupHeading}>
+              <button
+                type="button"
+                className={styles.groupHeader}
+                aria-expanded={open}
+                onClick={() => toggleCat(cat)}
+              >
+                <span aria-hidden className={styles.chevron}>{open ? '▾' : '▸'}</span>
+                <span aria-hidden className={styles.groupGlyph}>{CATEGORY_GLYPH[cat]}</span>
+                <span className={styles.groupTitle}>{t(CATEGORY_LABEL[cat].es, CATEGORY_LABEL[cat].en)}</span>
+                <span className={styles.groupCount}>{items.length}</span>
+                {usedHere > 0 && (
+                  <span className={styles.groupCtx} title={t('Usados como contexto', 'Used as context')}>
+                    ✦ {usedHere}
+                  </span>
+                )}
+              </button>
+            </h2>
+            {open && (
             <ul className={styles.rows}>
               {items.map((f) => {
                 const href = `/api/v1/projects/${slug}/files/${f.id}`;
@@ -384,8 +455,10 @@ export function FilesClient({
                 );
               })}
             </ul>
+            )}
           </section>
-        ))
+          );
+        })
       )}
     </div>
   );

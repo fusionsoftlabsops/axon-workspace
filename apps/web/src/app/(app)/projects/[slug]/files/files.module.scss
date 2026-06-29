@@ -88,23 +88,121 @@
   &:hover { text-decoration: underline; }
 }
 
-// ---------- Category section ----------
-.group {
+// ---------- "How context works" explainer ----------
+.howto {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-lg;
+  background: var(--paper-elev);
+  padding: t.$space-md t.$space-lg;
+}
+.howtoTitle {
+  margin: 0 0 t.$space-sm;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+.howtoSteps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: t.$space-md;
+
+  @media (min-width: t.$bp-md) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: t.$space-sm;
+
+  // Hairline divider between steps on wide screens.
+  @media (min-width: t.$bp-md) {
+    &:not(:first-child) {
+      padding-left: t.$space-md;
+      border-left: 1px solid var(--rule);
+    }
+  }
+}
+.stepNum {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: t.$radius-full;
+  background: var(--accent-ink-wash);
+  border: 1px solid var(--accent-ink);
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.stepBody {
   display: flex;
   flex-direction: column;
-  gap: t.$space-sm;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.stepTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--ink);
+}
+.stepText {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+// ---------- Category accordion (collapsed by default) ----------
+.group {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper-elev);
+  overflow: hidden;
+}
+.groupOpen {
+  border-color: var(--rule-strong);
+}
+.groupHeading {
+  margin: 0;
 }
 .groupHeader {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: t.$space-sm;
+  padding: t.$space-sm t.$space-md;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: background t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    background: var(--paper-deep);
+  }
+}
+.chevron {
+  flex: none;
+  width: 1ch;
+  font-size: 0.7rem;
+  color: var(--ink-subtle);
 }
 .groupGlyph {
   color: var(--ink-subtle);
   font-size: 0.95rem;
 }
 .groupTitle {
-  margin: 0;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
@@ -120,20 +218,27 @@
   border: 1px solid var(--rule);
   border-radius: t.$radius-full;
 }
-.groupRule {
-  flex: 1;
-  height: 1px;
-  background: var(--rule);
+// Count of files in this category that ground the plan — pushed to the right.
+.groupCtx {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--accent-ink);
+  padding: 0.02rem 0.4rem;
+  border: 1px solid var(--accent-ink);
+  border-radius: t.$radius-full;
+  background: var(--accent-ink-wash);
 }
 
 // ---------- Rows (the registry) ----------
 .rows {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: t.$space-xs t.$space-sm t.$space-sm;
   display: flex;
   flex-direction: column;
   gap: t.$space-xs;
+  border-top: 1px solid var(--rule);
 }
 
 // A file row uses the full width: thumb · name/meta · context pipeline · actions.
