@@ -17,19 +17,19 @@ import {
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
 import { PlanTaskCard, PlanSprintHead } from './PlanEditors';
 import { PlanRepos } from './PlanRepos';
-import { PlanContext } from './PlanContext';
+import { PlanContext, type ContextFile } from './PlanContext';
 import styles from './plan.module.scss';
 
 export function PlanChat({
   slug,
   canWrite,
   initialPlan,
-  contextFileCount = 0,
+  contextFiles = [],
 }: {
   slug: string;
   canWrite: boolean;
   initialPlan: PlanView;
-  contextFileCount?: number;
+  contextFiles?: ContextFile[];
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -243,7 +243,7 @@ export function PlanChat({
           slug={slug}
           canWrite={canWrite}
           contextGraph={plan.contextGraph}
-          contextFileCount={contextFileCount}
+          contextFiles={contextFiles}
           onChange={setPlan}
         />
         {/* Link repos BEFORE a plan exists so an existing project can be analyzed

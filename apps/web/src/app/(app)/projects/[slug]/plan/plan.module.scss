@@ -694,15 +694,6 @@
     color: var(--accent-stamp);
   }
 }
-.ctxFiles {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  font-size: 0.8rem;
-  color: var(--ink-muted);
-}
 .ctxStar {
   color: var(--signal, var(--accent-ink));
 }
@@ -710,9 +701,82 @@
   color: var(--accent-ink);
   text-decoration: none;
   font-weight: 600;
+  font-size: 0.78rem;
   &:hover {
     text-decoration: underline;
   }
+}
+
+// ---- Inline "use uploaded files as context" picker ----
+.ctxFilesBlock {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  padding-top: t.$space-sm;
+  border-top: 1px solid var(--rule);
+}
+.ctxFilesHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: t.$space-sm;
+  flex-wrap: wrap;
+}
+.ctxFileList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+
+  @media (min-width: t.$bp-md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ctxFileItem {
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-md;
+  background: var(--paper);
+  transition: border-color t.$dur-quick t.$ease-editorial, background t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    border-color: var(--rule-strong);
+  }
+}
+.ctxFileItemOn {
+  border-color: var(--signal, var(--accent-ink));
+  background: color-mix(in srgb, var(--signal, var(--accent-ink)) 9%, var(--paper));
+}
+.ctxFileLabel {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+  min-width: 0;
+}
+.ctxFileCheck {
+  accent-color: var(--signal, var(--accent-ink));
+  flex: none;
+}
+.ctxFileGlyph {
+  flex: none;
+  color: var(--ink-subtle);
+  font-size: 0.9rem;
+}
+.ctxFileName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.ctxFileSpin {
+  flex: none;
+  color: var(--ink-subtle);
 }
 
 // Code-analysis brief (graphify summary) — compact, scrollable.

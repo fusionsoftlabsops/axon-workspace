@@ -21,9 +21,15 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
   const role = project.members[0]!.role;
 
   const res = await getOrCreatePlanAction(slug);
-  const contextFileCount = await prisma.projectFile.count({
-    where: { projectId: project.id, isContext: true },
-  });
+  // The project's uploaded files, so the user can mark which feed the plan
+  // straight from the chat view (no trip to the Files tab).
+  const contextFiles = (
+    await prisma.projectFile.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, category: true, isContext: true },
+    })
+  ).map((f) => ({ id: f.id, name: f.name, category: f.category, isContext: f.isContext }));
 
   return (
     <main className={styles.page}>
@@ -40,7 +46,7 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
           slug={slug}
           canWrite={role !== 'VIEWER'}
           initialPlan={res.data}
-          contextFileCount={contextFileCount}
+          contextFiles={contextFiles}
         />
       ) : (
         <p className={styles.error}>{res.ok ? t('No se pudo cargar el plan', 'Could not load the plan') : res.error}</p>

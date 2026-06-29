@@ -2,12 +2,24 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import type { FileCategory } from '@prisma/client';
 import { SignalLine, type SignalState } from '@/components/SignalLine';
 import { useI18n } from '@/lib/i18n/i18n';
 import { setPlanContextGraphAction, type ContextGraph, type PlanView } from '@/lib/actions/planning';
+import { setFileContextAction } from '@/lib/actions/files';
 import { AnalysisPanelView } from './AnalysisPanel';
 import { useAnalysis } from './useAnalysis';
 import styles from './plan.module.scss';
+
+export interface ContextFile {
+  id: string;
+  name: string;
+  category: FileCategory;
+  isContext: boolean;
+}
+
+const FILE_GLYPH = (cat: FileCategory): string =>
+  cat === 'IMAGE' ? '▦' : cat === 'PDF' ? '◳' : cat === 'CODE' ? '⟨⟩' : '▤';
 
 /**
  * "Planning context" — lets the user explicitly connect the plan to a graph and
@@ -22,13 +34,13 @@ export function PlanContext({
   slug,
   canWrite,
   contextGraph,
-  contextFileCount = 0,
+  contextFiles = [],
   onChange,
 }: {
   slug: string;
   canWrite: boolean;
   contextGraph: ContextGraph | null;
-  contextFileCount?: number;
+  contextFiles?: ContextFile[];
   onChange: (plan: PlanView) => void;
 }) {
   const { t } = useI18n();
@@ -36,6 +48,24 @@ export function PlanContext({
   const view = analysis.view;
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Optimistic context flags for the file list, layered over the server value.
+  const [fileOn, setFileOn] = useState<Record<string, boolean>>({});
+  const [fileBusy, setFileBusy] = useState<string | null>(null);
+  const isFileOn = (f: ContextFile) => fileOn[f.id] ?? f.isContext;
+
+  async function toggleFile(f: ContextFile) {
+    if (!canWrite || fileBusy) return;
+    const next = !isFileOn(f);
+    setErr(null);
+    setFileBusy(f.id);
+    setFileOn((prev) => ({ ...prev, [f.id]: next }));
+    const r = await setFileContextAction(slug, f.id, next);
+    setFileBusy(null);
+    if (!r.ok) {
+      setFileOn((prev) => ({ ...prev, [f.id]: !next })); // revert
+      setErr(r.error);
+    }
+  }
 
   // `null` means "auto" → the code graph is the effective source.
   const selected: ContextGraph = contextGraph === 'NONE' ? 'NONE' : 'CODE_GRAPH';
@@ -142,20 +172,56 @@ export function PlanContext({
       </div>
       )}
 
-      {/* Project files marked as context — managed from the Files tab. */}
-      <p className={styles.ctxFiles}>
-        <span aria-hidden className={styles.ctxStar}>✦</span>
-        {contextFileCount > 0
-          ? t(
-              `${contextFileCount} ${contextFileCount === 1 ? 'archivo' : 'archivos'} de contexto alimenta${contextFileCount === 1 ? '' : 'n'} este plan`,
-              `${contextFileCount} context ${contextFileCount === 1 ? 'file feeds' : 'files feed'} this plan`,
-            )
-          : t('Sin archivos de contexto todavía', 'No context files yet')}{' '}
-        ·{' '}
-        <Link href={`/projects/${slug}/files`} className={styles.ctxFilesLink}>
-          {t('Gestionar en Archivos', 'Manage in Files')}
-        </Link>
-      </p>
+      {/* Project files — mark which feed the plan, right here in the chat view. */}
+      <div className={styles.ctxFilesBlock}>
+        <div className={styles.ctxFilesHead}>
+          <span className={styles.ctxLbl}>
+            <span aria-hidden className={styles.ctxStar}>✦</span> {t('Archivos del proyecto', 'Project files')}
+          </span>
+          <Link href={`/projects/${slug}/files`} className={styles.ctxFilesLink}>
+            {t('Subir / ver en Archivos', 'Upload / view in Files')}
+          </Link>
+        </div>
+
+        {contextFiles.length === 0 ? (
+          <p className={styles.ctxLead}>
+            {t(
+              'Aún no has subido archivos. Súbelos en Archivos y vuelve para usarlos como contexto.',
+              'No files uploaded yet. Upload them in Files and come back to use them as context.',
+            )}
+          </p>
+        ) : (
+          <>
+            <p className={styles.ctxLead}>
+              {t(
+                'Marca los archivos que la IA debe usar como contexto (los documentos aportan su texto; las imágenes, su contenido visual).',
+                'Tick the files the AI should use as context (documents contribute their text; images, their visual content).',
+              )}
+            </p>
+            <ul className={styles.ctxFileList}>
+              {contextFiles.map((f) => {
+                const on = isFileOn(f);
+                return (
+                  <li key={f.id} className={`${styles.ctxFileItem} ${on ? styles.ctxFileItemOn : ''}`}>
+                    <label className={styles.ctxFileLabel}>
+                      <input
+                        type="checkbox"
+                        className={styles.ctxFileCheck}
+                        checked={on}
+                        disabled={!canWrite || fileBusy === f.id}
+                        onChange={() => toggleFile(f)}
+                      />
+                      <span aria-hidden className={styles.ctxFileGlyph}>{FILE_GLYPH(f.category)}</span>
+                      <span className={styles.ctxFileName} title={f.name}>{f.name}</span>
+                      {fileBusy === f.id && <span className={styles.ctxFileSpin}>…</span>}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
 
       {err && <p className={styles.error}>{err}</p>}
 

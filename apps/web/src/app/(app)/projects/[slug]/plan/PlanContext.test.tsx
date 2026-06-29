@@ -8,16 +8,24 @@ const h = vi.hoisted(() => ({
   getAnalysisAction: vi.fn(),
   analyzeProjectAction: vi.fn(),
   setPlanContextGraphAction: vi.fn(),
+  setFileContextAction: vi.fn(),
 }));
 
+vi.mock('next/link', () => ({ default: ({ children, href }: any) => <a href={href}>{children}</a> }));
 vi.mock('@/lib/actions/analysis', () => ({
   getAnalysisAction: h.getAnalysisAction,
   analyzeProjectAction: h.analyzeProjectAction,
 }));
 vi.mock('@/lib/actions/planning', () => ({ setPlanContextGraphAction: h.setPlanContextGraphAction }));
+vi.mock('@/lib/actions/files', () => ({ setFileContextAction: h.setFileContextAction }));
 vi.mock('./AnalysisPanel', () => ({
   AnalysisPanelView: () => <div data-testid="analysis-panel" />,
 }));
+
+const FILES = [
+  { id: 'a', name: 'spec.pdf', category: 'PDF', isContext: true },
+  { id: 'b', name: 'mockup.png', category: 'IMAGE', isContext: false },
+] as any;
 
 import { PlanContext } from './PlanContext';
 
@@ -30,6 +38,7 @@ beforeEach(() => {
   h.getAnalysisAction.mockReset();
   h.analyzeProjectAction.mockReset();
   h.setPlanContextGraphAction.mockReset();
+  h.setFileContextAction.mockReset();
 });
 
 describe('PlanContext', () => {
@@ -75,11 +84,45 @@ describe('PlanContext', () => {
     expect(await screen.findByText('no perms')).toBeInTheDocument();
   });
 
-  it('shows how many project files feed the plan and links to Files', async () => {
+  it('lists the project files inline with the marked ones checked, and links to Files', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
-    render(<PlanContext slug="p" canWrite contextGraph={null} contextFileCount={3} onChange={() => {}} />);
-    expect(await screen.findByText(/3 context files feed this plan/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Manage in Files/i })).toHaveAttribute('href', '/projects/p/files');
+    render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={FILES} onChange={() => {}} />);
+    await screen.findByText('spec.pdf');
+    const specCheck = screen.getByText('spec.pdf').closest('label')!.querySelector('input')!;
+    const mockCheck = screen.getByText('mockup.png').closest('label')!.querySelector('input')!;
+    expect(specCheck).toBeChecked(); // isContext: true
+    expect(mockCheck).not.toBeChecked();
+    expect(screen.getByRole('link', { name: /view in Files/i })).toHaveAttribute('href', '/projects/p/files');
+  });
+
+  it('marks an uploaded file as context inline (optimistic + persisted)', async () => {
+    const user = userEvent.setup();
+    h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
+    h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'b', isContext: true, hasContent: true } });
+    render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={FILES} onChange={() => {}} />);
+    await screen.findByText('mockup.png');
+    const mockCheck = screen.getByText('mockup.png').closest('label')!.querySelector('input')!;
+    await user.click(mockCheck);
+    expect(h.setFileContextAction).toHaveBeenCalledWith('p', 'b', true);
+    expect(mockCheck).toBeChecked();
+  });
+
+  it('reverts and shows an error when marking a file fails', async () => {
+    const user = userEvent.setup();
+    h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
+    h.setFileContextAction.mockResolvedValue({ ok: false, error: 'file-fail' });
+    render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={FILES} onChange={() => {}} />);
+    await screen.findByText('mockup.png');
+    const mockCheck = screen.getByText('mockup.png').closest('label')!.querySelector('input')!;
+    await user.click(mockCheck);
+    expect(await screen.findByText('file-fail')).toBeInTheDocument();
+    expect(mockCheck).not.toBeChecked(); // reverted
+  });
+
+  it('invites the user to upload when there are no files', async () => {
+    h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
+    render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={[]} onChange={() => {}} />);
+    expect(await screen.findByText(/No files uploaded yet/i)).toBeInTheDocument();
   });
 
   it('shows the "no graph yet" hint when no analysis exists', async () => {
@@ -91,8 +134,8 @@ describe('PlanContext', () => {
   it('hides the graph chooser (but keeps the file-context line + panel) when graphify is not configured', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view({ configured: false }) });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={() => {}} />);
-    // Wait for the settled section (its file-context line is unique to it).
-    expect(await screen.findByText(/context files/i)).toBeInTheDocument();
+    // Wait for the settled section (its "Project files" block is unique to it).
+    expect(await screen.findByText(/Project files/i)).toBeInTheDocument();
     expect(screen.getByTestId('analysis-panel')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
   });
