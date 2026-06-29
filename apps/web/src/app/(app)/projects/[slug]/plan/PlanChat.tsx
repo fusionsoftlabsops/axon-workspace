@@ -353,8 +353,8 @@ export function PlanChat({
           {generated && !generating && (
             <>
               {generated.improvedIdea && (
-                <div>
-                  <h3>{t('Idea afinada', 'Refined idea')}</h3>
+                <div className={styles.refinedIdea}>
+                  <h3 className={styles.refinedIdeaTitle}>{t('Idea afinada', 'Refined idea')}</h3>
                   <p className={styles.idea}>{generated.improvedIdea}</p>
                 </div>
               )}
