@@ -694,6 +694,26 @@
     color: var(--accent-stamp);
   }
 }
+.ctxFiles {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.ctxStar {
+  color: var(--signal, var(--accent-ink));
+}
+.ctxFilesLink {
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-weight: 600;
+  &:hover {
+    text-decoration: underline;
+  }
+}
 
 // Code-analysis brief (graphify summary) — compact, scrollable.
 .analysisSummary {

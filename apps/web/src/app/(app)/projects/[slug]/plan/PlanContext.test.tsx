@@ -33,12 +33,18 @@ beforeEach(() => {
 });
 
 describe('PlanContext', () => {
+  // The two radios both contain "code graph" in their accessible name, so match
+  // on a phrase unique to each option's description.
+  const codeRadio = () => screen.getByRole('radio', { name: /knowledge graph/i });
+  const noneRadio = () => screen.getByRole('radio', { name: /context files still apply/i });
+
   it('offers both graph options and shows a live connection when the code graph is ready', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={() => {}} />);
 
-    expect(await screen.findByRole('radio', { name: /Code graph/i })).toBeChecked();
-    expect(screen.getByRole('radio', { name: /No context/i })).not.toBeChecked();
+    expect(await screen.findByRole('radiogroup')).toBeInTheDocument();
+    expect(codeRadio()).toBeChecked();
+    expect(noneRadio()).not.toBeChecked();
     // null contextGraph defaults to the code graph → connected + stats.
     expect(screen.getByText(/Connected/)).toBeInTheDocument();
     expect(screen.getByText(/10 nodes · 20 edges · 3 areas/)).toBeInTheDocument();
@@ -52,7 +58,8 @@ describe('PlanContext', () => {
     h.setPlanContextGraphAction.mockResolvedValue({ ok: true, data: { contextGraph: 'NONE' } });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={onChange} />);
 
-    await user.click(await screen.findByRole('radio', { name: /No context/i }));
+    await screen.findByRole('radiogroup');
+    await user.click(noneRadio());
     expect(h.setPlanContextGraphAction).toHaveBeenCalledWith('p', 'NONE');
     expect(onChange).toHaveBeenCalledWith({ contextGraph: 'NONE' });
   });
@@ -63,8 +70,16 @@ describe('PlanContext', () => {
     h.setPlanContextGraphAction.mockResolvedValue({ ok: false, error: 'no perms' });
     render(<PlanContext slug="p" canWrite contextGraph="CODE_GRAPH" onChange={() => {}} />);
 
-    await user.click(await screen.findByRole('radio', { name: /No context/i }));
+    await screen.findByRole('radiogroup');
+    await user.click(noneRadio());
     expect(await screen.findByText('no perms')).toBeInTheDocument();
+  });
+
+  it('shows how many project files feed the plan and links to Files', async () => {
+    h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
+    render(<PlanContext slug="p" canWrite contextGraph={null} contextFileCount={3} onChange={() => {}} />);
+    expect(await screen.findByText(/3 context files feed this plan/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Manage in Files/i })).toHaveAttribute('href', '/projects/p/files');
   });
 
   it('shows the "no graph yet" hint when no analysis exists', async () => {
@@ -73,17 +88,20 @@ describe('PlanContext', () => {
     expect(await screen.findByText(/No graph yet/i)).toBeInTheDocument();
   });
 
-  it('renders only the panel (no chooser) when graphify is not configured', async () => {
+  it('hides the graph chooser (but keeps the file-context line + panel) when graphify is not configured', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view({ configured: false }) });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={() => {}} />);
-    expect(await screen.findByTestId('analysis-panel')).toBeInTheDocument();
+    // Wait for the settled section (its file-context line is unique to it).
+    expect(await screen.findByText(/context files/i)).toBeInTheDocument();
+    expect(screen.getByTestId('analysis-panel')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
   });
 
   it('disables the radios for viewers', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     render(<PlanContext slug="p" canWrite={false} contextGraph={null} onChange={() => {}} />);
-    expect(await screen.findByRole('radio', { name: /Code graph/i })).toBeDisabled();
-    expect(screen.getByRole('radio', { name: /No context/i })).toBeDisabled();
+    await screen.findByRole('radiogroup');
+    expect(codeRadio()).toBeDisabled();
+    expect(noneRadio()).toBeDisabled();
   });
 });

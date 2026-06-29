@@ -31,7 +31,7 @@ import {
   type GeneratedPlan,
   type PlanTask,
 } from '@/lib/ai/plan-schema';
-import { fetchUrlText } from '@/lib/ai/extract';
+import { fetchUrlText, isImageMime } from '@/lib/ai/extract';
 import { getObjectBytes, deleteObject, putObject, buildKey, isStorageConfigured } from '@/lib/storage';
 import type { ActionResult } from './projects';
 
@@ -119,6 +119,25 @@ function buildManifest(atts: PlanAttachment[]): string {
     .join('\n');
 }
 
+/** Manifest of the project files marked as context, so the chat is grounded in
+ *  them too (not just in the plan's own attachments). */
+async function contextFilesManifest(projectId: string): Promise<string> {
+  const files = await prisma.projectFile.findMany({
+    where: { projectId, isContext: true },
+    orderBy: { createdAt: 'asc' },
+    select: { name: true, mimeType: true, category: true, extractedText: true },
+  });
+  if (files.length === 0) return '';
+  return files
+    .map((f) => {
+      if (isImageMime(f.mimeType) || f.category === 'IMAGE') return `- [imagen del proyecto] ${f.name}`;
+      const excerpt = (f.extractedText ?? '').slice(0, 800).replace(/\s+/g, ' ').trim();
+      const head = `- [archivo del proyecto] ${f.name}`;
+      return excerpt ? `${head}: ${excerpt}` : head;
+    })
+    .join('\n');
+}
+
 async function loadPlan(projectId: string) {
   return prisma.projectPlan.findFirst({
     where: { projectId },
@@ -170,13 +189,16 @@ export async function planChatAction(slug: string, userMessage: string): Promise
   const meta = await projectMeta(ctx.projectId);
   const lang = await getServerLang();
   const code = await codeContext(ctx.projectId, plan.contextGraph as ContextGraph | null);
+  const manifest = [buildManifest(plan.attachments), await contextFilesManifest(ctx.projectId)]
+    .filter(Boolean)
+    .join('\n');
   let reply: string;
   try {
     reply = await planChatReply(
       { name: meta?.name ?? '', description: meta?.description ?? null },
       withUser,
       lang,
-      buildManifest(plan.attachments),
+      manifest,
       ctx.userId,
       ctx.projectId,
       code,
@@ -430,27 +452,57 @@ const IMG_MEDIA: Record<string, PlanImage['mediaType']> = {
   'image/webp': 'image/webp',
 };
 
-async function resolveAttachments(planId: string): Promise<{ images: PlanImage[]; docs: PlanDocText[] }> {
-  const atts = await prisma.planAttachment.findMany({ where: { planId }, orderBy: { createdAt: 'asc' } });
+async function pushImage(images: PlanImage[], storageKey: string | null, mimeType: string | null): Promise<void> {
+  if (!storageKey || images.length >= 6) return;
+  const media = IMG_MEDIA[(mimeType ?? '').toLowerCase()];
+  if (!media) return;
+  try {
+    const bytes = await getObjectBytes(storageKey);
+    if (bytes.byteLength > 4 * 1024 * 1024) return; // skip very large images
+    images.push({ mediaType: media, base64: Buffer.from(bytes).toString('base64') });
+  } catch {
+    /* skip unreadable image */
+  }
+}
+
+/** Gather the model inputs for generation: the plan's own attachments plus the
+ *  project files marked as context. Images become vision blocks; documents
+ *  contribute extracted text. A single shared budget bounds the whole prompt. */
+async function resolveAttachments(
+  planId: string,
+  projectId: string,
+): Promise<{ images: PlanImage[]; docs: PlanDocText[] }> {
+  const [atts, ctxFiles] = await Promise.all([
+    prisma.planAttachment.findMany({ where: { planId }, orderBy: { createdAt: 'asc' } }),
+    prisma.projectFile.findMany({
+      where: { projectId, isContext: true },
+      orderBy: { createdAt: 'asc' },
+      select: { name: true, mimeType: true, category: true, storageKey: true, extractedText: true },
+    }),
+  ]);
   const images: PlanImage[] = [];
   const docs: PlanDocText[] = [];
   let docBudget = 120_000;
 
   for (const a of atts) {
-    if (a.kind === 'IMAGE' && a.storageKey && images.length < 6) {
-      const media = IMG_MEDIA[(a.mimeType ?? '').toLowerCase()];
-      if (!media) continue;
-      try {
-        const bytes = await getObjectBytes(a.storageKey);
-        if (bytes.byteLength > 4 * 1024 * 1024) continue; // skip very large images
-        images.push({ mediaType: media, base64: Buffer.from(bytes).toString('base64') });
-      } catch {
-        /* skip unreadable image */
-      }
+    if (a.kind === 'IMAGE') {
+      await pushImage(images, a.storageKey, a.mimeType);
     } else if ((a.kind === 'DOCUMENT' || a.kind === 'LINK') && a.extractedText && docBudget > 0) {
       const text = a.extractedText.slice(0, docBudget);
       docBudget -= text.length;
       docs.push({ label: a.kind === 'LINK' ? `${a.name} (${a.url})` : a.name, text });
+    }
+  }
+
+  // Project files marked as context (shared budget, same image cap).
+  for (const f of ctxFiles) {
+    const isImage = isImageMime(f.mimeType) || f.category === 'IMAGE';
+    if (isImage) {
+      await pushImage(images, f.storageKey, f.mimeType);
+    } else if (f.extractedText && docBudget > 0) {
+      const text = f.extractedText.slice(0, docBudget);
+      docBudget -= text.length;
+      docs.push({ label: `${f.name} (archivo del proyecto)`, text });
     }
   }
   return { images, docs };
@@ -466,7 +518,7 @@ async function runPlanGeneration(
 ): Promise<void> {
   try {
     const meta = await projectMeta(projectId);
-    const { images, docs } = await resolveAttachments(planId);
+    const { images, docs } = await resolveAttachments(planId, projectId);
     const code = await codeContext(projectId, contextGraph);
     const plan = await generatePlan(
       { name: meta?.name ?? '', description: meta?.description ?? null },

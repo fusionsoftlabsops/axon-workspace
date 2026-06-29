@@ -21,6 +21,9 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
   const role = project.members[0]!.role;
 
   const res = await getOrCreatePlanAction(slug);
+  const contextFileCount = await prisma.projectFile.count({
+    where: { projectId: project.id, isContext: true },
+  });
 
   return (
     <main className={styles.page}>
@@ -33,7 +36,12 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
         )}
       />
       {res.ok && res.data ? (
-        <PlanChat slug={slug} canWrite={role !== 'VIEWER'} initialPlan={res.data} />
+        <PlanChat
+          slug={slug}
+          canWrite={role !== 'VIEWER'}
+          initialPlan={res.data}
+          contextFileCount={contextFileCount}
+        />
       ) : (
         <p className={styles.error}>{res.ok ? t('No se pudo cargar el plan', 'Could not load the plan') : res.error}</p>
       )}

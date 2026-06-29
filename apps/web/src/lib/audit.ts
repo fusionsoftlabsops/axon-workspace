@@ -8,6 +8,8 @@ export type AuditAction =
   | 'project.delete'
   | 'file.upload'
   | 'file.delete'
+  | 'file.context.add'
+  | 'file.context.remove'
   | 'member.invite'
   | 'member.role_change'
   | 'member.remove'

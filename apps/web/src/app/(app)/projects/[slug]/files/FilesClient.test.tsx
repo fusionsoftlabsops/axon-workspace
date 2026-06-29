@@ -4,7 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { MAX_FILE_BYTES } from '@/lib/files';
 
 const nav = vi.hoisted(() => ({ refresh: vi.fn() }));
+const h = vi.hoisted(() => ({ setFileContextAction: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: nav.refresh }) }));
+vi.mock('next/link', () => ({ default: ({ children, href }: any) => <a href={href}>{children}</a> }));
+vi.mock('@/lib/actions/files', () => ({ setFileContextAction: h.setFileContextAction }));
 
 import { FilesClient } from './FilesClient';
 
@@ -20,6 +23,7 @@ function file(over: Partial<FileView> = {}): FileView {
     createdAt: new Date('2024-03-01').toISOString(),
     uploadedById: 'u1',
     uploaderName: 'Alice',
+    isContext: false,
     ...over,
   };
 }
@@ -39,6 +43,7 @@ function fileInput() {
 describe('FilesClient', () => {
   beforeEach(() => {
     nav.refresh.mockReset();
+    h.setFileContextAction.mockReset();
     vi.unstubAllGlobals();
     vi.stubGlobal('confirm', vi.fn(() => true));
   });
@@ -131,6 +136,31 @@ describe('FilesClient', () => {
     render(<FilesClient {...baseProps({ role: 'MEMBER', currentUserId: 'u1' })} />);
     // f1 owned by u1 -> deletable; f2 owned by u2 -> not deletable for a MEMBER
     expect(screen.getAllByText('Delete').length).toBe(1);
+  });
+
+  it('marks a file as planning context and refreshes', async () => {
+    h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'f1', isContext: true, hasContent: true } });
+    const user = userEvent.setup();
+    render(<FilesClient {...baseProps()} />);
+    await user.click(screen.getAllByRole('button', { name: /Use as context/i })[0]!);
+    expect(h.setFileContextAction).toHaveBeenCalledWith('proj', 'f1', true);
+    // optimistic ribbon + summary appear
+    expect(await screen.findByText(/feed AI planning|feeds AI planning/i)).toBeInTheDocument();
+    await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+  });
+
+  it('reverts and shows an error when marking context fails', async () => {
+    h.setFileContextAction.mockResolvedValue({ ok: false, error: 'ctx-fail' });
+    const user = userEvent.setup();
+    render(<FilesClient {...baseProps()} />);
+    await user.click(screen.getAllByRole('button', { name: /Use as context/i })[0]!);
+    expect(await screen.findByText('ctx-fail')).toBeInTheDocument();
+  });
+
+  it('shows the in-context state and summary for already-marked files', () => {
+    render(<FilesClient {...baseProps({ files: [file({ isContext: true })] })} />);
+    expect(screen.getByText(/1 file feeds AI planning/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /In context/i })).toBeInTheDocument();
   });
 
   it('handles drag over, leave and drop', async () => {

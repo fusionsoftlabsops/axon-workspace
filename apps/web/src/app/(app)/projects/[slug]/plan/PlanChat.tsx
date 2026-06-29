@@ -24,10 +24,12 @@ export function PlanChat({
   slug,
   canWrite,
   initialPlan,
+  contextFileCount = 0,
 }: {
   slug: string;
   canWrite: boolean;
   initialPlan: PlanView;
+  contextFileCount?: number;
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -237,7 +239,13 @@ export function PlanChat({
             </div>
           )}
         </div>
-        <PlanContext slug={slug} canWrite={canWrite} contextGraph={plan.contextGraph} onChange={setPlan} />
+        <PlanContext
+          slug={slug}
+          canWrite={canWrite}
+          contextGraph={plan.contextGraph}
+          contextFileCount={contextFileCount}
+          onChange={setPlan}
+        />
         {/* Link repos BEFORE a plan exists so an existing project can be analyzed
             (brownfield). Once a plan is generated, the repos section also appears
             in the preview pane below. */}

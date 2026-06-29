@@ -30,7 +30,7 @@ const {
       projectMember: { findMany: vi.fn(), findFirst: vi.fn() },
       projectRepo: { findMany: vi.fn() },
       workflow: { findFirst: vi.fn() },
-      projectFile: { create: vi.fn() },
+      projectFile: { create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
       $transaction: vi.fn(async (fn: (tx: typeof txMock) => unknown) => fn(txMock)),
     },
     assertMock: vi.fn(),
@@ -76,7 +76,10 @@ vi.mock('@/lib/ai/planner', () => plannerMock);
 vi.mock('@/lib/ai/infra-llm', () => ({ isInfraLlmConfigured: isInfraMock }));
 vi.mock('@/lib/repo/reader', () => ({ repoReaderFor: repoReaderMock }));
 vi.mock('@/lib/ai/plan-schema', () => schemaMock);
-vi.mock('@/lib/ai/extract', () => ({ fetchUrlText: extractMock }));
+vi.mock('@/lib/ai/extract', () => ({
+  fetchUrlText: extractMock,
+  isImageMime: (mime: string) => /^image\//.test(mime ?? ''),
+}));
 vi.mock('@/lib/storage', () => storageMock);
 
 import {
@@ -146,6 +149,8 @@ beforeEach(() => {
   isInfraMock.mockReturnValue(true);
   prismaMock.project.findUnique.mockResolvedValue({ name: 'N', description: 'd', repoPath: '/repo' });
   prismaMock.codeAnalysis.findUnique.mockResolvedValue(null);
+  prismaMock.projectFile.findMany.mockResolvedValue([]);
+  prismaMock.projectFile.count.mockResolvedValue(0);
   prismaMock.projectPlan.findFirst.mockResolvedValue(planRow());
   schemaMock.generatedPlanSchema.safeParse.mockImplementation(() => ({ success: true, data: makeGen() }));
   schemaMock.planTaskSchema.partial.mockImplementation(() => ({
@@ -227,6 +232,18 @@ describe('planChatAction', () => {
       expect.anything(), expect.anything(), expect.anything(), expect.anything(),
       expect.anything(), expect.anything(), undefined,
     );
+  });
+
+  it('grounds the chat in project files marked as context', async () => {
+    prismaMock.projectFile.findMany.mockResolvedValue([
+      { name: 'spec.md', mimeType: 'text/markdown', category: 'DOCUMENT', extractedText: 'IMPORTANT SPEC' },
+    ]);
+    plannerMock.planChatReply.mockResolvedValue('ok');
+    prismaMock.projectPlan.update.mockResolvedValue(planRow());
+    await planChatAction('slug', 'hi');
+    const manifestArg = plannerMock.planChatReply.mock.calls[0]![3] as string;
+    expect(manifestArg).toContain('spec.md');
+    expect(manifestArg).toContain('IMPORTANT SPEC');
   });
 });
 

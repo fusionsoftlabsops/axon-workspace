@@ -372,6 +372,10 @@ model ProjectFile {
   //   projects/<slug>/<category>/<YYYY-MM>/<fileId>-<name>
   storageKey   String
   uploadedById String
+  // When true, this file grounds the AI planning + chat. Documents contribute
+  // their extracted text (cached below); images are fed as native vision blocks.
+  isContext     Boolean     @default(false)
+  extractedText String?     @db.Text
   createdAt    DateTime     @default(now())
 
   project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -379,6 +383,7 @@ model ProjectFile {
 
   @@index([projectId, createdAt])
   @@index([projectId, category])
+  @@index([projectId, isContext])
 }
 
 // Tracks the next task number per project (for sequential PROJ-N numbering).

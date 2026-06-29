@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { SignalLine, type SignalState } from '@/components/SignalLine';
 import { useI18n } from '@/lib/i18n/i18n';
 import { setPlanContextGraphAction, type ContextGraph, type PlanView } from '@/lib/actions/planning';
@@ -21,11 +22,13 @@ export function PlanContext({
   slug,
   canWrite,
   contextGraph,
+  contextFileCount = 0,
   onChange,
 }: {
   slug: string;
   canWrite: boolean;
   contextGraph: ContextGraph | null;
+  contextFileCount?: number;
   onChange: (plan: PlanView) => void;
 }) {
   const { t } = useI18n();
@@ -37,12 +40,14 @@ export function PlanContext({
   // `null` means "auto" → the code graph is the effective source.
   const selected: ContextGraph = contextGraph === 'NONE' ? 'NONE' : 'CODE_GRAPH';
 
-  // No graph service on this instance, or still loading → just the panel
-  // (which renders its own quiet hint). Nothing to connect.
-  if (!view || !view.configured) {
+  // Still loading → render nothing yet (the panel renders null without a view).
+  if (!view) {
     return <AnalysisPanelView controller={analysis} canWrite={canWrite} />;
   }
 
+  // The code-graph chooser only applies when graphify is wired up; the file
+  // context line always applies.
+  const graphConfigured = view.configured;
   const ready = view.status === 'READY';
   const analyzing = view.status === 'ANALYZING';
   const failed = view.status === 'FAILED';
@@ -81,12 +86,13 @@ export function PlanContext({
         <span className={styles.ctxLbl}>{t('Contexto de planeación', 'Planning context')}</span>
         <p className={styles.ctxLead}>
           {t(
-            'Elige en qué grafo se ancla el plan. El chat y la generación lo tendrán en cuenta.',
-            'Choose which graph grounds the plan. The chat and generation will take it into account.',
+            'Define en qué se ancla el plan: el grafo del código y los archivos marcados como contexto. El chat y la generación los tienen en cuenta.',
+            'Set what grounds the plan: the code graph and the files marked as context. The chat and generation take them into account.',
           )}
         </p>
       </div>
 
+      {graphConfigured && (
       <div className={styles.ctxOptions} role="radiogroup" aria-label={t('Grafo de contexto', 'Context graph')}>
         {/* Code knowledge graph */}
         <label className={`${styles.ctxOption} ${linked ? styles.ctxOptionOn : ''}`}>
@@ -113,7 +119,7 @@ export function PlanContext({
           </span>
         </label>
 
-        {/* No context (greenfield) */}
+        {/* No code graph (greenfield) */}
         <label className={`${styles.ctxOption} ${selected === 'NONE' ? styles.ctxOptionOn : ''}`}>
           <input
             type="radio"
@@ -124,13 +130,32 @@ export function PlanContext({
             onChange={() => choose('NONE')}
           />
           <span className={styles.ctxOptBody}>
-            <span className={styles.ctxOptName}>{t('Sin contexto', 'No context')}</span>
+            <span className={styles.ctxOptName}>{t('Sin grafo de código', 'No code graph')}</span>
             <span className={styles.ctxOptDesc}>
-              {t('Planea desde cero, sin anclar en código existente.', 'Plan from scratch, not grounded in existing code.')}
+              {t(
+                'No ancles en el código existente (los archivos de contexto siguen aplicando).',
+                'Don’t ground in existing code (context files still apply).',
+              )}
             </span>
           </span>
         </label>
       </div>
+      )}
+
+      {/* Project files marked as context — managed from the Files tab. */}
+      <p className={styles.ctxFiles}>
+        <span aria-hidden className={styles.ctxStar}>✦</span>
+        {contextFileCount > 0
+          ? t(
+              `${contextFileCount} ${contextFileCount === 1 ? 'archivo' : 'archivos'} de contexto alimenta${contextFileCount === 1 ? '' : 'n'} este plan`,
+              `${contextFileCount} context ${contextFileCount === 1 ? 'file feeds' : 'files feed'} this plan`,
+            )
+          : t('Sin archivos de contexto todavía', 'No context files yet')}{' '}
+        ·{' '}
+        <Link href={`/projects/${slug}/files`} className={styles.ctxFilesLink}>
+          {t('Gestionar en Archivos', 'Manage in Files')}
+        </Link>
+      </p>
 
       {err && <p className={styles.error}>{err}</p>}
 

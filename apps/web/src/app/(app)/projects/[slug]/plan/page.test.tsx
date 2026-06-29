@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 const m = vi.hoisted(() => ({
   auth: vi.fn(),
   findUnique: vi.fn(),
+  count: vi.fn(() => Promise.resolve(0)),
   getOrCreatePlanAction: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND');
@@ -11,7 +12,9 @@ const m = vi.hoisted(() => ({
 }));
 
 vi.mock('@/auth', () => ({ auth: m.auth }));
-vi.mock('@/lib/db', () => ({ prisma: { project: { findUnique: m.findUnique } } }));
+vi.mock('@/lib/db', () => ({
+  prisma: { project: { findUnique: m.findUnique }, projectFile: { count: m.count } },
+}));
 vi.mock('@/lib/i18n/server', () => ({ getServerT: async () => (_es: string, en: string) => en }));
 vi.mock('next/navigation', () => ({ notFound: m.notFound }));
 vi.mock('@/lib/actions/planning', () => ({ getOrCreatePlanAction: m.getOrCreatePlanAction }));

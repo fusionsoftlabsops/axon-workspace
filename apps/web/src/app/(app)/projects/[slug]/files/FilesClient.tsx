@@ -2,9 +2,11 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { FileCategory, MemberRole } from '@prisma/client';
 import { Button, Badge, EmptyState } from '@/components/ui';
 import { CATEGORY_ORDER, CATEGORY_LABEL, formatBytes, MAX_FILE_BYTES } from '@/lib/files';
+import { setFileContextAction } from '@/lib/actions/files';
 import { useI18n } from '@/lib/i18n/i18n';
 import styles from './files.module.scss';
 
@@ -17,6 +19,7 @@ interface FileView {
   createdAt: string;
   uploadedById: string;
   uploaderName: string;
+  isContext: boolean;
 }
 
 const CATEGORY_GLYPH: Record<FileCategory, string> = {
@@ -50,9 +53,32 @@ export function FilesClient({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  // Optimistic context flags by file id, layered over the server-rendered value.
+  const [ctxOverride, setCtxOverride] = useState<Record<string, boolean>>({});
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const canWrite = role !== 'VIEWER';
   const canManage = role === 'OWNER' || role === 'ADMIN';
+
+  const isContext = (f: FileView) => ctxOverride[f.id] ?? f.isContext;
+  const contextCount = files.filter(isContext).length;
+
+  function toggleContext(file: FileView) {
+    const next = !isContext(file);
+    setError(null);
+    setTogglingId(file.id);
+    setCtxOverride((prev) => ({ ...prev, [file.id]: next }));
+    startTransition(async () => {
+      const r = await setFileContextAction(slug, file.id, next);
+      setTogglingId(null);
+      if (!r.ok) {
+        setCtxOverride((prev) => ({ ...prev, [file.id]: !next })); // revert
+        setError(r.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   async function upload(list: FileList | null) {
     if (!list || list.length === 0) return;
@@ -156,6 +182,29 @@ export function FilesClient({
 
       {error && <p className={styles.error}>{error}</p>}
 
+      {contextCount > 0 ? (
+        <p className={styles.ctxSummary}>
+          <span aria-hidden className={styles.ctxStar}>✦</span>
+          {t(
+            `${contextCount} ${contextCount === 1 ? 'archivo alimenta' : 'archivos alimentan'} la planeación con IA`,
+            `${contextCount} ${contextCount === 1 ? 'file feeds' : 'files feed'} AI planning`,
+          )}{' '}
+          ·{' '}
+          <Link href={`/projects/${slug}/plan`} className={styles.ctxLink}>
+            {t('Ver en Planeación', 'View in Planning')}
+          </Link>
+        </p>
+      ) : (
+        canWrite && (
+          <p className={styles.ctxSummary}>
+            {t(
+              'Marca un archivo como contexto (✦) para que la planeación con IA y el chat lo tengan en cuenta.',
+              'Mark a file as context (✦) so AI planning and the chat take it into account.',
+            )}
+          </p>
+        )
+      )}
+
       {grouped.length === 0 ? (
         <EmptyState
           title={t('Aún no hay archivos', 'No files yet')}
@@ -179,8 +228,14 @@ export function FilesClient({
               {items.map((f) => {
                 const href = `/api/v1/projects/${slug}/files/${f.id}`;
                 const canDelete = canManage || f.uploadedById === currentUserId;
+                const ctxOn = isContext(f);
                 return (
-                  <li key={f.id} className={styles.card}>
+                  <li key={f.id} className={`${styles.card} ${ctxOn ? styles.cardContext : ''}`}>
+                    {ctxOn && (
+                      <span className={styles.contextRibbon} title={t('Usado como contexto', 'Used as context')}>
+                        ✦ {t('Contexto', 'Context')}
+                      </span>
+                    )}
                     <a
                       href={href}
                       target="_blank"
@@ -204,6 +259,26 @@ export function FilesClient({
                       </p>
                       <p className={styles.sub}>{f.uploaderName}</p>
                       <div className={styles.actions}>
+                        {canWrite && (
+                          <button
+                            type="button"
+                            className={`${styles.ctxBtn} ${ctxOn ? styles.ctxBtnOn : ''}`}
+                            onClick={() => toggleContext(f)}
+                            disabled={togglingId === f.id}
+                            aria-pressed={ctxOn}
+                            title={
+                              ctxOn
+                                ? t('Quitar de contexto de planeación', 'Remove from planning context')
+                                : t('Usar como contexto de planeación', 'Use as planning context')
+                            }
+                          >
+                            {togglingId === f.id
+                              ? '…'
+                              : ctxOn
+                                ? t('✦ En contexto', '✦ In context')
+                                : t('✦ Usar como contexto', '✦ Use as context')}
+                          </button>
+                        )}
                         <a className={styles.download} href={`${href}?download=1`}>
                           {t('Descargar', 'Download')}
                         </a>
