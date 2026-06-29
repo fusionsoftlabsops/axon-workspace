@@ -42,6 +42,27 @@ function railState(status: DeploymentView['status']): SignalState {
   return 'idle';
 }
 
+// Human label for a deploy phase (the honest progress signal).
+const PHASE_LABELS: Record<string, [string, string]> = {
+  queued: ['En cola', 'Queued'],
+  login: ['Autenticando registro', 'Authenticating registry'],
+  pulling: ['Descargando imagen', 'Pulling image'],
+  building: ['Construyendo imagen', 'Building image'],
+  publishing: ['Publicando imagen', 'Publishing image'],
+  pruning: ['Limpiando', 'Pruning'],
+  starting: ['Arrancando contenedor', 'Starting container'],
+  stopping: ['Deteniendo', 'Stopping'],
+  removing: ['Eliminando', 'Removing'],
+  running: ['Ejecutando', 'Running'],
+  done: ['Listo', 'Done'],
+  failed: ['Falló', 'Failed'],
+  cancelled: ['Cancelado', 'Cancelled'],
+};
+function phaseLabel(phase: string | undefined, t: Tr): string {
+  const [es, en] = PHASE_LABELS[phase ?? 'queued'] ?? ['Procesando', 'Working'];
+  return t(es, en);
+}
+
 export function DeployClient({ slug, initial }: { slug: string; initial: DeployView }) {
   const { t } = useI18n();
   const [view, setView] = useState<DeployView>(initial);
@@ -384,9 +405,29 @@ function DeploymentCard({
       )}
       {dep.status === 'FAILED' && dep.error && <p className={styles.error}>{dep.error}</p>}
 
-      <div className={styles.rail}>
-        <SignalLine state={railState(dep.status)} />
-      </div>
+      {dep.status === 'BUILDING' || dep.status === 'PENDING' ? (
+        <div className={styles.progress}>
+          <div
+            className={styles.progressTrack}
+            role="progressbar"
+            aria-valuenow={dep.progress?.percent ?? undefined}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={t('Progreso del despliegue', 'Deployment progress')}
+          >
+            <div className={styles.progressFill} style={{ width: `${dep.progress?.percent ?? 6}%` }} />
+          </div>
+          <p className={styles.progressMeta}>
+            {phaseLabel(dep.progress?.phase, t)}
+            {dep.progress ? ` · ${dep.progress.percent}%` : ''}
+            {dep.progress?.lastLine ? ` · ${dep.progress.lastLine.slice(0, 80)}` : ''}
+          </p>
+        </div>
+      ) : (
+        <div className={styles.rail}>
+          <SignalLine state={railState(dep.status)} />
+        </div>
+      )}
 
       <div className={styles.rowActions}>
         {dep.repoId && (

@@ -89,6 +89,7 @@ export interface FusionLogLine {
   seq: number;
   stream: string;
   text: string;
+  stepId?: string | null;
   createdAt: string;
 }
 

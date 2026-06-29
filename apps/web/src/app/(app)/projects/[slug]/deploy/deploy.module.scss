@@ -187,6 +187,38 @@
   padding: 0.15rem 0;
 }
 
+// Barra de progreso real (fase + %) para despliegues en vuelo. El relleno usa
+// el gradiente-señal (la firma) y avanza por fase; el meta muestra fase·%·log.
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.progressTrack {
+  height: 6px;
+  border-radius: t.$radius-full;
+  background: var(--ink-wash-8);
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  min-width: 6px;
+  border-radius: t.$radius-full;
+  background: var(--signal);
+  box-shadow: 0 0 8px -2px var(--accent-ink);
+  transition: width t.$dur-page t.$ease-page-turn;
+}
+.progressMeta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .rowActions {
   display: flex;
   flex-wrap: wrap;

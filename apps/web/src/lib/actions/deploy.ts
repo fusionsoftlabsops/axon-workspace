@@ -8,6 +8,7 @@ import { audit } from '@/lib/audit';
 import { assertProjectMember } from '@/lib/auth/membership';
 import * as fusion from '@/lib/deploy/fusion-client';
 import { deriveState, startPolling, type DeployState } from '@/lib/deploy/poll';
+import { deriveProgress, type DeployProgress } from '@/lib/deploy/progress';
 import type { ActionResult } from './projects';
 
 // ---- view shapes ----
@@ -28,6 +29,7 @@ export interface DeploymentView {
   repoName: string | null;
   lastDeploymentId: string | null;
   updatedAt: string;
+  progress?: DeployProgress; // live phase/% for in-flight deployments (from polling)
 }
 
 export interface DeployRepoView {
@@ -98,8 +100,10 @@ function toDeploymentView(
     updatedAt: Date;
     projectRepo: { id: string; name: string } | null;
   },
+  progress?: DeployProgress,
 ): DeploymentView {
   return {
+    progress,
     id: d.id,
     fusionAppId: d.fusionAppId,
     kind: d.kind === 'DATABASE' ? 'DATABASE' : 'APP',
@@ -118,7 +122,10 @@ function toDeploymentView(
   };
 }
 
-async function loadView(projectId: string): Promise<DeployView> {
+async function loadView(
+  projectId: string,
+  progressMap?: Map<string, DeployProgress>,
+): Promise<DeployView> {
   const [target, repos] = await Promise.all([
     prisma.deployTarget.findUnique({
       where: { projectId },
@@ -153,7 +160,7 @@ async function loadView(projectId: string): Promise<DeployView> {
       url: r.url,
       deployed: r.deployments.length > 0,
     })),
-    deployments: (target?.deployments ?? []).map(toDeploymentView),
+    deployments: (target?.deployments ?? []).map((d) => toDeploymentView(d, progressMap?.get(d.id))),
   };
 }
 
@@ -712,24 +719,35 @@ export async function refreshDeploymentsAction(slug: string): Promise<ActionResu
   });
   if (!target) return { ok: true, data: await loadView(g.ctx.projectId) };
 
+  const progressMap = new Map<string, DeployProgress>();
   await Promise.all(
     target.deployments.map(async (d) => {
       try {
         const app = await fusion.getApp(d.fusionAppId, target.fusionTeamId);
+        const state = deriveState(app.latestDeployment);
         await prisma.deployment.update({
           where: { id: d.id },
           data: {
-            status: deriveState(app.latestDeployment),
+            status: state,
             hostname: app.hostname ?? d.hostname,
             error: app.latestDeployment?.errorReason ?? null,
           },
         });
+        // Live phase/% for in-flight deployments (best-effort; needs the logs).
+        if ((state === 'BUILDING' || state === 'PENDING') && d.lastDeploymentId) {
+          try {
+            const dep = await fusion.getDeployment(d.lastDeploymentId, target.fusionTeamId);
+            progressMap.set(d.id, deriveProgress(dep.status, dep.logs));
+          } catch {
+            /* progress is best-effort */
+          }
+        }
       } catch {
         /* leave stale on transient errors */
       }
     }),
   );
-  return { ok: true, data: await loadView(g.ctx.projectId) };
+  return { ok: true, data: await loadView(g.ctx.projectId, progressMap) };
 }
 
 // ---- shared resolver ----
