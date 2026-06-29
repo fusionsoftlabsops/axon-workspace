@@ -521,6 +521,7 @@ model ProjectPlan {
   suggestedRepos Json?      // [{ name, kind, stack, reason }]
   improvedIdea   String?    @db.Text
   error          String?
+  contextGraph   String?    // which graph grounds this plan: 'CODE_GRAPH' | 'NONE' | null (auto)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 

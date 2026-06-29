@@ -42,6 +42,10 @@ export interface AttachmentView {
   mimeType: string | null;
   url: string | null;
 }
+/** Which graph (if any) grounds the plan. `null` means "auto": use the code
+ *  knowledge graph when a READY analysis exists (the historical default). */
+export type ContextGraph = 'CODE_GRAPH' | 'NONE';
+
 export interface PlanView {
   id: string;
   status: 'CHATTING' | 'GENERATING' | 'READY' | 'PUBLISHED' | 'FAILED';
@@ -50,6 +54,7 @@ export interface PlanView {
   improvedIdea: string | null;
   error: string | null;
   attachments: AttachmentView[];
+  contextGraph: ContextGraph | null;
 }
 
 const planInclude = { attachments: { orderBy: { createdAt: 'asc' as const } } };
@@ -60,8 +65,12 @@ async function projectMeta(projectId: string) {
 
 /** The code knowledge-graph brief, when a READY analysis exists, so the planner
  *  can plan in brownfield mode (over the real existing code). Undefined → the
- *  planner stays in its original greenfield behavior. */
-async function codeContext(projectId: string): Promise<string | undefined> {
+ *  planner stays in its original greenfield behavior.
+ *
+ *  `choice` is the plan's explicit context selection: 'NONE' disconnects the
+ *  graph (greenfield even if one exists); 'CODE_GRAPH'/null use the code graph. */
+async function codeContext(projectId: string, choice?: ContextGraph | null): Promise<string | undefined> {
+  if (choice === 'NONE') return undefined;
   const row = await prisma.codeAnalysis.findUnique({
     where: { projectId },
     select: { status: true, summary: true },
@@ -76,6 +85,7 @@ function toView(p: {
   generated: unknown;
   improvedIdea: string | null;
   error: string | null;
+  contextGraph: string | null;
   attachments: PlanAttachment[];
 }): PlanView {
   return {
@@ -85,6 +95,7 @@ function toView(p: {
     generated: p.generated ? (p.generated as GeneratedPlan) : null,
     improvedIdea: p.improvedIdea,
     error: p.error,
+    contextGraph: p.contextGraph === 'NONE' || p.contextGraph === 'CODE_GRAPH' ? p.contextGraph : null,
     attachments: p.attachments.map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -158,7 +169,7 @@ export async function planChatAction(slug: string, userMessage: string): Promise
 
   const meta = await projectMeta(ctx.projectId);
   const lang = await getServerLang();
-  const code = await codeContext(ctx.projectId);
+  const code = await codeContext(ctx.projectId, plan.contextGraph as ContextGraph | null);
   let reply: string;
   try {
     reply = await planChatReply(
@@ -385,8 +396,30 @@ export async function startPlanGenerationAction(slug: string): Promise<ActionRes
   const lang = await getServerLang();
   await prisma.projectPlan.update({ where: { id: plan.id }, data: { status: 'GENERATING', error: null } });
 
-  void runPlanGeneration(plan.id, ctx.projectId, ctx.userId, messages, lang);
+  void runPlanGeneration(plan.id, ctx.projectId, ctx.userId, messages, lang, plan.contextGraph as ContextGraph | null);
   return { ok: true };
+}
+
+/** Connect (or disconnect) the plan's grounding graph. The chat and the
+ *  generator read this on their next run. */
+export async function setPlanContextGraphAction(
+  slug: string,
+  choice: ContextGraph,
+): Promise<ActionResult<PlanView>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+  if (choice !== 'CODE_GRAPH' && choice !== 'NONE') return { ok: false, error: 'Grafo inválido' };
+
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+
+  const updated = await prisma.projectPlan.update({
+    where: { id: plan.id },
+    data: { contextGraph: choice },
+    include: planInclude,
+  });
+  return { ok: true, data: toView(updated) };
 }
 
 const IMG_MEDIA: Record<string, PlanImage['mediaType']> = {
@@ -429,11 +462,12 @@ async function runPlanGeneration(
   userId: string,
   messages: ChatMsg[],
   lang: Lang,
+  contextGraph: ContextGraph | null,
 ): Promise<void> {
   try {
     const meta = await projectMeta(projectId);
     const { images, docs } = await resolveAttachments(planId);
-    const code = await codeContext(projectId);
+    const code = await codeContext(projectId, contextGraph);
     const plan = await generatePlan(
       { name: meta?.name ?? '', description: meta?.description ?? null },
       messages,

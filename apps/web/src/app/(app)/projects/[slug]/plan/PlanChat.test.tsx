@@ -15,7 +15,7 @@ const h = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('next/link', () => ({ default: ({ children, href }: any) => <a href={href}>{children}</a> }));
 vi.mock('./PlanRepos', () => ({ PlanRepos: () => <div>planrepos</div> }));
-vi.mock('./AnalysisPanel', () => ({ AnalysisPanel: () => <div>analysispanel</div> }));
+vi.mock('./PlanContext', () => ({ PlanContext: () => <div>plancontext</div> }));
 vi.mock('./PlanEditors', () => ({
   PlanSprintHead: ({ sprintIndex, onToggle }: any) => (
     <button onClick={onToggle}>toggle-{sprintIndex}</button>

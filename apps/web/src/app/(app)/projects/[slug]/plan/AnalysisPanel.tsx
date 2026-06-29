@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
-import { getAnalysisAction, analyzeProjectAction, type AnalysisView } from '@/lib/actions/analysis';
+import { useAnalysis, type AnalysisController } from './useAnalysis';
 import styles from './plan.module.scss';
 
 /**
@@ -11,34 +10,19 @@ import styles from './plan.module.scss';
  * linked repos, polls until the code knowledge graph is READY, and shows that
  * planning is now grounded in the real code (brownfield). When graphify-svc is
  * not configured, it renders a quiet hint and never blocks greenfield planning.
+ *
+ * `AnalysisPanelView` is the presentational half driven by an external
+ * controller, so the planning-context picker can share one poller with it.
  */
-export function AnalysisPanel({ slug, canWrite }: { slug: string; canWrite: boolean }) {
+export function AnalysisPanelView({
+  controller,
+  canWrite,
+}: {
+  controller: AnalysisController;
+  canWrite: boolean;
+}) {
   const { t } = useI18n();
-  const [view, setView] = useState<AnalysisView | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const load = useCallback(async () => {
-    const r = await getAnalysisAction(slug);
-    if (r.ok && r.data) setView(r.data);
-  }, [slug]);
-
-  useEffect(() => {
-    void load();
-    return () => {
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
-  }, [load]);
-
-  // Poll while an analysis is running.
-  useEffect(() => {
-    if (view?.status !== 'ANALYZING') return;
-    pollRef.current = setTimeout(() => void load(), 4000);
-    return () => {
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
-  }, [view?.status, view?.updatedAt, load]);
+  const { view, busy, error, run } = controller;
 
   if (!view) return null;
 
@@ -77,15 +61,6 @@ export function AnalysisPanel({ slug, canWrite }: { slug: string; canWrite: bool
     typeof stats.chunksTotal === 'number'
       ? ` (${Number(stats.chunksDone ?? 0)}/${Number(stats.chunksTotal)})`
       : '';
-
-  async function run() {
-    setBusy(true);
-    setError(null);
-    const r = await analyzeProjectAction(slug);
-    if (!r.ok) setError(r.error);
-    else if (r.data) setView(r.data);
-    setBusy(false);
-  }
 
   return (
     <div className={styles.repoCard}>
@@ -180,4 +155,10 @@ export function AnalysisPanel({ slug, canWrite }: { slug: string; canWrite: bool
       )}
     </div>
   );
+}
+
+/** Self-contained panel (owns its own poller). Used standalone on the Context tab. */
+export function AnalysisPanel({ slug, canWrite }: { slug: string; canWrite: boolean }) {
+  const controller = useAnalysis(slug);
+  return <AnalysisPanelView controller={controller} canWrite={canWrite} />;
 }

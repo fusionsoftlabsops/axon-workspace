@@ -17,7 +17,7 @@ import {
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
 import { PlanTaskCard, PlanSprintHead } from './PlanEditors';
 import { PlanRepos } from './PlanRepos';
-import { AnalysisPanel } from './AnalysisPanel';
+import { PlanContext } from './PlanContext';
 import styles from './plan.module.scss';
 
 export function PlanChat({
@@ -237,7 +237,7 @@ export function PlanChat({
             </div>
           )}
         </div>
-        <AnalysisPanel slug={slug} canWrite={canWrite} />
+        <PlanContext slug={slug} canWrite={canWrite} contextGraph={plan.contextGraph} onChange={setPlan} />
         {/* Link repos BEFORE a plan exists so an existing project can be analyzed
             (brownfield). Once a plan is generated, the repos section also appears
             in the preview pane below. */}

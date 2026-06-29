@@ -95,6 +95,7 @@ import {
   clearTaskAssignmentAction,
   generateImplPlanAction,
   publishPlanAction,
+  setPlanContextGraphAction,
 } from './planning';
 
 const okCtx = { ok: true, userId: 'u1', projectId: 'p1', role: 'OWNER' as const };
@@ -207,6 +208,56 @@ describe('planChatAction', () => {
     const res = await planChatAction('slug', 'hi');
     expect(prismaMock.projectPlan.update).toHaveBeenCalled();
     expect(res.ok).toBe(true);
+    // default (null) → the code graph grounds the chat.
+    expect(plannerMock.planChatReply).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(), expect.anything(),
+      expect.anything(), expect.anything(), 'brief',
+    );
+  });
+
+  it('disconnects the graph when the plan chose NONE (greenfield even if a READY analysis exists)', async () => {
+    prismaMock.projectPlan.findFirst.mockResolvedValue({ ...planRow(), contextGraph: 'NONE' });
+    prismaMock.codeAnalysis.findUnique.mockResolvedValue({ status: 'READY', summary: 'brief' });
+    plannerMock.planChatReply.mockResolvedValue('the reply');
+    prismaMock.projectPlan.update.mockResolvedValue(planRow());
+    await planChatAction('slug', 'hi');
+    // The 7th arg (code context) must be undefined — the graph is not consulted.
+    expect(prismaMock.codeAnalysis.findUnique).not.toHaveBeenCalled();
+    expect(plannerMock.planChatReply).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), expect.anything(), expect.anything(),
+      expect.anything(), expect.anything(), undefined,
+    );
+  });
+});
+
+describe('setPlanContextGraphAction', () => {
+  it('propagates the membership error', async () => {
+    assertMock.mockResolvedValue({ ok: false, error: 'nope' });
+    expect(await setPlanContextGraphAction('slug', 'NONE')).toEqual({ ok: false, error: 'nope' });
+  });
+
+  it('rejects a VIEWER', async () => {
+    assertMock.mockResolvedValue({ ...okCtx, role: 'VIEWER' });
+    expect(await setPlanContextGraphAction('slug', 'NONE')).toEqual({ ok: false, error: 'Sin permisos' });
+  });
+
+  it('rejects an invalid choice', async () => {
+    expect(await setPlanContextGraphAction('slug', 'BOGUS' as never)).toEqual({ ok: false, error: 'Grafo inválido' });
+  });
+
+  it('rejects when no plan exists', async () => {
+    prismaMock.projectPlan.findFirst.mockResolvedValue(null);
+    expect(await setPlanContextGraphAction('slug', 'NONE')).toEqual({ ok: false, error: 'Plan no encontrado' });
+  });
+
+  it('persists the choice and returns the updated view', async () => {
+    prismaMock.projectPlan.update.mockResolvedValue({ ...planRow(), contextGraph: 'NONE' });
+    const res = await setPlanContextGraphAction('slug', 'NONE');
+    expect(prismaMock.projectPlan.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { contextGraph: 'NONE' } }),
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.data.contextGraph).toBe('NONE');
   });
 });
 

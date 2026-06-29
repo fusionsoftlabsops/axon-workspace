@@ -598,6 +598,103 @@
   color: var(--ink-muted);
 }
 
+// ---- Planning context picker (connect plan to a graph) ----
+.ctxCard {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-md;
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-lg;
+  background: var(--paper-elev);
+  padding: t.$space-md t.$space-lg;
+}
+.ctxHead {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.ctxLbl {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--signal, var(--accent-ink));
+}
+.ctxLead {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  max-width: 60ch;
+}
+.ctxOptions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: t.$space-sm;
+
+  @media (min-width: t.$bp-md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ctxOption {
+  display: flex;
+  align-items: flex-start;
+  gap: t.$space-sm;
+  padding: t.$space-sm t.$space-md;
+  border: 1px solid var(--rule-strong);
+  border-radius: t.$radius-md;
+  background: var(--paper);
+  cursor: pointer;
+  transition:
+    border-color t.$dur-quick t.$ease-editorial,
+    background t.$dur-quick t.$ease-editorial;
+
+  &:hover {
+    border-color: var(--ink);
+  }
+}
+.ctxOptionOn {
+  border-color: var(--signal, var(--accent-ink));
+  background: var(--accent-ink-wash);
+}
+.ctxRadio {
+  margin-top: 0.2rem;
+  accent-color: var(--signal, var(--accent-ink));
+  flex: none;
+}
+.ctxOptBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.ctxOptName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.ctxOptDesc {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+.ctxSignal {
+  margin-top: 0.15rem;
+}
+.ctxStatus {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-subtle);
+
+  &[data-state='live'] {
+    color: var(--signal, var(--accent-ink));
+  }
+  &[data-state='failed'] {
+    color: var(--accent-stamp);
+  }
+}
+
 // Code-analysis brief (graphify summary) — compact, scrollable.
 .analysisSummary {
   margin: 0.5rem 0 0;
