@@ -1,52 +1,61 @@
 @use '@/styles/tokens' as t;
 
+// The file store is a workspace registry, not reading content — let it use the
+// horizontal space instead of a narrow column.
 .page {
   padding: t.$space-xl;
-  max-width: t.$max-content-width;
+  max-width: min(1680px, 100%);
   margin: 0 auto;
 }
 
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: t.$space-xl;
+  gap: t.$space-lg;
 }
 
-// ---------- Dropzone ----------
-.dropzone {
+// ---------- Upload bar (slim, horizontal) ----------
+.uploader {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: t.$space-sm;
-  padding: t.$space-2xl t.$space-lg;
+  gap: t.$space-md;
+  padding: t.$space-sm t.$space-lg;
   border: 1px dashed var(--rule-strong);
   border-radius: t.$radius-lg;
   background: var(--paper-deep);
-  text-align: center;
-  transition: border-color t.$dur-quick t.$ease-editorial,
+  transition:
+    border-color t.$dur-quick t.$ease-editorial,
     background t.$dur-quick t.$ease-editorial;
 }
-
 .dragOver {
   border-color: var(--accent-ink);
   background: var(--accent-ink-wash);
 }
-
 .hiddenInput {
   display: none;
 }
-
-.dropText {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 0.9375rem;
-  color: var(--ink-muted);
+.uploaderGlyph {
+  flex: none;
+  font-size: 1.25rem;
+  color: var(--accent-ink);
 }
-
-.hint {
+.uploaderCopy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.uploaderText {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 0.8125rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.uploaderHint {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
   color: var(--ink-subtle);
 }
 
@@ -59,123 +68,150 @@
   font-size: 0.875rem;
 }
 
-// ---------- Groups ----------
+// ---------- Context summary line ----------
+.ctxSummary {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.84rem;
+  color: var(--ink-muted);
+}
+.ctxStar {
+  color: var(--accent-ink);
+}
+.ctxLink {
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-weight: 600;
+  &:hover { text-decoration: underline; }
+}
+
+// ---------- Category section ----------
 .group {
   display: flex;
   flex-direction: column;
-  gap: t.$space-md;
+  gap: t.$space-sm;
 }
-
 .groupHeader {
   display: flex;
   align-items: center;
   gap: t.$space-sm;
-  padding-bottom: t.$space-xs;
-  border-bottom: 1px solid var(--rule);
 }
-
-.groupTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: t.$space-sm;
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.0625rem;
-  color: var(--ink);
-}
-
 .groupGlyph {
   color: var(--ink-subtle);
-  font-size: 0.95em;
+  font-size: 0.95rem;
+}
+.groupTitle {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-muted);
+}
+.groupCount {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-subtle);
+  padding: 0.02rem 0.4rem;
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-full;
+}
+.groupRule {
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
 }
 
-// ---------- Grid + cards ----------
-.grid {
+// ---------- Rows (the registry) ----------
+.rows {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: t.$space-md;
-}
-
-.card {
-  position: relative;
   display: flex;
   flex-direction: column;
+  gap: t.$space-xs;
+}
+
+// A file row uses the full width: thumb · name/meta · context pipeline · actions.
+.row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1.1fr) minmax(0, 1.4fr) auto;
+  grid-template-areas: 'thumb main pipe actions';
+  align-items: center;
+  gap: t.$space-md;
+  padding: t.$space-sm t.$space-md;
   border: 1px solid var(--rule);
-  border-radius: t.$radius-lg;
+  border-left: 3px solid transparent;
+  border-radius: t.$radius-md;
   background: var(--paper-elev);
-  overflow: hidden;
-  transition: border-color t.$dur-quick t.$ease-editorial,
+  transition:
+    border-color t.$dur-quick t.$ease-editorial,
     box-shadow t.$dur-quick t.$ease-editorial;
 
   &:hover {
     border-color: var(--rule-strong);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px -8px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 6px 16px -12px rgba(0, 0, 0, 0.18);
+  }
+
+  // Stack on narrow screens.
+  @media (max-width: t.$bp-md) {
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-areas:
+      'thumb main'
+      'pipe pipe'
+      'actions actions';
+    row-gap: t.$space-sm;
   }
 }
-
-// A file feeding the planner gets a violet hairline + a corner ribbon.
-.cardContext {
-  border-color: var(--signal, var(--accent-ink));
-  &:hover {
-    border-color: var(--signal, var(--accent-ink));
-  }
-}
-
-.contextRibbon {
-  position: absolute;
-  top: t.$space-xs;
-  right: t.$space-xs;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: t.$radius-sm;
-  background: color-mix(in srgb, var(--signal, var(--accent-ink)) 16%, var(--paper));
-  border: 1px solid var(--signal, var(--accent-ink));
-  color: var(--signal, var(--accent-ink));
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 124px;
-  background: var(--sunken, var(--paper-deep));
-  border-bottom: 1px solid var(--rule);
-  text-decoration: none;
+// A file that grounds the plan carries a violet signal edge.
+.rowOn {
+  border-left-color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 5%, var(--paper-elev));
 }
 
 .thumb {
+  grid-area: thumb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: t.$radius-md;
+  background: var(--sunken, var(--paper-deep));
+  border: 1px solid var(--rule);
+  overflow: hidden;
+  text-decoration: none;
+
+  @media (max-width: t.$bp-md) {
+    width: 44px;
+    height: 44px;
+  }
+}
+.thumbImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-
-.fileGlyph {
-  font-size: 2.25rem;
+.thumbGlyph {
+  font-size: 1.4rem;
   color: var(--ink-subtle);
 }
 
-.meta {
+.rowMain {
+  grid-area: main;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: t.$space-sm t.$space-md t.$space-md;
+  gap: 0.15rem;
 }
-
-.name {
-  font-family: var(--font-sans);
+.rowName {
+  font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.92rem;
   color: var(--ink);
   text-decoration: none;
   white-space: nowrap;
@@ -187,56 +223,102 @@
     text-decoration: underline;
   }
 }
-
-.sub {
+.rowMeta {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.actions {
+// ---------- Context pipeline (the signature) ----------
+.pipe {
+  grid-area: pipe;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-xs;
+}
+.track {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: t.$space-sm t.$space-md;
-  margin-top: t.$space-xs;
+  gap: 0.35rem;
 }
+.node {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 
-// ---------- Context (planning source) ----------
-.ctxSummary {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-  font-size: 0.83rem;
-  color: var(--ink-muted);
+  &::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+  }
 }
-.ctxStar {
-  color: var(--signal, var(--accent-ink));
-}
-.ctxLink {
+.nodeDone {
   color: var(--accent-ink);
-  text-decoration: none;
-  font-weight: 600;
-  &:hover { text-decoration: underline; }
+  &::before { background: var(--accent-ink); }
 }
+.nodeActive {
+  color: var(--accent-ink);
+  &::before {
+    background: var(--accent-ink);
+    animation: ctxPulse 1.2s ease-in-out infinite;
+  }
+}
+.nodePending {
+  color: var(--ink-subtle);
+}
+.nodeFail {
+  color: var(--accent-stamp);
+  &::before { background: var(--accent-stamp); }
+}
+.seg {
+  flex: 1;
+  min-width: 14px;
+  max-width: 46px;
+  height: 1.5px;
+  background: var(--rule-strong);
+  border-radius: 2px;
+}
+.segOn {
+  // The reached segments ARE the signal line (indigo→cyan gradient).
+  background: var(--signal);
+}
+
+.pipeCtl {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+  flex-wrap: wrap;
+}
+
+// Pill button used for "generate / use as context".
 .ctxBtn {
   border: 1px solid var(--rule-strong);
   background: var(--paper);
-  padding: 0.12rem 0.45rem;
-  border-radius: 999px;
+  padding: 0.14rem 0.55rem;
+  border-radius: t.$radius-full;
   font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--ink-muted);
   cursor: pointer;
-  transition: border-color t.$dur-quick t.$ease-editorial, color t.$dur-quick t.$ease-editorial;
+  transition:
+    border-color t.$dur-quick t.$ease-editorial,
+    color t.$dur-quick t.$ease-editorial;
 
   &:hover:not(:disabled) {
-    border-color: var(--signal, var(--accent-ink));
-    color: var(--signal, var(--accent-ink));
+    border-color: var(--accent-ink);
+    color: var(--accent-ink);
   }
   &:disabled {
     opacity: 0.6;
@@ -244,81 +326,85 @@
   }
 }
 .ctxBtnOn {
-  border-color: var(--signal, var(--accent-ink));
-  color: var(--signal, var(--accent-ink));
-  background: color-mix(in srgb, var(--signal, var(--accent-ink)) 12%, var(--paper));
-}
-
-// The "double card" context zone: generate → ready (use + download .md).
-.ctxZone {
-  margin-top: t.$space-sm;
-  padding-top: t.$space-sm;
-  border-top: 1px dashed var(--rule);
-}
-.ctxGenWrap {
-  display: flex;
-}
-.ctxGen {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.74rem;
-  color: var(--signal, var(--accent-ink));
-  font-family: var(--font-mono);
-}
-.ctxReady {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-.ctxReadyTag {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--signal, var(--accent-ink));
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 12%, var(--paper));
 }
 .ctxUse {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--ink);
   cursor: pointer;
 
   input {
-    accent-color: var(--signal, var(--accent-ink));
+    accent-color: var(--accent-ink);
   }
 }
 
+// Generating state: spinner + breathing label.
+.ctxGen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+}
+.spinner {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, var(--accent-ink) 28%, transparent);
+  border-top-color: var(--accent-ink);
+  border-radius: 50%;
+  animation: ctxSpin 0.7s linear infinite;
+}
+.ctxGenText {
+  animation: ctxPulse 1.4s ease-in-out infinite;
+}
+@keyframes ctxSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ctxPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: ctxPulse 1.6s ease-in-out infinite; }
+  .ctxGenText,
+  .nodeActive::before { animation: none; }
+}
+
+// ---------- Row actions ----------
+.rowActions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: t.$space-md;
+  justify-content: flex-end;
+}
 .download {
   font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--accent-ink);
   text-decoration: none;
+  white-space: nowrap;
 
-  &:hover {
-    text-decoration: underline;
-  }
+  &:hover { text-decoration: underline; }
 }
-
 .deleteBtn {
   border: none;
   background: none;
   padding: 0;
   font-family: var(--font-sans);
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--ink-subtle);
   cursor: pointer;
 
-  &:hover {
-    color: var(--accent-stamp);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  &:hover { color: var(--accent-stamp); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }

@@ -629,7 +629,7 @@
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--signal, var(--accent-ink));
+  color: var(--accent-ink);
 }
 .ctxLead {
   margin: 0;
@@ -664,12 +664,12 @@
   }
 }
 .ctxOptionOn {
-  border-color: var(--signal, var(--accent-ink));
+  border-color: var(--accent-ink);
   background: var(--accent-ink-wash);
 }
 .ctxRadio {
   margin-top: 0.2rem;
-  accent-color: var(--signal, var(--accent-ink));
+  accent-color: var(--accent-ink);
   flex: none;
 }
 .ctxOptBody {
@@ -699,14 +699,14 @@
   color: var(--ink-subtle);
 
   &[data-state='live'] {
-    color: var(--signal, var(--accent-ink));
+    color: var(--accent-ink);
   }
   &[data-state='failed'] {
     color: var(--accent-stamp);
   }
 }
 .ctxStar {
-  color: var(--signal, var(--accent-ink));
+  color: var(--accent-ink);
 }
 .ctxFilesLink {
   color: var(--accent-ink);
@@ -756,8 +756,8 @@
   }
 }
 .ctxFileItemOn {
-  border-color: var(--signal, var(--accent-ink));
-  background: color-mix(in srgb, var(--signal, var(--accent-ink)) 9%, var(--paper));
+  border-color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent-ink) 9%, var(--paper));
 }
 .ctxFileItemOff {
   opacity: 0.6;
@@ -778,7 +778,7 @@
   min-width: 0;
 }
 .ctxFileCheck {
-  accent-color: var(--signal, var(--accent-ink));
+  accent-color: var(--accent-ink);
   flex: none;
 }
 .ctxFileGlyph {

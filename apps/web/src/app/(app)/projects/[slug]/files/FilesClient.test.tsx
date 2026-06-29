@@ -169,7 +169,6 @@ describe('FilesClient', () => {
     const user = userEvent.setup();
     const doc = file({ id: 'd1', name: 'spec.pdf', mimeType: 'application/pdf', category: 'PDF', contextStatus: 'READY' });
     render(<FilesClient {...baseProps({ files: [doc] })} />);
-    expect(screen.getByText(/Context ready/i)).toBeInTheDocument();
     const dl = screen.getByRole('link', { name: /Download \.md/i });
     expect(dl).toHaveAttribute('href', '/api/v1/projects/proj/files/d1/context');
     await user.click(screen.getByRole('checkbox', { name: /Use in the plan/i }));

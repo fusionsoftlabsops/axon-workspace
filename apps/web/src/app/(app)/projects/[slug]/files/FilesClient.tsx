@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { FileCategory, MemberRole } from '@prisma/client';
-import { Button, Badge, EmptyState } from '@/components/ui';
+import { Button, EmptyState } from '@/components/ui';
 import { CATEGORY_ORDER, CATEGORY_LABEL, formatBytes, MAX_FILE_BYTES } from '@/lib/files';
 import { setFileContextAction, generateFileContextAction, type ContextStatus } from '@/lib/actions/files';
 import { useI18n } from '@/lib/i18n/i18n';
@@ -172,9 +172,10 @@ export function FilesClient({
 
   return (
     <div className={styles.wrap}>
+      {/* Slim horizontal upload bar — drag target + action on one line. */}
       {canWrite && (
         <div
-          className={`${styles.dropzone} ${dragOver ? styles.dragOver : ''}`}
+          className={`${styles.uploader} ${dragOver ? styles.dragOver : ''}`}
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -193,20 +194,19 @@ export function FilesClient({
             className={styles.hiddenInput}
             onChange={(e) => void upload(e.target.files)}
           />
-          <p className={styles.dropText}>
-            {t('Arrastra archivos aquí o', 'Drag files here or')}
-          </p>
-          <Button
-            variant="primary"
-            disabled={busy}
-            onClick={() => inputRef.current?.click()}
-          >
+          <span aria-hidden className={styles.uploaderGlyph}>⤒</span>
+          <div className={styles.uploaderCopy}>
+            <p className={styles.uploaderText}>
+              {t('Arrastra archivos al almacén o', 'Drop files into the store, or')}
+            </p>
+            <p className={styles.uploaderHint}>
+              {t('Imágenes, PDF, documentos…', 'Images, PDFs, documents…')} ·{' '}
+              {t('máx.', 'max')} {Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB
+            </p>
+          </div>
+          <Button variant="primary" disabled={busy} onClick={() => inputRef.current?.click()}>
             {busy ? t('Subiendo…', 'Uploading…') : t('Seleccionar archivos', 'Choose files')}
           </Button>
-          <p className={styles.hint}>
-            {t('Imágenes, PDF, documentos…', 'Images, PDFs, documents…')} ·{' '}
-            {t('máx.', 'max')} {Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB
-          </p>
         </div>
       )}
 
@@ -248,53 +248,72 @@ export function FilesClient({
         grouped.map(({ cat, items }) => (
           <section key={cat} className={styles.group}>
             <header className={styles.groupHeader}>
-              <h2 className={styles.groupTitle}>
-                <span aria-hidden className={styles.groupGlyph}>{CATEGORY_GLYPH[cat]}</span>
-                {t(CATEGORY_LABEL[cat].es, CATEGORY_LABEL[cat].en)}
-              </h2>
-              <Badge tone="neutral">{items.length}</Badge>
+              <span aria-hidden className={styles.groupGlyph}>{CATEGORY_GLYPH[cat]}</span>
+              <h2 className={styles.groupTitle}>{t(CATEGORY_LABEL[cat].es, CATEGORY_LABEL[cat].en)}</h2>
+              <span className={styles.groupCount}>{items.length}</span>
+              <span aria-hidden className={styles.groupRule} />
             </header>
-            <ul className={styles.grid}>
+            <ul className={styles.rows}>
               {items.map((f) => {
                 const href = `/api/v1/projects/${slug}/files/${f.id}`;
                 const canDelete = canManage || f.uploadedById === currentUserId;
                 const ctxOn = isContext(f);
                 const status = statusOf(f);
+                const image = isImage(f);
+                const mdNode = image
+                  ? ''
+                  : status === 'READY'
+                    ? styles.nodeDone
+                    : status === 'GENERATING'
+                      ? styles.nodeActive
+                      : status === 'FAILED'
+                        ? styles.nodeFail
+                        : styles.nodePending;
                 return (
-                  <li key={f.id} className={`${styles.card} ${ctxOn ? styles.cardContext : ''}`}>
-                    {ctxOn && (
-                      <span className={styles.contextRibbon} title={t('Usado como contexto', 'Used as context')}>
-                        ✦ {t('Contexto', 'Context')}
-                      </span>
-                    )}
+                  <li key={f.id} className={`${styles.row} ${ctxOn ? styles.rowOn : ''}`}>
                     <a
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={styles.preview}
+                      className={styles.thumb}
                       title={t('Abrir', 'Open')}
                     >
-                      {cat === 'IMAGE' ? (
+                      {image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={href} alt={f.name} loading="lazy" className={styles.thumb} />
+                        <img src={href} alt={f.name} loading="lazy" className={styles.thumbImg} />
                       ) : (
-                        <span aria-hidden className={styles.fileGlyph}>{CATEGORY_GLYPH[cat]}</span>
+                        <span aria-hidden className={styles.thumbGlyph}>{CATEGORY_GLYPH[cat]}</span>
                       )}
                     </a>
-                    <div className={styles.meta}>
-                      <a href={href} target="_blank" rel="noopener noreferrer" className={styles.name} title={f.name}>
+
+                    <div className={styles.rowMain}>
+                      <a href={href} target="_blank" rel="noopener noreferrer" className={styles.rowName} title={f.name}>
                         {f.name}
                       </a>
-                      <p className={styles.sub}>
-                        {formatBytes(f.size)} · {fmtDate(f.createdAt)}
+                      <p className={styles.rowMeta}>
+                        {formatBytes(f.size)} · {fmtDate(f.createdAt)} · {f.uploaderName}
                       </p>
-                      <p className={styles.sub}>{f.uploaderName}</p>
+                    </div>
 
-                      {/* ---- Context (double card) ---- */}
+                    {/* ---- Context pipeline (signature): uploaded → markdown → in plan ---- */}
+                    <div className={styles.pipe}>
+                      <div className={styles.track} aria-hidden>
+                        <span className={`${styles.node} ${styles.nodeDone}`}>{t('subido', 'uploaded')}</span>
+                        {!image && (
+                          <>
+                            <span className={`${styles.seg} ${status === 'READY' ? styles.segOn : ''}`} />
+                            <span className={`${styles.node} ${mdNode}`}>markdown</span>
+                          </>
+                        )}
+                        <span className={`${styles.seg} ${ctxOn ? styles.segOn : ''}`} />
+                        <span className={`${styles.node} ${ctxOn ? styles.nodeDone : styles.nodePending}`}>
+                          {t('en el plan', 'in plan')}
+                        </span>
+                      </div>
+
                       {canWrite && (
-                        <div className={styles.ctxZone}>
-                          {isImage(f) ? (
-                            // Images: usable directly (fed as vision), no .md to generate.
+                        <div className={styles.pipeCtl}>
+                          {image ? (
                             <button
                               type="button"
                               className={`${styles.ctxBtn} ${ctxOn ? styles.ctxBtnOn : ''}`}
@@ -309,10 +328,14 @@ export function FilesClient({
                                   : t('✦ Usar como contexto', '✦ Use as context')}
                             </button>
                           ) : status === 'GENERATING' ? (
-                            <span className={styles.ctxGen}>⟳ {t('Generando contexto…', 'Generating context…')}</span>
+                            <span className={styles.ctxGen} role="status" aria-live="polite">
+                              <span className={styles.spinner} aria-hidden />
+                              <span className={styles.ctxGenText}>
+                                {t('Generando contexto…', 'Generating context…')}
+                              </span>
+                            </span>
                           ) : status === 'READY' ? (
-                            <div className={styles.ctxReady}>
-                              <span className={styles.ctxReadyTag}>✦ {t('Contexto listo', 'Context ready')}</span>
+                            <>
                               <label className={styles.ctxUse}>
                                 <input
                                   type="checkbox"
@@ -325,39 +348,37 @@ export function FilesClient({
                               <a className={styles.download} href={`${href}/context`}>
                                 {t('Descargar .md', 'Download .md')}
                               </a>
-                            </div>
+                            </>
                           ) : (
-                            <div className={styles.ctxGenWrap}>
-                              <button
-                                type="button"
-                                className={styles.ctxBtn}
-                                onClick={() => generateContext(f)}
-                                disabled={pending}
-                              >
-                                {status === 'FAILED'
-                                  ? t('⚠ Reintentar contexto', '⚠ Retry context')
-                                  : t('✦ Generar contexto', '✦ Generate context')}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              className={styles.ctxBtn}
+                              onClick={() => generateContext(f)}
+                              disabled={pending}
+                            >
+                              {status === 'FAILED'
+                                ? t('⚠ Reintentar contexto', '⚠ Retry context')
+                                : t('✦ Generar contexto', '✦ Generate context')}
+                            </button>
                           )}
                         </div>
                       )}
+                    </div>
 
-                      <div className={styles.actions}>
-                        <a className={styles.download} href={`${href}?download=1`}>
-                          {t('Descargar', 'Download')}
-                        </a>
-                        {canDelete && (
-                          <button
-                            type="button"
-                            className={styles.deleteBtn}
-                            onClick={() => remove(f)}
-                            disabled={busy}
-                          >
-                            {t('Eliminar', 'Delete')}
-                          </button>
-                        )}
-                      </div>
+                    <div className={styles.rowActions}>
+                      <a className={styles.download} href={`${href}?download=1`}>
+                        {t('Descargar', 'Download')}
+                      </a>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          className={styles.deleteBtn}
+                          onClick={() => remove(f)}
+                          disabled={busy}
+                        >
+                          {t('Eliminar', 'Delete')}
+                        </button>
+                      )}
                     </div>
                   </li>
                 );
