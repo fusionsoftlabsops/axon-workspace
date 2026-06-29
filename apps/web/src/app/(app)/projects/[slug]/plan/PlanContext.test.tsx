@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('@/lib/i18n/i18n', () => ({ useI18n: () => ({ t: (_es: unknown, en: unknown) => en }) }));
@@ -47,11 +47,19 @@ describe('PlanContext', () => {
   const codeRadio = () => screen.getByRole('radio', { name: /knowledge graph/i });
   const noneRadio = () => screen.getByRole('radio', { name: /context files still apply/i });
 
+  // Sections are accordions collapsed by default — wait for them to mount (the
+  // analysis view loads async) and expand all so the bodies are in the DOM.
+  async function openAll() {
+    await screen.findByRole('button', { name: /Context files/i });
+    screen.queryAllByRole('button', { expanded: false }).forEach((b) => fireEvent.click(b));
+  }
+
   it('offers both graph options and shows a live connection when the code graph is ready', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={() => {}} />);
 
-    expect(await screen.findByRole('radiogroup')).toBeInTheDocument();
+    await openAll();
+    expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     expect(codeRadio()).toBeChecked();
     expect(noneRadio()).not.toBeChecked();
     // null contextGraph defaults to the code graph → the chip shows "Connected".
@@ -66,7 +74,7 @@ describe('PlanContext', () => {
     h.setPlanContextGraphAction.mockResolvedValue({ ok: true, data: { contextGraph: 'NONE' } });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={onChange} />);
 
-    await screen.findByRole('radiogroup');
+    await openAll();
     await user.click(noneRadio());
     expect(h.setPlanContextGraphAction).toHaveBeenCalledWith('p', 'NONE');
     expect(onChange).toHaveBeenCalledWith({ contextGraph: 'NONE' });
@@ -78,7 +86,7 @@ describe('PlanContext', () => {
     h.setPlanContextGraphAction.mockResolvedValue({ ok: false, error: 'no perms' });
     render(<PlanContext slug="p" canWrite contextGraph="CODE_GRAPH" onChange={() => {}} />);
 
-    await screen.findByRole('radiogroup');
+    await openAll();
     await user.click(noneRadio());
     expect(await screen.findByText('no perms')).toBeInTheDocument();
   });
@@ -86,7 +94,7 @@ describe('PlanContext', () => {
   it('lists the project files inline with the marked ones checked, and links to Files', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={FILES} onChange={() => {}} />);
-    await screen.findByText('spec.pdf');
+    await openAll();
     const specCheck = screen.getByText('spec.pdf').closest('label')!.querySelector('input')!;
     const mockCheck = screen.getByText('mockup.png').closest('label')!.querySelector('input')!;
     expect(specCheck).toBeChecked(); // isContext: true
@@ -99,7 +107,7 @@ describe('PlanContext', () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'b', isContext: true, hasContent: true } });
     render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={FILES} onChange={() => {}} />);
-    await screen.findByText('mockup.png');
+    await openAll();
     const mockCheck = screen.getByText('mockup.png').closest('label')!.querySelector('input')!;
     await user.click(mockCheck);
     expect(h.setFileContextAction).toHaveBeenCalledWith('p', 'b', true);
@@ -111,7 +119,7 @@ describe('PlanContext', () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     h.setFileContextAction.mockResolvedValue({ ok: false, error: 'file-fail' });
     render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={FILES} onChange={() => {}} />);
-    await screen.findByText('mockup.png');
+    await openAll();
     const mockCheck = screen.getByText('mockup.png').closest('label')!.querySelector('input')!;
     await user.click(mockCheck);
     expect(await screen.findByText('file-fail')).toBeInTheDocument();
@@ -121,7 +129,8 @@ describe('PlanContext', () => {
   it('invites the user to upload when there are no files', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={[]} onChange={() => {}} />);
-    expect(await screen.findByText(/No files to use as context yet/i)).toBeInTheDocument();
+    await openAll();
+    expect(screen.getByText(/No files to use as context yet/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Upload files/i })).toHaveAttribute('href', '/projects/p/files');
   });
 
@@ -135,8 +144,8 @@ describe('PlanContext', () => {
   it('hides the graph chooser (but keeps the file-context line + panel) when graphify is not configured', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view({ configured: false }) });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={() => {}} />);
-    // Wait for the settled section (its "Context files" block is unique to it).
-    expect(await screen.findByText(/Context files/i)).toBeInTheDocument();
+    await openAll();
+    expect(screen.getByText(/Context files/i)).toBeInTheDocument();
     expect(screen.getByTestId('analysis-panel')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
   });
@@ -144,7 +153,7 @@ describe('PlanContext', () => {
   it('disables the radios for viewers', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     render(<PlanContext slug="p" canWrite={false} contextGraph={null} onChange={() => {}} />);
-    await screen.findByRole('radiogroup');
+    await openAll();
     expect(codeRadio()).toBeDisabled();
     expect(noneRadio()).toBeDisabled();
   });

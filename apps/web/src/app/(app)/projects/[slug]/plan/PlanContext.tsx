@@ -53,8 +53,8 @@ export function PlanContext({
   const [fileOn, setFileOn] = useState<Record<string, boolean>>({});
   const [fileBusy, setFileBusy] = useState<string | null>(null);
   const isFileOn = (f: ContextFile) => fileOn[f.id] ?? f.isContext;
-  // Each context section is a collapsible card (all open by default).
-  const [openSecs, setOpenSecs] = useState<Set<string>>(() => new Set(['graph', 'files', 'analysis']));
+  // Each context section is a collapsible card — collapsed by default.
+  const [openSecs, setOpenSecs] = useState<Set<string>>(() => new Set());
   const toggleSec = (id: string) =>
     setOpenSecs((prev) => {
       const next = new Set(prev);
