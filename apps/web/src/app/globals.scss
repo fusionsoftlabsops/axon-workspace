@@ -37,6 +37,13 @@
   --accent-ink-wash: #eef0fe;            // --accent-wash
   --accent-marginalia-wash: #eef0fe;
 
+  // ---------- Señal (firma "Signal Console") ----------
+  // Un gradiente violeta→cian reservado EXCLUSIVAMENTE a la línea-señal
+  // (componente SignalLine): tab activa, subrayado de sección, riel de deploy.
+  // No usar como relleno general — el carácter se gasta solo aquí.
+  --accent-cyan: #0891b2;
+  --signal: linear-gradient(90deg, var(--accent-ink), var(--accent-cyan));
+
   // ---------- Compatibilidad con los módulos existentes ----------
   // Los .module.scss legacy aún usan --color-* — los alias evitan
   // tener que reescribir cada hoja hoy. Las re-skin específicas
@@ -98,6 +105,10 @@
   --ink-wash-4: rgba(232, 234, 239, 0.04);
   --accent-ink-wash: rgba(124, 131, 255, 0.14);     // --accent-wash
   --accent-marginalia-wash: rgba(124, 131, 255, 0.14);
+
+  // Señal más brillante sobre fondo oscuro (el gradiente --signal se re-deriva
+  // de var(--accent-ink) + var(--accent-cyan) en el punto de uso).
+  --accent-cyan: #22d3ee;
 
   --color-accent-hover: #a7aaff;
   // Sobre el acento lavanda claro, el texto va oscuro para mantener AA.

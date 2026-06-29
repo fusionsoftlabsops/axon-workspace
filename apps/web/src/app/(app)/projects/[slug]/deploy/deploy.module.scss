@@ -1,12 +1,19 @@
 @use '@/styles/tokens' as t;
 
+// ============================================================
+// Deploy · "Signal Console"
+// El operador conecta un proyecto a fusion-infra y ve la telemetría
+// de sus despliegues. La firma (SignalLine) lleva el carácter; todo
+// lo demás queda en neutrales Graphite (AA en light y dark).
+// ============================================================
+
 .page {
   padding: t.$space-xl;
   max-width: t.$max-content-width;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: t.$space-lg;
+  gap: t.$space-2xl;
 }
 
 .section {
@@ -14,35 +21,129 @@
   flex-direction: column;
   gap: t.$space-md;
 }
+
 .sectionHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: t.$space-sm;
+  gap: t.$space-md;
   flex-wrap: wrap;
 }
 .sectionTitle {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
   color: var(--ink);
+  white-space: nowrap;
+}
+// Subrayado-señal que rellena el resto del cabezal de sección.
+.headRule {
+  flex: 1;
+  min-width: 2rem;
 }
 
+// ---------- Etiqueta de instrumento (dispositivo estructural) ----------
+// Mono, mayúsculas, tracked, con un ◦ punto-señal a la izquierda.
+.lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-subtle);
+  &::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-ink);
+    box-shadow: 0 0 6px -1px var(--accent-ink);
+  }
+}
+
+// ---------- Hero: header de binding (proyecto ──señal──▶ infra) ----------
+.binding {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  border: 1px solid var(--rule);
+  border-radius: t.$radius-lg;
+  background: linear-gradient(180deg, var(--paper-elev), var(--paper));
+  overflow: hidden;
+}
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: t.$space-lg;
+}
+.nodeName {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.nodeSub {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+}
+.bindLink {
+  position: relative;
+  min-width: 116px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  background: var(--paper-deep);
+}
+.bindSignal {
+  position: absolute;
+  left: t.$space-md;
+  right: t.$space-md;
+  top: 50%;
+}
+.bindArrow {
+  position: relative;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  color: var(--accent-cyan);
+  font-size: 0.7rem;
+  box-shadow: 0 0 0 4px var(--paper-deep);
+}
+
+// ---------- Tarjetas / telemetría ----------
 .grid {
   display: flex;
   flex-direction: column;
-  gap: t.$space-md;
+  gap: t.$space-sm;
 }
 
 .card {
+  position: relative;
   border: 1px solid var(--rule);
-  border-radius: t.$radius-md;
+  border-radius: t.$radius-lg;
   background: var(--paper-elev);
-  padding: t.$space-md;
+  padding: t.$space-md t.$space-lg;
   display: flex;
   flex-direction: column;
   gap: t.$space-sm;
+  transition: border-color t.$dur-quick t.$ease-editorial;
+  &:hover {
+    border-color: var(--rule-strong);
+  }
 }
 .cardTop {
   display: flex;
@@ -51,10 +152,11 @@
   flex-wrap: wrap;
 }
 .name {
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-weight: 600;
   color: var(--ink);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
 }
 .reason {
   margin: 0;
@@ -62,37 +164,48 @@
   color: var(--ink-muted);
 }
 .link {
-  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  color: var(--accent-cyan);
   text-decoration: none;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  word-break: break-all;
   &:hover { text-decoration: underline; }
 }
 .error {
   color: var(--accent-stamp);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+  margin: 0;
 }
 .notice {
   color: var(--accent-ink);
   font-size: 0.85rem;
 }
 
+// Riel-señal de un despliegue (la firma, por tarjeta).
+.rail {
+  padding: 0.15rem 0;
+}
+
 .rowActions {
   display: flex;
   flex-wrap: wrap;
-  gap: t.$space-sm;
-  margin-top: t.$space-sm;
+  gap: t.$space-xs;
+  margin-top: t.$space-2xs;
 }
 .miniBtn {
-  border: 1px solid var(--rule-strong);
-  background: var(--paper-elev);
+  border: 1px solid var(--rule);
+  background: var(--paper-deep);
   color: var(--ink-muted);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  padding: 0.3rem 0.6rem;
   border-radius: t.$radius-md;
   cursor: pointer;
+  transition: border-color t.$dur-quick t.$ease-editorial, color t.$dur-quick t.$ease-editorial;
   &:hover:not(:disabled) {
-    border-color: var(--ink);
+    border-color: var(--accent-ink);
     color: var(--ink);
   }
   &:disabled {
@@ -105,25 +218,26 @@
   color: var(--accent-stamp);
 }
 
+// ---------- Formularios ----------
 .form {
   display: flex;
   flex-direction: column;
   gap: t.$space-sm;
-  padding: t.$space-sm;
-  border: 1px dashed var(--rule-strong);
+  padding: t.$space-md;
+  border: 1px solid var(--rule);
   border-radius: t.$radius-md;
   background: var(--paper-deep);
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.25rem;
 }
 .fieldLabel {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   color: var(--ink-subtle);
 }
 .input,
@@ -133,15 +247,17 @@
   border-radius: t.$radius-md;
   background: var(--paper-elev);
   color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-  padding: 0.4rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 0.45rem 0.6rem;
   &:focus {
     outline: none;
     border-color: var(--accent-ink);
+    box-shadow: 0 0 0 3px var(--accent-ink-wash);
   }
 }
 
+// ---------- Spinner (estado building en el badge) ----------
 .spinner {
   display: inline-block;
   width: 0.7rem;
@@ -156,6 +272,7 @@
   to { transform: rotate(360deg); }
 }
 
+// ---------- Logs ----------
 .logs {
   margin: 0;
   max-height: 50vh;
@@ -165,7 +282,7 @@
   border-radius: t.$radius-md;
   padding: t.$space-sm;
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -173,6 +290,7 @@
   color: var(--accent-stamp);
 }
 
+// ---------- Credenciales DB ----------
 .creds {
   list-style: none;
   margin: 0;
@@ -189,7 +307,9 @@
 }
 .credKey {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--ink-subtle);
   width: 5.5rem;
   flex: none;
@@ -203,6 +323,7 @@
   color: var(--ink);
 }
 
+// ---------- Env editor / misc ----------
 .envRow {
   display: flex;
   align-items: center;
@@ -233,7 +354,20 @@
   display: flex;
   flex-direction: column;
   gap: t.$space-sm;
-  padding: t.$space-sm;
+  padding: t.$space-md;
   border: 1px solid var(--rule);
   border-radius: t.$radius-md;
+  background: var(--paper-elev);
+}
+
+@media (max-width: t.$bp-sm) {
+  .page { padding: t.$space-md; }
+  .binding { grid-template-columns: 1fr; }
+  .bindLink {
+    border-left: none;
+    border-right: none;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    min-height: 48px;
+  }
 }

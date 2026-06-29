@@ -26,12 +26,21 @@ import {
   type ConnectOption,
 } from '@/lib/actions/deploy';
 import type { DbEngine, FusionDbCatalogEntry, FusionDbCredentials } from '@/lib/deploy/fusion-client';
+import { SignalLine, type SignalState } from '@/components/SignalLine';
 import styles from './deploy.module.scss';
 
 type Tr = <T>(es: T, en: T) => T;
 type Result<T> = { ok: true; data?: T } | { ok: false; error: string };
 
 const ACTIVE = new Set<DeploymentView['status']>(['PENDING', 'BUILDING']);
+
+// Map a deployment status to the SignalLine signature state.
+function railState(status: DeploymentView['status']): SignalState {
+  if (status === 'LIVE') return 'live';
+  if (status === 'FAILED') return 'failed';
+  if (status === 'BUILDING' || status === 'PENDING') return 'active';
+  return 'idle';
+}
 
 export function DeployClient({ slug, initial }: { slug: string; initial: DeployView }) {
   const { t } = useI18n();
@@ -159,10 +168,35 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
     <div className={styles.page}>
       {error && <p className={styles.error}>{error}</p>}
 
+      {/* ---- Binding header (hero): project ──signal──▶ infrastructure ---- */}
+      <section className={styles.section}>
+        <div className={styles.binding}>
+          <div className={styles.node}>
+            <span className={styles.lbl}>{t('Proyecto', 'Project')}</span>
+            <span className={styles.nodeName}>{slug}</span>
+            <span className={styles.nodeSub}>
+              {view.repos.length} {t('repos', 'repos')}
+            </span>
+          </div>
+          <div className={styles.bindLink}>
+            <SignalLine state="live" className={styles.bindSignal} />
+            <span className={styles.bindArrow} aria-hidden>
+              ▶
+            </span>
+          </div>
+          <div className={styles.node}>
+            <span className={styles.lbl}>fusion-infra</span>
+            <span className={styles.nodeName}>{t('producción', 'production')}</span>
+            <span className={styles.nodeSub}>{view.target?.serverId}</span>
+          </div>
+        </div>
+      </section>
+
       {/* ---- Repos ---- */}
       <section className={styles.section}>
         <div className={styles.sectionHead}>
           <h3 className={styles.sectionTitle}>{t('Repositorios', 'Repositories')}</h3>
+          <SignalLine className={styles.headRule} />
           <Button
             variant="ghost"
             size="sm"
@@ -349,6 +383,10 @@ function DeploymentCard({
         </a>
       )}
       {dep.status === 'FAILED' && dep.error && <p className={styles.error}>{dep.error}</p>}
+
+      <div className={styles.rail}>
+        <SignalLine state={railState(dep.status)} />
+      </div>
 
       <div className={styles.rowActions}>
         {dep.repoId && (
@@ -772,6 +810,7 @@ function ImportSection({
     <section className={styles.section}>
       <div className={styles.sectionHead}>
         <h3 className={styles.sectionTitle}>{t('Importar app existente', 'Import existing app')}</h3>
+        <SignalLine className={styles.headRule} />
         <Button variant="secondary" size="sm" disabled={busy === 'import-list'} onClick={() => void load()}>
           {open ? t('Recargar', 'Reload') : t('Buscar apps', 'Find apps')}
         </Button>
@@ -882,6 +921,7 @@ function DatabaseSection({
     <section className={styles.section}>
       <div className={styles.sectionHead}>
         <h3 className={styles.sectionTitle}>{t('Bases de datos', 'Databases')}</h3>
+        <SignalLine className={styles.headRule} />
         <Button variant="secondary" size="sm" onClick={() => void load()}>
           {t('Aprovisionar base de datos', 'Provision database')}
         </Button>

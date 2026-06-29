@@ -1,0 +1,62 @@
+@use '@/styles/tokens' as t;
+
+// The "Signal Console" signature: a 1–2px rule that carries a travelling pulse
+// of light — an action potential along an axon. Reused for the active tab
+// underline, section rules and per-deployment status rails.
+.line {
+  position: relative;
+  height: 2px;
+  background: var(--rule);
+  border-radius: t.$radius-full;
+  overflow: hidden;
+}
+
+// Building / in-flight: a violet→cyan pulse travels left→right on a loop.
+.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -32%;
+  width: 32%;
+  background: var(--signal);
+  filter: drop-shadow(0 0 6px var(--accent-ink));
+  animation: signal-travel 2.1s t.$ease-page-turn infinite;
+}
+
+// Live: a steady, calm glow centred on the line.
+.live {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent-correction) 60%, transparent),
+    transparent
+  );
+  box-shadow: 0 0 8px -2px var(--accent-correction);
+}
+
+// Failed: a broken, dashed red segment.
+.failed {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--accent-stamp) 0 8px,
+    transparent 8px 14px
+  );
+  opacity: 0.7;
+}
+
+@keyframes signal-travel {
+  0% { left: -32%; }
+  100% { left: 132%; }
+}
+
+// Reduced motion: no travelling pulse — show a static dim fill so "active"
+// still reads as energised rather than blank.
+@media (prefers-reduced-motion: reduce) {
+  .active::after {
+    left: 0;
+    width: 100%;
+    animation: none;
+    opacity: 0.5;
+  }
+}
