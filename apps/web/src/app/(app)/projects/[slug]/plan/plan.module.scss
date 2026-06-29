@@ -20,11 +20,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: t.$space-lg;
-  align-items: start;
+  // Stretch both columns to equal height so a short chat doesn't leave a void
+  // beside a tall context panel (and vice-versa).
+  align-items: stretch;
 
   // Beside the chat: a context panel the user can edit while chatting.
   @media (min-width: t.$bp-lg) {
-    grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+    grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
   }
 }
 .chat {
@@ -642,6 +644,13 @@
   border-radius: t.$radius-lg;
   background: var(--paper-elev);
   padding: t.$space-md t.$space-lg;
+
+  // Beside the chat, bound the panel to the chat's height and scroll inside it,
+  // so the two columns stay balanced no matter how many files there are.
+  @media (min-width: t.$bp-lg) {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
 }
 .ctxHead {
   display: flex;
