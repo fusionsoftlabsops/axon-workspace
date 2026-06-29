@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
     throw new Error('NEXT_NOT_FOUND');
   }),
   lastProps: null as Record<string, unknown> | null,
+  analysisProps: null as Record<string, unknown> | null,
 }));
 vi.mock('@/lib/auth/membership', () => ({ assertProjectMember: h.assertProjectMember }));
 vi.mock('@/lib/graph/build', () => ({
@@ -27,6 +28,12 @@ vi.mock('./ContextGraphView', () => ({
     return <div data-testid="graph-view" />;
   },
 }));
+vi.mock('../plan/AnalysisPanel', () => ({
+  AnalysisPanel: (props: Record<string, unknown>) => {
+    h.analysisProps = props;
+    return <div data-testid="analysis-panel" />;
+  },
+}));
 
 import Page from './page';
 
@@ -41,6 +48,7 @@ describe('ContextPage', () => {
     h.graphSignature.mockReturnValue('sig-current');
     h.notFound.mockClear();
     h.lastProps = null;
+    h.analysisProps = null;
     h.assertProjectMember.mockResolvedValue({ ok: true, projectId: 'p1', userId: 'u1', role: 'OWNER' });
     h.buildProjectGraph.mockResolvedValue({ nodes: [], edges: [] });
     h.summaryFindUnique.mockResolvedValue(null);
@@ -55,6 +63,8 @@ describe('ContextPage', () => {
   it('renders with no summary row (configured)', async () => {
     render(await Page({ params }));
     expect(screen.getByTestId('graph-view')).toBeInTheDocument();
+    expect(screen.getByTestId('analysis-panel')).toBeInTheDocument();
+    expect(h.analysisProps?.canWrite).toBe(true);
     expect((h.lastProps?.initialProjectSummary as Record<string, unknown>).body).toBeNull();
     expect((h.lastProps?.initialProjectSummary as Record<string, unknown>).stale).toBe(false);
     expect(h.lastProps?.canWrite).toBe(true);
@@ -73,5 +83,6 @@ describe('ContextPage', () => {
     expect(s.body).toBe('old summary');
     expect(s.stale).toBe(true);
     expect(h.lastProps?.canWrite).toBe(false);
+    expect(h.analysisProps?.canWrite).toBe(false);
   });
 });

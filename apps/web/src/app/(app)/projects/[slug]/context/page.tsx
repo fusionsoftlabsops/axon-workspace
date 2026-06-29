@@ -6,6 +6,7 @@ import { buildProjectGraph, graphSignature } from '@/lib/graph/build';
 import { getServerT } from '@/lib/i18n/server';
 import { PageHeader, Eyebrow } from '@/components/ui';
 import { ContextGraphView } from './ContextGraphView';
+import { AnalysisPanel } from '../plan/AnalysisPanel';
 import type { ContextSummaryView } from '@/lib/actions/context';
 import styles from './context.module.scss';
 
@@ -36,10 +37,25 @@ export default async function ContextPage({ params }: { params: Promise<{ slug: 
         eyebrow={<Eyebrow>{t('Contexto del proyecto', 'Project context')}</Eyebrow>}
         title={t('Grafo de contexto', 'Context graph')}
         description={t(
-          'Cómo se conectan HUs, sprints y conocimiento del cerebro; se actualiza a medida que avanza el trabajo.',
-          'How stories, sprints and brain knowledge connect; it updates as work progresses.',
+          'El grafo de código (brownfield) y cómo se conectan HUs, sprints y cerebro — fundamenta las HUs nuevas y se actualiza con el trabajo.',
+          'The code graph (brownfield) and how stories, sprints and brain connect — it grounds new stories and updates as work progresses.',
         )}
       />
+
+      {/* Code knowledge graph (graphify): generate it from the project's real code
+          so new stories are grounded in what already exists (brownfield). The
+          READY summary feeds the planner via codeContext() in planning.ts. */}
+      <section className={styles.codeGraph}>
+        <Eyebrow>{t('Grafo de código', 'Code graph')}</Eyebrow>
+        <p className={styles.lead}>
+          {t(
+            'Genera un grafo de conocimiento del código existente. Sirve de contexto para redactar HUs nuevas alineadas con lo que ya hay.',
+            'Generate a knowledge graph of the existing code. It serves as context for writing new stories aligned with what already exists.',
+          )}
+        </p>
+        <AnalysisPanel slug={slug} canWrite={ctx.role !== 'VIEWER'} />
+      </section>
+
       <ContextGraphView
         slug={slug}
         canWrite={ctx.role !== 'VIEWER'}
