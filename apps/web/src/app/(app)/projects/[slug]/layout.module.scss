@@ -47,20 +47,38 @@
 
 .tabs {
   display: flex;
-  gap: t.$space-xl;
+  flex-wrap: wrap;
+  gap: t.$space-md t.$space-lg;
 }
 
 .tabs a {
   @include ty.eyebrow;
+  position: relative;
   font-size: 0.7rem;
   color: var(--ink-muted);
   text-decoration: none;
   padding: t.$space-xs 0;
   border-bottom: 1.5px solid transparent;
-  transition: all t.$dur-quick t.$ease-editorial;
+  transition: color t.$dur-quick t.$ease-editorial;
 
   &:hover {
     color: var(--ink);
-    border-bottom-color: var(--rule-strong);
   }
+}
+
+// Active tab — the "Signal Console" signature: brighter ink + a violet→cyan
+// signal underline so you always know which view you're in.
+.tabs a.active {
+  color: var(--ink);
+}
+.tabs a.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--signal);
+  box-shadow: 0 0 8px -1px var(--accent-ink);
 }

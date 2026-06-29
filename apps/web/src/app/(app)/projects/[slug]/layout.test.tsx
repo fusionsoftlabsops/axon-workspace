@@ -14,7 +14,10 @@ vi.mock('@/lib/db', () => ({ prisma: { project: { findUnique: h.findUnique } } }
 vi.mock('@/lib/i18n/server', () => ({
   getServerT: async () => (_es: unknown, en: unknown) => en,
 }));
-vi.mock('next/navigation', () => ({ notFound: h.notFound }));
+vi.mock('next/navigation', () => ({
+  notFound: h.notFound,
+  usePathname: () => '/projects/demo/plan',
+}));
 vi.mock('next/link', () => ({
   default: ({ children, href }: any) => <a href={href}>{children}</a>,
 }));
