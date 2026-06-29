@@ -6,7 +6,9 @@ import { buildProjectGraph, graphSignature } from '@/lib/graph/build';
 import { getServerT } from '@/lib/i18n/server';
 import { PageHeader, Eyebrow } from '@/components/ui';
 import { ContextGraphView } from './ContextGraphView';
+import { CodeGraphView } from './CodeGraphView';
 import { AnalysisPanel } from '../plan/AnalysisPanel';
+import { subsetCodeGraph, type CodeGraph } from '@/lib/analysis/describe';
 import type { ContextSummaryView } from '@/lib/actions/context';
 import styles from './context.module.scss';
 
@@ -18,9 +20,21 @@ export default async function ContextPage({ params }: { params: Promise<{ slug: 
 
   const graph = await buildProjectGraph(ctx.projectId);
   const sig = graphSignature(graph);
-  const row = await prisma.contextSummary.findUnique({
-    where: { scope_refId: { scope: 'PROJECT', refId: ctx.projectId } },
-  });
+  const [row, codeAnalysis] = await Promise.all([
+    prisma.contextSummary.findUnique({
+      where: { scope_refId: { scope: 'PROJECT', refId: ctx.projectId } },
+    }),
+    prisma.codeAnalysis.findUnique({
+      where: { projectId: ctx.projectId },
+      select: { status: true, graph: true },
+    }),
+  ]);
+  // The full code graph can be thousands of nodes — subset to the busiest ones
+  // server-side so only a readable slice crosses the wire.
+  const codeSubset =
+    codeAnalysis?.status === 'READY' && codeAnalysis.graph
+      ? subsetCodeGraph(codeAnalysis.graph as unknown as CodeGraph, 90)
+      : null;
   const projectSummary: ContextSummaryView = {
     scope: 'PROJECT',
     refId: '',
@@ -53,6 +67,7 @@ export default async function ContextPage({ params }: { params: Promise<{ slug: 
             'Generate a knowledge graph of the existing code. It serves as context for writing new stories aligned with what already exists.',
           )}
         </p>
+        {codeSubset && codeSubset.nodes.length > 0 && <CodeGraphView subset={codeSubset} />}
         <AnalysisPanel slug={slug} canWrite={ctx.role !== 'VIEWER'} />
       </section>
 

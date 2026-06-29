@@ -7,11 +7,13 @@ const h = vi.hoisted(() => ({
   graphSignature: vi.fn(() => 'sig-current'),
   isInfraLlmConfigured: vi.fn(() => true),
   summaryFindUnique: vi.fn(),
+  codeAnalysisFindUnique: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND');
   }),
   lastProps: null as Record<string, unknown> | null,
   analysisProps: null as Record<string, unknown> | null,
+  codeGraphProps: null as Record<string, unknown> | null,
 }));
 vi.mock('@/lib/auth/membership', () => ({ assertProjectMember: h.assertProjectMember }));
 vi.mock('@/lib/graph/build', () => ({
@@ -19,7 +21,12 @@ vi.mock('@/lib/graph/build', () => ({
   graphSignature: h.graphSignature,
 }));
 vi.mock('@/lib/ai/infra-llm', () => ({ isInfraLlmConfigured: h.isInfraLlmConfigured }));
-vi.mock('@/lib/db', () => ({ prisma: { contextSummary: { findUnique: h.summaryFindUnique } } }));
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    contextSummary: { findUnique: h.summaryFindUnique },
+    codeAnalysis: { findUnique: h.codeAnalysisFindUnique },
+  },
+}));
 vi.mock('@/lib/i18n/server', () => ({ getServerT: async () => (_es: unknown, en: unknown) => en }));
 vi.mock('next/navigation', () => ({ notFound: h.notFound }));
 vi.mock('./ContextGraphView', () => ({
@@ -32,6 +39,12 @@ vi.mock('../plan/AnalysisPanel', () => ({
   AnalysisPanel: (props: Record<string, unknown>) => {
     h.analysisProps = props;
     return <div data-testid="analysis-panel" />;
+  },
+}));
+vi.mock('./CodeGraphView', () => ({
+  CodeGraphView: (props: Record<string, unknown>) => {
+    h.codeGraphProps = props;
+    return <div data-testid="code-graph" />;
   },
 }));
 
@@ -49,9 +62,39 @@ describe('ContextPage', () => {
     h.notFound.mockClear();
     h.lastProps = null;
     h.analysisProps = null;
+    h.codeGraphProps = null;
     h.assertProjectMember.mockResolvedValue({ ok: true, projectId: 'p1', userId: 'u1', role: 'OWNER' });
     h.buildProjectGraph.mockResolvedValue({ nodes: [], edges: [] });
     h.summaryFindUnique.mockResolvedValue(null);
+    h.codeAnalysisFindUnique.mockResolvedValue(null);
+  });
+
+  it('renders the code graph view when a READY analysis with a graph exists', async () => {
+    h.codeAnalysisFindUnique.mockResolvedValue({
+      status: 'READY',
+      graph: {
+        nodes: [
+          { id: 'a', label: 'A', community: 0 },
+          { id: 'b', label: 'B', community: 1 },
+          { id: 'c', label: 'C', community: 0 },
+        ],
+        links: [
+          { source: 'a', target: 'b' },
+          { source: 'a', target: 'c' },
+        ],
+      },
+    });
+    render(await Page({ params }));
+    expect(screen.getByTestId('code-graph')).toBeInTheDocument();
+    const subset = h.codeGraphProps?.subset as { nodes: unknown[]; total: number };
+    expect(subset.total).toBe(3);
+    expect(subset.nodes.length).toBe(3);
+  });
+
+  it('omits the code graph when there is no READY analysis', async () => {
+    h.codeAnalysisFindUnique.mockResolvedValue({ status: 'PENDING', graph: null });
+    render(await Page({ params }));
+    expect(screen.queryByTestId('code-graph')).not.toBeInTheDocument();
   });
 
   it('calls notFound when not a member', async () => {

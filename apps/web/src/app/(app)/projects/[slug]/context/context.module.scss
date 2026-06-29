@@ -19,6 +19,25 @@
   font-size: 0.85rem;
   max-width: 64ch;
 }
+.codeMeta {
+  margin-top: t.$space-xs;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-subtle);
+  letter-spacing: 0.02em;
+}
+.nodeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: t.$space-xs;
+  strong {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--ink);
+    word-break: break-all;
+  }
+}
 
 .wrap {
   display: grid;

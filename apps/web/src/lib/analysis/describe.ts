@@ -89,6 +89,69 @@ export function computeGodNodes(graph: CodeGraph, limit = MAX_GOD_NODES): GodNod
     .slice(0, limit);
 }
 
+// ---- visual subgraph (for the Context-page code-graph view) ----
+
+export interface CodeSubgraphNode {
+  id: string;
+  label: string;
+  community: string | null;
+  degree: number;
+}
+export interface CodeSubgraphEdge {
+  source: string;
+  target: string;
+}
+export interface CodeSubgraph {
+  nodes: CodeSubgraphNode[];
+  edges: CodeSubgraphEdge[];
+  total: number; // total nodes in the full graph (the subset is the busiest `limit`)
+  communities: number;
+}
+
+/**
+ * A readable, bounded subgraph for visualization: the `limit` highest-degree
+ * nodes (the architecture's skeleton) plus the de-duplicated edges among them.
+ * Computed server-side so the full (possibly thousands-of-nodes) graph never
+ * crosses the wire.
+ */
+export function subsetCodeGraph(graph: CodeGraph, limit = 90): CodeSubgraph {
+  const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
+  const edges = edgesOf(graph);
+  const degree = new Map<string, number>();
+  for (const e of edges) {
+    const s = endpointId(e.source);
+    const t = endpointId(e.target);
+    if (s && nodes.has(s)) degree.set(s, (degree.get(s) ?? 0) + 1);
+    if (t && nodes.has(t)) degree.set(t, (degree.get(t) ?? 0) + 1);
+  }
+  const top = [...degree.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([id]) => id);
+  const keep = new Set(top);
+  const outNodes: CodeSubgraphNode[] = top.map((id) => {
+    const n = nodes.get(id)!;
+    return { id, label: labelOf(n), community: communityKey(n.community), degree: degree.get(id) ?? 0 };
+  });
+  const seen = new Set<string>();
+  const outEdges: CodeSubgraphEdge[] = [];
+  for (const e of edges) {
+    const s = endpointId(e.source);
+    const t = endpointId(e.target);
+    if (s && t && s !== t && keep.has(s) && keep.has(t)) {
+      const key = s < t ? `${s}|${t}` : `${t}|${s}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        outEdges.push({ source: s, target: t });
+      }
+    }
+  }
+  const communities = new Set(
+    graph.nodes.map((n) => communityKey(n.community)).filter((c): c is string => c !== null),
+  ).size;
+  return { nodes: outNodes, edges: outEdges, total: graph.nodes.length, communities };
+}
+
 interface Community {
   key: string;
   size: number;
