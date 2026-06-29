@@ -249,6 +249,48 @@
   background: color-mix(in srgb, var(--signal, var(--accent-ink)) 12%, var(--paper));
 }
 
+// The "double card" context zone: generate → ready (use + download .md).
+.ctxZone {
+  margin-top: t.$space-sm;
+  padding-top: t.$space-sm;
+  border-top: 1px dashed var(--rule);
+}
+.ctxGenWrap {
+  display: flex;
+}
+.ctxGen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  color: var(--signal, var(--accent-ink));
+  font-family: var(--font-mono);
+}
+.ctxReady {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.ctxReadyTag {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--signal, var(--accent-ink));
+}
+.ctxUse {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  cursor: pointer;
+
+  input {
+    accent-color: var(--signal, var(--accent-ink));
+  }
+}
+
 .download {
   font-family: var(--font-sans);
   font-weight: 600;

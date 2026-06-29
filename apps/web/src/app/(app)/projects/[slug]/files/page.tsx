@@ -32,6 +32,7 @@ export default async function FilesPage({ params }: { params: Promise<{ slug: st
       createdAt: true,
       uploadedById: true,
       isContext: true,
+      contextStatus: true,
       uploadedBy: { select: { name: true } },
     },
   });
@@ -60,6 +61,7 @@ export default async function FilesPage({ params }: { params: Promise<{ slug: st
           uploadedById: f.uploadedById,
           uploaderName: f.uploadedBy.name,
           isContext: f.isContext,
+          contextStatus: f.contextStatus as 'NONE' | 'GENERATING' | 'READY' | 'FAILED',
         }))}
       />
     </main>

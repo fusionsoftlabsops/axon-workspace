@@ -14,7 +14,18 @@
   gap: t.$space-xl;
 }
 
-// ---- Chat ----
+// ---- Chat + context side panel ----
+.chatRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: t.$space-lg;
+  align-items: start;
+
+  // Beside the chat: a context panel the user can edit while chatting.
+  @media (min-width: t.$bp-lg) {
+    grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+  }
+}
 .chat {
   display: flex;
   flex-direction: column;
@@ -747,6 +758,16 @@
 .ctxFileItemOn {
   border-color: var(--signal, var(--accent-ink));
   background: color-mix(in srgb, var(--signal, var(--accent-ink)) 9%, var(--paper));
+}
+.ctxFileItemOff {
+  opacity: 0.6;
+}
+.ctxFileHint {
+  display: block;
+  padding: 0 0.55rem 0.35rem 2rem;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--ink-subtle);
 }
 .ctxFileLabel {
   display: flex;

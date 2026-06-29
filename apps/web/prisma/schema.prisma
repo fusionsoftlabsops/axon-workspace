@@ -372,10 +372,17 @@ model ProjectFile {
   //   projects/<slug>/<category>/<YYYY-MM>/<fileId>-<name>
   storageKey   String
   uploadedById String
-  // When true, this file grounds the AI planning + chat. Documents contribute
-  // their extracted text (cached below); images are fed as native vision blocks.
+  // When true, this file is USED as context in the AI planning + chat (the user's
+  // decision). For documents this requires a generated context artifact (below);
+  // images are fed as native vision blocks.
   isContext     Boolean     @default(false)
-  extractedText String?     @db.Text
+  // Two-step "convert to context": extractedText is the raw 0-token extraction
+  // cache (intermediate); contextMarkdown is the AI-cleaned .md artifact that is
+  // downloadable and grounds planning. contextStatus tracks the generation.
+  extractedText   String?   @db.Text
+  contextStatus   String    @default("NONE") // NONE | GENERATING | READY | FAILED
+  contextMarkdown String?   @db.Text
+  contextError    String?   @db.Text
   createdAt    DateTime     @default(now())
 
   project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)

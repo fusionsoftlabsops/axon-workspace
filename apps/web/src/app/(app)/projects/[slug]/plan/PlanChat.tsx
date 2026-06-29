@@ -206,46 +206,48 @@ export function PlanChat({
             <Link href={`/projects/${slug}/roadmap`}>{t('Ver roadmap', 'View roadmap')}</Link>
           </Card>
         )}
-        <div className={styles.chat}>
-          <div className={styles.messages} ref={msgRef}>
-            {plan.messages.map((m, i) => (
-              <div
-                key={i}
-                className={`${styles.msg} ${m.role === 'assistant' ? styles.assistant : styles.user}`}
-              >
-                {m.content}
-              </div>
-            ))}
-            {sending && <div className={`${styles.msg} ${styles.assistant}`}>…</div>}
-          </div>
-          {canWrite && !published && (
-            <div className={styles.composer}>
-              <textarea
-                className={styles.input}
-                rows={2}
-                value={input}
-                placeholder={t('Escribe tu respuesta…', 'Type your answer…')}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    send();
-                  }
-                }}
-              />
-              <Button variant="secondary" onClick={send} disabled={sending || !input.trim()}>
-                {t('Enviar', 'Send')}
-              </Button>
+        <div className={styles.chatRow}>
+          <div className={styles.chat}>
+            <div className={styles.messages} ref={msgRef}>
+              {plan.messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={`${styles.msg} ${m.role === 'assistant' ? styles.assistant : styles.user}`}
+                >
+                  {m.content}
+                </div>
+              ))}
+              {sending && <div className={`${styles.msg} ${styles.assistant}`}>…</div>}
             </div>
-          )}
+            {canWrite && !published && (
+              <div className={styles.composer}>
+                <textarea
+                  className={styles.input}
+                  rows={2}
+                  value={input}
+                  placeholder={t('Escribe tu respuesta…', 'Type your answer…')}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      send();
+                    }
+                  }}
+                />
+                <Button variant="secondary" onClick={send} disabled={sending || !input.trim()}>
+                  {t('Enviar', 'Send')}
+                </Button>
+              </div>
+            )}
+          </div>
+          <PlanContext
+            slug={slug}
+            canWrite={canWrite}
+            contextGraph={plan.contextGraph}
+            contextFiles={contextFiles}
+            onChange={setPlan}
+          />
         </div>
-        <PlanContext
-          slug={slug}
-          canWrite={canWrite}
-          contextGraph={plan.contextGraph}
-          contextFiles={contextFiles}
-          onChange={setPlan}
-        />
         {/* Link repos BEFORE a plan exists so an existing project can be analyzed
             (brownfield). Once a plan is generated, the repos section also appears
             in the preview pane below. */}

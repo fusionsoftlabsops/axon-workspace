@@ -236,7 +236,7 @@ describe('planChatAction', () => {
 
   it('grounds the chat in project files marked as context', async () => {
     prismaMock.projectFile.findMany.mockResolvedValue([
-      { name: 'spec.md', mimeType: 'text/markdown', category: 'DOCUMENT', extractedText: 'IMPORTANT SPEC' },
+      { name: 'spec.md', mimeType: 'text/markdown', category: 'DOCUMENT', contextStatus: 'READY', contextMarkdown: 'IMPORTANT SPEC' },
     ]);
     plannerMock.planChatReply.mockResolvedValue('ok');
     prismaMock.projectPlan.update.mockResolvedValue(planRow());

@@ -23,8 +23,8 @@ vi.mock('./AnalysisPanel', () => ({
 }));
 
 const FILES = [
-  { id: 'a', name: 'spec.pdf', category: 'PDF', isContext: true },
-  { id: 'b', name: 'mockup.png', category: 'IMAGE', isContext: false },
+  { id: 'a', name: 'spec.pdf', category: 'PDF', isContext: true, contextStatus: 'READY' },
+  { id: 'b', name: 'mockup.png', category: 'IMAGE', isContext: false, contextStatus: 'NONE' },
 ] as any;
 
 import { PlanContext } from './PlanContext';

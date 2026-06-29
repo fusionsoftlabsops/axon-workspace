@@ -4,10 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { MAX_FILE_BYTES } from '@/lib/files';
 
 const nav = vi.hoisted(() => ({ refresh: vi.fn() }));
-const h = vi.hoisted(() => ({ setFileContextAction: vi.fn() }));
+const h = vi.hoisted(() => ({ setFileContextAction: vi.fn(), generateFileContextAction: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: nav.refresh }) }));
 vi.mock('next/link', () => ({ default: ({ children, href }: any) => <a href={href}>{children}</a> }));
-vi.mock('@/lib/actions/files', () => ({ setFileContextAction: h.setFileContextAction }));
+vi.mock('@/lib/actions/files', () => ({
+  setFileContextAction: h.setFileContextAction,
+  generateFileContextAction: h.generateFileContextAction,
+}));
 
 import { FilesClient } from './FilesClient';
 
@@ -24,6 +27,7 @@ function file(over: Partial<FileView> = {}): FileView {
     uploadedById: 'u1',
     uploaderName: 'Alice',
     isContext: false,
+    contextStatus: 'NONE',
     ...over,
   };
 }
@@ -44,6 +48,7 @@ describe('FilesClient', () => {
   beforeEach(() => {
     nav.refresh.mockReset();
     h.setFileContextAction.mockReset();
+    h.generateFileContextAction.mockReset();
     vi.unstubAllGlobals();
     vi.stubGlobal('confirm', vi.fn(() => true));
   });
@@ -138,29 +143,43 @@ describe('FilesClient', () => {
     expect(screen.getAllByText('Delete').length).toBe(1);
   });
 
-  it('marks a file as planning context and refreshes', async () => {
-    h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'f1', isContext: true, hasContent: true } });
+  it('marks an image as context directly (no generation) and refreshes', async () => {
+    h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'f1', isContext: true, contextStatus: 'NONE' } });
     const user = userEvent.setup();
-    render(<FilesClient {...baseProps()} />);
-    await user.click(screen.getAllByRole('button', { name: /Use as context/i })[0]!);
+    render(<FilesClient {...baseProps({ files: [file()] })} />); // f1 = image
+    await user.click(screen.getByRole('button', { name: /Use as context/i }));
     expect(h.setFileContextAction).toHaveBeenCalledWith('proj', 'f1', true);
-    // optimistic ribbon + summary appear
     expect(await screen.findByText(/feed AI planning|feeds AI planning/i)).toBeInTheDocument();
     await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
   });
 
-  it('reverts and shows an error when marking context fails', async () => {
-    h.setFileContextAction.mockResolvedValue({ ok: false, error: 'ctx-fail' });
+  it('generates context for a document (step 1)', async () => {
+    h.generateFileContextAction.mockResolvedValue({ ok: true, data: { id: 'd1', isContext: false, contextStatus: 'GENERATING' } });
     const user = userEvent.setup();
-    render(<FilesClient {...baseProps()} />);
-    await user.click(screen.getAllByRole('button', { name: /Use as context/i })[0]!);
-    expect(await screen.findByText('ctx-fail')).toBeInTheDocument();
+    const doc = file({ id: 'd1', name: 'spec.pdf', mimeType: 'application/pdf', category: 'PDF', contextStatus: 'NONE' });
+    render(<FilesClient {...baseProps({ files: [doc] })} />);
+    await user.click(screen.getByRole('button', { name: /Generate context/i }));
+    expect(h.generateFileContextAction).toHaveBeenCalledWith('proj', 'd1');
+    // optimistic GENERATING label
+    expect(await screen.findByText(/Generating context/i)).toBeInTheDocument();
   });
 
-  it('shows the in-context state and summary for already-marked files', () => {
-    render(<FilesClient {...baseProps({ files: [file({ isContext: true })] })} />);
-    expect(screen.getByText(/1 file feeds AI planning/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /In context/i })).toBeInTheDocument();
+  it('shows the double card for a READY document: use-in-plan + download .md', async () => {
+    h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'd1', isContext: true, contextStatus: 'READY' } });
+    const user = userEvent.setup();
+    const doc = file({ id: 'd1', name: 'spec.pdf', mimeType: 'application/pdf', category: 'PDF', contextStatus: 'READY' });
+    render(<FilesClient {...baseProps({ files: [doc] })} />);
+    expect(screen.getByText(/Context ready/i)).toBeInTheDocument();
+    const dl = screen.getByRole('link', { name: /Download \.md/i });
+    expect(dl).toHaveAttribute('href', '/api/v1/projects/proj/files/d1/context');
+    await user.click(screen.getByRole('checkbox', { name: /Use in the plan/i }));
+    expect(h.setFileContextAction).toHaveBeenCalledWith('proj', 'd1', true);
+  });
+
+  it('shows a retry button for a FAILED document', () => {
+    const doc = file({ id: 'd1', name: 'spec.pdf', mimeType: 'application/pdf', category: 'PDF', contextStatus: 'FAILED' });
+    render(<FilesClient {...baseProps({ files: [doc] })} />);
+    expect(screen.getByRole('button', { name: /Retry context/i })).toBeInTheDocument();
   });
 
   it('handles drag over, leave and drop', async () => {

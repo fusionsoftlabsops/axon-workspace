@@ -1,12 +1,12 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { FileCategory, MemberRole } from '@prisma/client';
 import { Button, Badge, EmptyState } from '@/components/ui';
 import { CATEGORY_ORDER, CATEGORY_LABEL, formatBytes, MAX_FILE_BYTES } from '@/lib/files';
-import { setFileContextAction } from '@/lib/actions/files';
+import { setFileContextAction, generateFileContextAction, type ContextStatus } from '@/lib/actions/files';
 import { useI18n } from '@/lib/i18n/i18n';
 import styles from './files.module.scss';
 
@@ -20,6 +20,7 @@ interface FileView {
   uploadedById: string;
   uploaderName: string;
   isContext: boolean;
+  contextStatus: ContextStatus;
 }
 
 const CATEGORY_GLYPH: Record<FileCategory, string> = {
@@ -53,15 +54,30 @@ export function FilesClient({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  // Optimistic context flags by file id, layered over the server-rendered value.
+  // Optimistic overlays by file id, layered over the server-rendered values.
   const [ctxOverride, setCtxOverride] = useState<Record<string, boolean>>({});
+  const [genOverride, setGenOverride] = useState<Record<string, ContextStatus>>({});
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const canWrite = role !== 'VIEWER';
   const canManage = role === 'OWNER' || role === 'ADMIN';
 
   const isContext = (f: FileView) => ctxOverride[f.id] ?? f.isContext;
+  const isImage = (f: FileView) => f.category === 'IMAGE';
+  // Prefer the server's terminal state; otherwise show the optimistic overlay.
+  const statusOf = (f: FileView): ContextStatus =>
+    f.contextStatus === 'READY' || f.contextStatus === 'FAILED'
+      ? f.contextStatus
+      : genOverride[f.id] ?? f.contextStatus;
   const contextCount = files.filter(isContext).length;
+
+  // Poll while any document is still generating its context artifact.
+  const anyGenerating = files.some((f) => statusOf(f) === 'GENERATING');
+  useEffect(() => {
+    if (!anyGenerating) return;
+    const id = setInterval(() => router.refresh(), 3000);
+    return () => clearInterval(id);
+  }, [anyGenerating, router]);
 
   function toggleContext(file: FileView) {
     const next = !isContext(file);
@@ -73,6 +89,20 @@ export function FilesClient({
       setTogglingId(null);
       if (!r.ok) {
         setCtxOverride((prev) => ({ ...prev, [file.id]: !next })); // revert
+        setError(r.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function generateContext(file: FileView) {
+    setError(null);
+    setGenOverride((prev) => ({ ...prev, [file.id]: 'GENERATING' }));
+    startTransition(async () => {
+      const r = await generateFileContextAction(slug, file.id);
+      if (!r.ok) {
+        setGenOverride((prev) => ({ ...prev, [file.id]: 'FAILED' }));
         setError(r.error);
         return;
       }
@@ -229,6 +259,7 @@ export function FilesClient({
                 const href = `/api/v1/projects/${slug}/files/${f.id}`;
                 const canDelete = canManage || f.uploadedById === currentUserId;
                 const ctxOn = isContext(f);
+                const status = statusOf(f);
                 return (
                   <li key={f.id} className={`${styles.card} ${ctxOn ? styles.cardContext : ''}`}>
                     {ctxOn && (
@@ -258,27 +289,61 @@ export function FilesClient({
                         {formatBytes(f.size)} · {fmtDate(f.createdAt)}
                       </p>
                       <p className={styles.sub}>{f.uploaderName}</p>
+
+                      {/* ---- Context (double card) ---- */}
+                      {canWrite && (
+                        <div className={styles.ctxZone}>
+                          {isImage(f) ? (
+                            // Images: usable directly (fed as vision), no .md to generate.
+                            <button
+                              type="button"
+                              className={`${styles.ctxBtn} ${ctxOn ? styles.ctxBtnOn : ''}`}
+                              onClick={() => toggleContext(f)}
+                              disabled={togglingId === f.id}
+                              aria-pressed={ctxOn}
+                            >
+                              {togglingId === f.id
+                                ? '…'
+                                : ctxOn
+                                  ? t('✦ En contexto', '✦ In context')
+                                  : t('✦ Usar como contexto', '✦ Use as context')}
+                            </button>
+                          ) : status === 'GENERATING' ? (
+                            <span className={styles.ctxGen}>⟳ {t('Generando contexto…', 'Generating context…')}</span>
+                          ) : status === 'READY' ? (
+                            <div className={styles.ctxReady}>
+                              <span className={styles.ctxReadyTag}>✦ {t('Contexto listo', 'Context ready')}</span>
+                              <label className={styles.ctxUse}>
+                                <input
+                                  type="checkbox"
+                                  checked={ctxOn}
+                                  disabled={togglingId === f.id}
+                                  onChange={() => toggleContext(f)}
+                                />
+                                {t('Usar en el plan', 'Use in the plan')}
+                              </label>
+                              <a className={styles.download} href={`${href}/context`}>
+                                {t('Descargar .md', 'Download .md')}
+                              </a>
+                            </div>
+                          ) : (
+                            <div className={styles.ctxGenWrap}>
+                              <button
+                                type="button"
+                                className={styles.ctxBtn}
+                                onClick={() => generateContext(f)}
+                                disabled={pending}
+                              >
+                                {status === 'FAILED'
+                                  ? t('⚠ Reintentar contexto', '⚠ Retry context')
+                                  : t('✦ Generar contexto', '✦ Generate context')}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className={styles.actions}>
-                        {canWrite && (
-                          <button
-                            type="button"
-                            className={`${styles.ctxBtn} ${ctxOn ? styles.ctxBtnOn : ''}`}
-                            onClick={() => toggleContext(f)}
-                            disabled={togglingId === f.id}
-                            aria-pressed={ctxOn}
-                            title={
-                              ctxOn
-                                ? t('Quitar de contexto de planeación', 'Remove from planning context')
-                                : t('Usar como contexto de planeación', 'Use as planning context')
-                            }
-                          >
-                            {togglingId === f.id
-                              ? '…'
-                              : ctxOn
-                                ? t('✦ En contexto', '✦ In context')
-                                : t('✦ Usar como contexto', '✦ Use as context')}
-                          </button>
-                        )}
                         <a className={styles.download} href={`${href}?download=1`}>
                           {t('Descargar', 'Download')}
                         </a>

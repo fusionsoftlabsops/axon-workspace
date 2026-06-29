@@ -16,7 +16,12 @@ export interface ContextFile {
   name: string;
   category: FileCategory;
   isContext: boolean;
+  contextStatus: 'NONE' | 'GENERATING' | 'READY' | 'FAILED';
 }
+
+/** A file can be used as context when it's an image (vision) or a document whose
+ *  context artifact is READY. */
+const isUsable = (f: ContextFile) => f.category === 'IMAGE' || f.contextStatus === 'READY';
 
 const FILE_GLYPH = (cat: FileCategory): string =>
   cat === 'IMAGE' ? '▦' : cat === 'PDF' ? '◳' : cat === 'CODE' ? '⟨⟩' : '▤';
@@ -194,27 +199,38 @@ export function PlanContext({
           <>
             <p className={styles.ctxLead}>
               {t(
-                'Marca los archivos que la IA debe usar como contexto (los documentos aportan su texto; las imágenes, su contenido visual).',
-                'Tick the files the AI should use as context (documents contribute their text; images, their visual content).',
+                'Marca los archivos que la IA debe usar como contexto. Deseleccionar aquí se guarda.',
+                'Tick the files the AI should use as context. Deselecting here is saved.',
               )}
             </p>
             <ul className={styles.ctxFileList}>
               {contextFiles.map((f) => {
                 const on = isFileOn(f);
+                const usable = isUsable(f);
                 return (
-                  <li key={f.id} className={`${styles.ctxFileItem} ${on ? styles.ctxFileItemOn : ''}`}>
+                  <li
+                    key={f.id}
+                    className={`${styles.ctxFileItem} ${on ? styles.ctxFileItemOn : ''} ${usable ? '' : styles.ctxFileItemOff}`}
+                  >
                     <label className={styles.ctxFileLabel}>
                       <input
                         type="checkbox"
                         className={styles.ctxFileCheck}
                         checked={on}
-                        disabled={!canWrite || fileBusy === f.id}
+                        disabled={!canWrite || !usable || fileBusy === f.id}
                         onChange={() => toggleFile(f)}
                       />
                       <span aria-hidden className={styles.ctxFileGlyph}>{FILE_GLYPH(f.category)}</span>
                       <span className={styles.ctxFileName} title={f.name}>{f.name}</span>
                       {fileBusy === f.id && <span className={styles.ctxFileSpin}>…</span>}
                     </label>
+                    {!usable && (
+                      <span className={styles.ctxFileHint}>
+                        {f.contextStatus === 'GENERATING'
+                          ? t('generando…', 'generating…')
+                          : t('genera el contexto en Archivos', 'generate context in Files')}
+                      </span>
+                    )}
                   </li>
                 );
               })}

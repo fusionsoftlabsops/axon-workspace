@@ -10,6 +10,7 @@ export type AuditAction =
   | 'file.delete'
   | 'file.context.add'
   | 'file.context.remove'
+  | 'file.context.generate'
   | 'member.invite'
   | 'member.role_change'
   | 'member.remove'

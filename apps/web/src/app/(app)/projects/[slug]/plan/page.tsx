@@ -27,9 +27,15 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
     await prisma.projectFile.findMany({
       where: { projectId: project.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, name: true, category: true, isContext: true },
+      select: { id: true, name: true, category: true, isContext: true, contextStatus: true },
     })
-  ).map((f) => ({ id: f.id, name: f.name, category: f.category, isContext: f.isContext }));
+  ).map((f) => ({
+    id: f.id,
+    name: f.name,
+    category: f.category,
+    isContext: f.isContext,
+    contextStatus: f.contextStatus as 'NONE' | 'GENERATING' | 'READY' | 'FAILED',
+  }));
 
   return (
     <main className={styles.page}>

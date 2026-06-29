@@ -125,13 +125,14 @@ async function contextFilesManifest(projectId: string): Promise<string> {
   const files = await prisma.projectFile.findMany({
     where: { projectId, isContext: true },
     orderBy: { createdAt: 'asc' },
-    select: { name: true, mimeType: true, category: true, extractedText: true },
+    select: { name: true, mimeType: true, category: true, contextStatus: true, contextMarkdown: true },
   });
   if (files.length === 0) return '';
   return files
     .map((f) => {
       if (isImageMime(f.mimeType) || f.category === 'IMAGE') return `- [imagen del proyecto] ${f.name}`;
-      const excerpt = (f.extractedText ?? '').slice(0, 800).replace(/\s+/g, ' ').trim();
+      const md = f.contextStatus === 'READY' ? (f.contextMarkdown ?? '') : '';
+      const excerpt = md.slice(0, 800).replace(/\s+/g, ' ').trim();
       const head = `- [archivo del proyecto] ${f.name}`;
       return excerpt ? `${head}: ${excerpt}` : head;
     })
@@ -477,7 +478,7 @@ async function resolveAttachments(
     prisma.projectFile.findMany({
       where: { projectId, isContext: true },
       orderBy: { createdAt: 'asc' },
-      select: { name: true, mimeType: true, category: true, storageKey: true, extractedText: true },
+      select: { name: true, mimeType: true, category: true, storageKey: true, contextStatus: true, contextMarkdown: true },
     }),
   ]);
   const images: PlanImage[] = [];
@@ -494,13 +495,14 @@ async function resolveAttachments(
     }
   }
 
-  // Project files marked as context (shared budget, same image cap).
+  // Project files marked as context (shared budget, same image cap). Documents
+  // contribute their generated Markdown artifact (READY); images go as vision.
   for (const f of ctxFiles) {
     const isImage = isImageMime(f.mimeType) || f.category === 'IMAGE';
     if (isImage) {
       await pushImage(images, f.storageKey, f.mimeType);
-    } else if (f.extractedText && docBudget > 0) {
-      const text = f.extractedText.slice(0, docBudget);
+    } else if (f.contextStatus === 'READY' && f.contextMarkdown && docBudget > 0) {
+      const text = f.contextMarkdown.slice(0, docBudget);
       docBudget -= text.length;
       docs.push({ label: `${f.name} (archivo del proyecto)`, text });
     }
