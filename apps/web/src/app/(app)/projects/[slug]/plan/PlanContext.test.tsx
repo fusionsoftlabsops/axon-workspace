@@ -54,9 +54,8 @@ describe('PlanContext', () => {
     expect(await screen.findByRole('radiogroup')).toBeInTheDocument();
     expect(codeRadio()).toBeChecked();
     expect(noneRadio()).not.toBeChecked();
-    // null contextGraph defaults to the code graph → connected + stats.
+    // null contextGraph defaults to the code graph → the chip shows "Connected".
     expect(screen.getByText(/Connected/)).toBeInTheDocument();
-    expect(screen.getByText(/10 nodes · 20 edges · 3 areas/)).toBeInTheDocument();
     expect(screen.getByTestId('analysis-panel')).toBeInTheDocument();
   });
 
@@ -92,7 +91,7 @@ describe('PlanContext', () => {
     const mockCheck = screen.getByText('mockup.png').closest('label')!.querySelector('input')!;
     expect(specCheck).toBeChecked(); // isContext: true
     expect(mockCheck).not.toBeChecked();
-    expect(screen.getByRole('link', { name: /view in Files/i })).toHaveAttribute('href', '/projects/p/files');
+    expect(screen.getByRole('link', { name: /Manage/i })).toHaveAttribute('href', '/projects/p/files');
   });
 
   it('marks an uploaded file as context inline (optimistic + persisted)', async () => {
@@ -122,20 +121,22 @@ describe('PlanContext', () => {
   it('invites the user to upload when there are no files', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view() });
     render(<PlanContext slug="p" canWrite contextGraph={null} contextFiles={[]} onChange={() => {}} />);
-    expect(await screen.findByText(/No files uploaded yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No files to use as context yet/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Upload files/i })).toHaveAttribute('href', '/projects/p/files');
   });
 
   it('shows the "no graph yet" hint when no analysis exists', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view({ status: 'NONE', stats: {} }) });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={() => {}} />);
-    expect(await screen.findByText(/No graph yet/i)).toBeInTheDocument();
+    // the graph status chip
+    expect(await screen.findByText(/^No graph$/i)).toBeInTheDocument();
   });
 
   it('hides the graph chooser (but keeps the file-context line + panel) when graphify is not configured', async () => {
     h.getAnalysisAction.mockResolvedValue({ ok: true, data: view({ configured: false }) });
     render(<PlanContext slug="p" canWrite contextGraph={null} onChange={() => {}} />);
-    // Wait for the settled section (its "Project files" block is unique to it).
-    expect(await screen.findByText(/Project files/i)).toBeInTheDocument();
+    // Wait for the settled section (its "Context files" block is unique to it).
+    expect(await screen.findByText(/Context files/i)).toBeInTheDocument();
     expect(screen.getByTestId('analysis-panel')).toBeInTheDocument();
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
   });

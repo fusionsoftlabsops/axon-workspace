@@ -637,14 +637,67 @@
   color: var(--ink-muted);
   max-width: 60ch;
 }
+
+// Each context source is its own labelled section.
+.ctxSec {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-sm;
+  padding-top: t.$space-md;
+  border-top: 1px solid var(--rule);
+}
+.ctxSecHead {
+  display: flex;
+  align-items: center;
+  gap: t.$space-sm;
+}
+.ctxSecGlyph {
+  color: var(--accent-ink);
+  font-size: 0.9rem;
+}
+.ctxSecTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.ctxSecLink {
+  margin-left: auto;
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.76rem;
+  &:hover { text-decoration: underline; }
+}
+// Status chip (graph state, or N/M files in context).
+.ctxChip {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.03em;
+  padding: 0.05rem 0.45rem;
+  border-radius: t.$radius-full;
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-subtle);
+  white-space: nowrap;
+
+  &[data-state='live'] {
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+    background: var(--accent-ink-wash);
+  }
+  &[data-state='active'] {
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+  }
+  &[data-state='failed'] {
+    color: var(--accent-stamp);
+    border-color: var(--accent-stamp);
+  }
+}
 .ctxOptions {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: t.$space-sm;
-
-  @media (min-width: t.$bp-md) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 .ctxOption {
   display: flex;
@@ -718,32 +771,34 @@
   }
 }
 
-// ---- Inline "use uploaded files as context" picker ----
-.ctxFilesBlock {
+// ---- "Use uploaded files as context" picker ----
+.ctxEmpty {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: t.$space-sm;
-  padding-top: t.$space-sm;
-  border-top: 1px solid var(--rule);
 }
-.ctxFilesHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: t.$space-sm;
-  flex-wrap: wrap;
+.ctxEmptyCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--accent-ink);
+  border-radius: t.$radius-md;
+  background: var(--accent-ink-wash);
+  color: var(--accent-ink);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-decoration: none;
+  &:hover { background: color-mix(in srgb, var(--accent-ink) 16%, var(--paper)); }
 }
 .ctxFileList {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 0.35rem;
-
-  @media (min-width: t.$bp-md) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 .ctxFileItem {
   border: 1px solid var(--rule);
@@ -760,20 +815,13 @@
   background: color-mix(in srgb, var(--accent-ink) 9%, var(--paper));
 }
 .ctxFileItemOff {
-  opacity: 0.6;
-}
-.ctxFileHint {
-  display: block;
-  padding: 0 0.55rem 0.35rem 2rem;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  color: var(--ink-subtle);
+  opacity: 0.65;
 }
 .ctxFileLabel {
   display: flex;
   align-items: center;
   gap: t.$space-sm;
-  padding: 0.4rem 0.55rem;
+  padding: 0.45rem 0.6rem;
   cursor: pointer;
   min-width: 0;
 }
@@ -798,6 +846,33 @@
 .ctxFileSpin {
   flex: none;
   color: var(--ink-subtle);
+}
+// Per-file status chip, right-aligned.
+.ctxFileStatus {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  padding: 0.04rem 0.4rem;
+  border-radius: t.$radius-full;
+}
+.ctxStOn {
+  color: var(--accent-ink);
+  border: 1px solid var(--accent-ink);
+  background: var(--accent-ink-wash);
+}
+.ctxStReady {
+  color: var(--ink-muted);
+  border: 1px solid var(--rule-strong);
+}
+.ctxStBusy {
+  color: var(--accent-ink);
+  border: 1px solid var(--accent-ink);
+}
+.ctxStOff {
+  color: var(--ink-subtle);
+  border: 1px solid var(--rule);
 }
 
 // Code-analysis brief (graphify summary) — compact, scrollable.

@@ -27,13 +27,9 @@ const FILE_GLYPH = (cat: FileCategory): string =>
   cat === 'IMAGE' ? '▦' : cat === 'PDF' ? '◳' : cat === 'CODE' ? '⟨⟩' : '▤';
 
 /**
- * "Planning context" — lets the user explicitly connect the plan to a graph and
- * choose which one. Today there is one grounding graph (the graphify code
- * knowledge graph); the chooser also offers "no context" (greenfield). The
- * choice is persisted on the plan and read by the chat and the generator.
- *
- * The selected source carries a Signal Console "live link": a steady glow when
- * the graph is connected and ready, a travelling pulse while it builds.
+ * "Planning context" — the side panel where the user sets what the AI plans
+ * from: the code knowledge graph (or none) and the project files marked as
+ * context. The choices are persisted and read by the chat and the generator.
  */
 export function PlanContext({
   slug,
@@ -80,30 +76,34 @@ export function PlanContext({
     return <AnalysisPanelView controller={analysis} canWrite={canWrite} />;
   }
 
-  // The code-graph chooser only applies when graphify is wired up; the file
-  // context line always applies.
   const graphConfigured = view.configured;
   const ready = view.status === 'READY';
   const analyzing = view.status === 'ANALYZING';
   const failed = view.status === 'FAILED';
-  const stats = view.stats ?? {};
 
   const linked = selected === 'CODE_GRAPH';
-  const codeSignal: SignalState = analyzing
-    ? 'active'
-    : failed
-      ? 'failed'
-      : ready && linked
-        ? 'live'
-        : 'idle';
+  const codeSignal: SignalState = analyzing ? 'active' : failed ? 'failed' : ready && linked ? 'live' : 'idle';
 
-  const codeStatus = analyzing
-    ? t('Generando el grafo…', 'Building the graph…')
-    : ready
-      ? `${String(stats.nodes ?? '?')} ${t('nodos', 'nodes')} · ${String(stats.edges ?? '?')} ${t('relaciones', 'edges')} · ${String(stats.communities ?? '?')} ${t('áreas', 'areas')}`
-      : failed
-        ? t('El último análisis falló — re-analiza abajo.', 'The last analysis failed — re-analyze below.')
-        : t('Aún sin grafo — genéralo abajo.', 'No graph yet — generate it below.');
+  // One quick status chip for the graph section.
+  const graphChip: { label: string; state: SignalState } = analyzing
+    ? { label: t('Generando…', 'Building…'), state: 'active' }
+    : failed
+      ? { label: t('Falló', 'Failed'), state: 'failed' }
+      : ready
+        ? linked
+          ? { label: t('Conectado', 'Connected'), state: 'live' }
+          : { label: t('Disponible', 'Available'), state: 'idle' }
+        : { label: t('Sin grafo', 'No graph'), state: 'idle' };
+
+  const onCount = contextFiles.filter(isFileOn).length;
+  const usableCount = contextFiles.filter(isUsable).length;
+
+  function fileStatus(f: ContextFile, on: boolean, usable: boolean): { label: string; cls: string } {
+    if (on) return { label: t('En contexto', 'In context'), cls: styles.ctxStOn ?? '' };
+    if (f.contextStatus === 'GENERATING') return { label: t('Generando…', 'Building…'), cls: styles.ctxStBusy ?? '' };
+    if (usable) return { label: t('Listo', 'Ready'), cls: styles.ctxStReady ?? '' };
+    return { label: t('Genera en Archivos', 'Generate in Files'), cls: styles.ctxStOff ?? '' };
+  }
 
   async function choose(next: ContextGraph) {
     if (next === selected || saving || !canWrite) return;
@@ -121,121 +121,122 @@ export function PlanContext({
         <span className={styles.ctxLbl}>{t('Contexto de planeación', 'Planning context')}</span>
         <p className={styles.ctxLead}>
           {t(
-            'Define en qué se ancla el plan: el grafo del código y los archivos marcados como contexto. El chat y la generación los tienen en cuenta.',
-            'Set what grounds the plan: the code graph and the files marked as context. The chat and generation take them into account.',
+            'Elige en qué se basa la IA para planear. El chat y la generación lo tienen en cuenta.',
+            'Choose what the AI plans from. The chat and generation take it into account.',
           )}
         </p>
       </div>
 
+      {/* ---- Section: code graph ---- */}
       {graphConfigured && (
-      <div className={styles.ctxOptions} role="radiogroup" aria-label={t('Grafo de contexto', 'Context graph')}>
-        {/* Code knowledge graph */}
-        <label className={`${styles.ctxOption} ${linked ? styles.ctxOptionOn : ''}`}>
-          <input
-            type="radio"
-            name="plan-context-graph"
-            className={styles.ctxRadio}
-            checked={linked}
-            disabled={!canWrite || saving}
-            onChange={() => choose('CODE_GRAPH')}
-          />
-          <span className={styles.ctxOptBody}>
-            <span className={styles.ctxOptName}>{t('Grafo de código', 'Code graph')}</span>
-            <span className={styles.ctxOptDesc}>
-              {t(
-                'Ancla el plan en el grafo de conocimiento del código existente (graphify).',
-                'Grounds the plan in the existing code knowledge graph (graphify).',
-              )}
-            </span>
-            <SignalLine state={codeSignal} className={styles.ctxSignal} />
-            <span className={styles.ctxStatus} data-state={codeSignal}>
-              {linked && ready ? `${t('Conectado', 'Connected')} · ${codeStatus}` : codeStatus}
-            </span>
-          </span>
-        </label>
+        <div className={styles.ctxSec}>
+          <div className={styles.ctxSecHead}>
+            <span aria-hidden className={styles.ctxSecGlyph}>◈</span>
+            <span className={styles.ctxSecTitle}>{t('Grafo de código', 'Code graph')}</span>
+            <span className={styles.ctxChip} data-state={graphChip.state}>{graphChip.label}</span>
+          </div>
+          <SignalLine state={codeSignal} className={styles.ctxSignal} />
 
-        {/* No code graph (greenfield) */}
-        <label className={`${styles.ctxOption} ${selected === 'NONE' ? styles.ctxOptionOn : ''}`}>
-          <input
-            type="radio"
-            name="plan-context-graph"
-            className={styles.ctxRadio}
-            checked={selected === 'NONE'}
-            disabled={!canWrite || saving}
-            onChange={() => choose('NONE')}
-          />
-          <span className={styles.ctxOptBody}>
-            <span className={styles.ctxOptName}>{t('Sin grafo de código', 'No code graph')}</span>
-            <span className={styles.ctxOptDesc}>
-              {t(
-                'No ancles en el código existente (los archivos de contexto siguen aplicando).',
-                'Don’t ground in existing code (context files still apply).',
-              )}
-            </span>
-          </span>
-        </label>
-      </div>
+          <div className={styles.ctxOptions} role="radiogroup" aria-label={t('Grafo de contexto', 'Context graph')}>
+            <label className={`${styles.ctxOption} ${linked ? styles.ctxOptionOn : ''}`}>
+              <input
+                type="radio"
+                name="plan-context-graph"
+                className={styles.ctxRadio}
+                checked={linked}
+                disabled={!canWrite || saving}
+                onChange={() => choose('CODE_GRAPH')}
+              />
+              <span className={styles.ctxOptBody}>
+                <span className={styles.ctxOptName}>{t('Usar el grafo del código', 'Use the code graph')}</span>
+                <span className={styles.ctxOptDesc}>
+                  {t(
+                    'Ancla el plan en el grafo de conocimiento del código existente (graphify).',
+                    'Grounds the plan in the existing code knowledge graph (graphify).',
+                  )}
+                </span>
+              </span>
+            </label>
+
+            <label className={`${styles.ctxOption} ${selected === 'NONE' ? styles.ctxOptionOn : ''}`}>
+              <input
+                type="radio"
+                name="plan-context-graph"
+                className={styles.ctxRadio}
+                checked={selected === 'NONE'}
+                disabled={!canWrite || saving}
+                onChange={() => choose('NONE')}
+              />
+              <span className={styles.ctxOptBody}>
+                <span className={styles.ctxOptName}>{t('Planear sin grafo', 'Plan without a graph')}</span>
+                <span className={styles.ctxOptDesc}>
+                  {t(
+                    'No ancles en el código existente (los archivos de contexto siguen aplicando).',
+                    'Don’t ground in existing code (context files still apply).',
+                  )}
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
       )}
 
-      {/* Project files — mark which feed the plan, right here in the chat view. */}
-      <div className={styles.ctxFilesBlock}>
-        <div className={styles.ctxFilesHead}>
-          <span className={styles.ctxLbl}>
-            <span aria-hidden className={styles.ctxStar}>✦</span> {t('Archivos del proyecto', 'Project files')}
-          </span>
-          <Link href={`/projects/${slug}/files`} className={styles.ctxFilesLink}>
-            {t('Subir / ver en Archivos', 'Upload / view in Files')}
+      {/* ---- Section: context files ---- */}
+      <div className={styles.ctxSec}>
+        <div className={styles.ctxSecHead}>
+          <span aria-hidden className={styles.ctxSecGlyph}>✦</span>
+          <span className={styles.ctxSecTitle}>{t('Archivos de contexto', 'Context files')}</span>
+          {usableCount > 0 && (
+            <span className={styles.ctxChip} data-state={onCount > 0 ? 'live' : 'idle'}>
+              {onCount}/{usableCount}
+            </span>
+          )}
+          <Link href={`/projects/${slug}/files`} className={styles.ctxSecLink}>
+            {t('Gestionar', 'Manage')}
           </Link>
         </div>
 
         {contextFiles.length === 0 ? (
-          <p className={styles.ctxLead}>
-            {t(
-              'Aún no has subido archivos. Súbelos en Archivos y vuelve para usarlos como contexto.',
-              'No files uploaded yet. Upload them in Files and come back to use them as context.',
-            )}
-          </p>
-        ) : (
-          <>
+          <div className={styles.ctxEmpty}>
             <p className={styles.ctxLead}>
-              {t(
-                'Marca los archivos que la IA debe usar como contexto. Deseleccionar aquí se guarda.',
-                'Tick the files the AI should use as context. Deselecting here is saved.',
-              )}
+              {t('Aún no hay archivos para usar como contexto.', 'No files to use as context yet.')}
             </p>
-            <ul className={styles.ctxFileList}>
-              {contextFiles.map((f) => {
-                const on = isFileOn(f);
-                const usable = isUsable(f);
-                return (
-                  <li
-                    key={f.id}
-                    className={`${styles.ctxFileItem} ${on ? styles.ctxFileItemOn : ''} ${usable ? '' : styles.ctxFileItemOff}`}
-                  >
-                    <label className={styles.ctxFileLabel}>
-                      <input
-                        type="checkbox"
-                        className={styles.ctxFileCheck}
-                        checked={on}
-                        disabled={!canWrite || !usable || fileBusy === f.id}
-                        onChange={() => toggleFile(f)}
-                      />
-                      <span aria-hidden className={styles.ctxFileGlyph}>{FILE_GLYPH(f.category)}</span>
-                      <span className={styles.ctxFileName} title={f.name}>{f.name}</span>
-                      {fileBusy === f.id && <span className={styles.ctxFileSpin}>…</span>}
-                    </label>
-                    {!usable && (
-                      <span className={styles.ctxFileHint}>
-                        {f.contextStatus === 'GENERATING'
-                          ? t('generando…', 'generating…')
-                          : t('genera el contexto en Archivos', 'generate context in Files')}
-                      </span>
+            <Link href={`/projects/${slug}/files`} className={styles.ctxEmptyCta}>
+              {t('Subir archivos', 'Upload files')}
+            </Link>
+          </div>
+        ) : (
+          <ul className={styles.ctxFileList}>
+            {contextFiles.map((f) => {
+              const on = isFileOn(f);
+              const usable = isUsable(f);
+              const busyHere = fileBusy === f.id;
+              const st = fileStatus(f, on, usable);
+              return (
+                <li
+                  key={f.id}
+                  className={`${styles.ctxFileItem} ${on ? styles.ctxFileItemOn : ''} ${usable ? '' : styles.ctxFileItemOff}`}
+                >
+                  <label className={styles.ctxFileLabel}>
+                    <input
+                      type="checkbox"
+                      className={styles.ctxFileCheck}
+                      checked={on}
+                      disabled={!canWrite || !usable || busyHere}
+                      onChange={() => toggleFile(f)}
+                    />
+                    <span aria-hidden className={styles.ctxFileGlyph}>{FILE_GLYPH(f.category)}</span>
+                    <span className={styles.ctxFileName} title={f.name}>{f.name}</span>
+                    {busyHere ? (
+                      <span className={styles.ctxFileSpin}>…</span>
+                    ) : (
+                      <span className={`${styles.ctxFileStatus} ${st.cls}`}>{st.label}</span>
                     )}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
