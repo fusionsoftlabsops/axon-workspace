@@ -77,6 +77,9 @@ export function TaskCard({
       ref={setNodeRef}
       style={style}
       className={`${styles.card} ${isOverlay ? styles.cardOverlay : ''}`}
+      data-testid="task-card"
+      data-task-id={task.id}
+      data-task-number={task.taskNumber}
       {...attributes}
       {...listeners}
     >

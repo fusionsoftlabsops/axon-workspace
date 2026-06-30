@@ -31,12 +31,16 @@ export function ProjectTabs({ tabs }: { tabs: ProjectTab[] }) {
     <nav className={styles.tabs}>
       {tabs.map((tab) => {
         const active = tab.href === activeHref;
+        // Stable, semantic tab key derived from the route's last segment.
+        const tabKey = tab.href.split('/').filter(Boolean).pop() ?? tab.href;
         return (
           <Link
             key={tab.href}
             href={tab.href}
             className={active ? styles.active : undefined}
             aria-current={active ? 'page' : undefined}
+            data-testid="project-tab"
+            data-tab={tabKey}
           >
             {tab.label}
           </Link>

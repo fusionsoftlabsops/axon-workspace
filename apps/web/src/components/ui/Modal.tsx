@@ -33,10 +33,12 @@ export function Modal({
         className={styles.card}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? 'modal-title' : undefined}
+        aria-label={title ? undefined : 'Dialog'}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.head}>
-          {title ? <h3 className={styles.title}>{title}</h3> : <span />}
+          {title ? <h3 id="modal-title" className={styles.title}>{title}</h3> : <span />}
           <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
             ✕
           </button>

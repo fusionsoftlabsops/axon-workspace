@@ -21,6 +21,9 @@ export function Column({
       ref={setNodeRef}
       className={`${styles.column} ${isOver ? styles.columnOver : ''}`}
       style={{ borderTopColor: state.color }}
+      data-testid="board-column"
+      data-state-id={state.id}
+      data-state-name={state.name}
     >
       <header className={styles.columnHeader}>
         <h3 className={styles.columnTitle}>

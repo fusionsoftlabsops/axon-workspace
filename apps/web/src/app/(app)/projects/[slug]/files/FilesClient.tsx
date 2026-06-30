@@ -341,7 +341,12 @@ export function FilesClient({
                         ? styles.nodeFail
                         : styles.nodePending;
                 return (
-                  <li key={f.id} className={`${styles.row} ${ctxOn ? styles.rowOn : ''}`}>
+                  <li
+                    key={f.id}
+                    className={`${styles.row} ${ctxOn ? styles.rowOn : ''}`}
+                    data-testid="file-row"
+                    data-file-id={f.id}
+                  >
                     <a
                       href={href}
                       target="_blank"
