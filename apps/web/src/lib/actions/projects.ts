@@ -138,6 +138,7 @@ export async function inviteMemberAction(
   }
 
   const email = parsed.data.email.toLowerCase().trim();
+  const seniority = parsed.data.seniority ?? null;
   const invitee = await prisma.user.findUnique({ where: { email } });
 
   // Not registered yet → create a project-scoped registration invite. On signup
@@ -154,22 +155,11 @@ export async function inviteMemberAction(
         expiresAt,
         projectId: project.id,
         projectRole: parsed.data.role,
+        seniority,
       },
     });
 
-    let emailSent = false;
-    const base = env().AUTH_URL?.replace(/\/+$/, '');
-    if (base) {
-      const link = `${base}/signup?token=${token}`;
-      emailSent = await sendMail({
-        to: email,
-        subject: `Invitación a ${project.name} en Axon`,
-        html:
-          `<p>Te invitaron a colaborar en <b>${project.name}</b> en Axon.</p>` +
-          `<p>Creá tu cuenta con este enlace (válido 7 días, un solo uso): <a href="${link}">${link}</a></p>`,
-        text: `Te invitaron a colaborar en ${project.name} en Axon. Creá tu cuenta (válido 7 días): ${link}`,
-      });
-    }
+    const emailSent = await sendProjectInviteEmail(email, project.name, token);
 
     await audit({
       actorId: session.user.id,
@@ -177,7 +167,7 @@ export async function inviteMemberAction(
       resourceType: 'project',
       resourceId: project.id,
       projectId: project.id,
-      payload: { email, role: parsed.data.role, emailSent, pending: true },
+      payload: { email, role: parsed.data.role, seniority, emailSent, pending: true },
     });
     revalidatePath(`/projects/${projectSlug}/settings`);
     return { ok: true, data: { pending: true, token, email, emailSent } };
@@ -189,6 +179,7 @@ export async function inviteMemberAction(
         projectId: project.id,
         userId: invitee.id,
         role: parsed.data.role,
+        seniority,
       },
     });
   } catch (err) {
@@ -198,17 +189,163 @@ export async function inviteMemberAction(
     throw err;
   }
 
+  // Existing accounts are added directly (no signup needed) — but they still
+  // deserve a heads-up. Previously this path sent NO email, so already-registered
+  // collaborators were added silently with no notification.
+  const emailSent = await sendProjectAddedEmail(email, project.name, projectSlug);
+
   await audit({
     actorId: session.user.id,
     action: 'member.invite',
     resourceType: 'project',
     resourceId: project.id,
     projectId: project.id,
-    payload: { invitedUserId: invitee.id, role: parsed.data.role },
+    payload: { invitedUserId: invitee.id, role: parsed.data.role, seniority, emailSent },
   });
 
   revalidatePath(`/projects/${projectSlug}/settings`);
-  return { ok: true, data: { pending: false } };
+  return { ok: true, data: { pending: false, email, emailSent } };
+}
+
+/** Email a registration invite link for a project (new, unregistered email). */
+async function sendProjectInviteEmail(
+  email: string,
+  projectName: string,
+  token: string,
+): Promise<boolean> {
+  const base = env().AUTH_URL?.replace(/\/+$/, '');
+  if (!base) return false;
+  const link = `${base}/signup?token=${token}`;
+  return sendMail({
+    to: email,
+    subject: `Invitación a ${projectName} en Axon`,
+    html:
+      `<p>Te invitaron a colaborar en <b>${projectName}</b> en Axon.</p>` +
+      `<p>Creá tu cuenta con este enlace (válido 7 días, un solo uso): <a href="${link}">${link}</a></p>`,
+    text: `Te invitaron a colaborar en ${projectName} en Axon. Creá tu cuenta (válido 7 días): ${link}`,
+  });
+}
+
+/** Notify an already-registered user that they were added to a project. */
+async function sendProjectAddedEmail(
+  email: string,
+  projectName: string,
+  projectSlug: string,
+): Promise<boolean> {
+  const base = env().AUTH_URL?.replace(/\/+$/, '');
+  if (!base) return false;
+  const link = `${base}/projects/${projectSlug}`;
+  return sendMail({
+    to: email,
+    subject: `Te agregaron a ${projectName} en Axon`,
+    html:
+      `<p>Te agregaron como colaborador en <b>${projectName}</b> en Axon.</p>` +
+      `<p>Entrá al proyecto: <a href="${link}">${link}</a></p>`,
+    text: `Te agregaron como colaborador en ${projectName} en Axon. Entrá: ${link}`,
+  });
+}
+
+/**
+ * Resend a pending project invitation email. Rotates the token (so the previous
+ * link is invalidated) and renews the 7-day expiry. OWNER/ADMIN only.
+ */
+export async function resendInvitationAction(
+  projectSlug: string,
+  invitationId: string,
+): Promise<ActionResult<{ emailSent: boolean; token: string; email: string }>> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'No autenticado' };
+
+  const project = await prisma.project.findUnique({
+    where: { slug: projectSlug },
+    select: { id: true, name: true, members: { where: { userId: session.user.id }, select: { role: true } } },
+  });
+  if (!project) return { ok: false, error: 'Proyecto no encontrado' };
+  const myRole = project.members[0]?.role;
+  if (myRole !== 'OWNER' && myRole !== 'ADMIN') {
+    return { ok: false, error: 'Sin permisos para reenviar invitaciones' };
+  }
+
+  const invite = await prisma.invitation.findFirst({
+    where: { id: invitationId, projectId: project.id, acceptedAt: null },
+    select: { id: true, email: true },
+  });
+  if (!invite) return { ok: false, error: 'Invitación no encontrada o ya aceptada' };
+
+  const token = randomBytes(24).toString('base64url');
+  await prisma.invitation.update({
+    where: { id: invite.id },
+    data: { tokenHash: hashInviteToken(token), expiresAt: new Date(Date.now() + 7 * 86_400_000) },
+  });
+
+  const emailSent = await sendProjectInviteEmail(invite.email, project.name, token);
+
+  await audit({
+    actorId: session.user.id,
+    action: 'member.invite_resend',
+    resourceType: 'project',
+    resourceId: project.id,
+    projectId: project.id,
+    payload: { email: invite.email, emailSent },
+  });
+
+  revalidatePath(`/projects/${projectSlug}/settings`);
+  return { ok: true, data: { emailSent, token, email: invite.email } };
+}
+
+/**
+ * Transfer project ownership to another member. Only the current OWNER may do
+ * this. The new owner becomes OWNER and the previous owner is demoted to ADMIN.
+ */
+export async function transferOwnershipAction(
+  projectSlug: string,
+  newOwnerUserId: string,
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: 'No autenticado' };
+
+  const project = await prisma.project.findUnique({
+    where: { slug: projectSlug },
+    select: {
+      id: true,
+      ownerId: true,
+      members: { select: { userId: true, role: true } },
+    },
+  });
+  if (!project) return { ok: false, error: 'Proyecto no encontrado' };
+  if (project.ownerId !== session.user.id) {
+    return { ok: false, error: 'Solo el OWNER puede transferir la propiedad' };
+  }
+  if (newOwnerUserId === project.ownerId) {
+    return { ok: false, error: 'Ese usuario ya es el OWNER' };
+  }
+  const target = project.members.find((m) => m.userId === newOwnerUserId);
+  if (!target) return { ok: false, error: 'El nuevo OWNER debe ser miembro del proyecto' };
+
+  await prisma.$transaction([
+    prisma.project.update({ where: { id: project.id }, data: { ownerId: newOwnerUserId } }),
+    prisma.projectMember.update({
+      where: { projectId_userId: { projectId: project.id, userId: newOwnerUserId } },
+      data: { role: 'OWNER' },
+    }),
+    prisma.projectMember.update({
+      where: { projectId_userId: { projectId: project.id, userId: project.ownerId } },
+      data: { role: 'ADMIN' },
+    }),
+  ]);
+
+  await audit({
+    actorId: session.user.id,
+    action: 'project.transfer_ownership',
+    resourceType: 'project',
+    resourceId: project.id,
+    projectId: project.id,
+    payload: { from: project.ownerId, to: newOwnerUserId },
+  });
+
+  revalidatePath('/projects');
+  revalidatePath(`/projects/${projectSlug}/settings`);
+  return { ok: true };
 }
 
 /** Set a member's seniority (for AI time estimation). Only OWNER/ADMIN. */

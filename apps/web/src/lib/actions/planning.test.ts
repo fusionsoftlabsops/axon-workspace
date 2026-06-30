@@ -24,6 +24,7 @@ const {
     txMock,
     prismaMock: {
       project: { findUnique: vi.fn() },
+      user: { findUnique: vi.fn() },
       codeAnalysis: { findUnique: vi.fn() },
       projectPlan: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
       planAttachment: { create: vi.fn(), delete: vi.fn(), findMany: vi.fn() },
@@ -81,10 +82,16 @@ vi.mock('@/lib/ai/extract', () => ({
   isImageMime: (mime: string) => /^image\//.test(mime ?? ''),
 }));
 vi.mock('@/lib/storage', () => storageMock);
+vi.mock('@/lib/realtime', () => ({
+  publish: vi.fn(async () => {}),
+  subscribe: vi.fn(async () => () => {}),
+  planChannel: (id: string) => `plan:${id}`,
+}));
 
 import {
   getOrCreatePlanAction,
   planChatAction,
+  planTypingAction,
   addPlanLinkAction,
   removePlanAttachmentAction,
   refinePlanTaskAction,
@@ -147,6 +154,7 @@ beforeEach(() => {
   assertMock.mockResolvedValue(okCtx);
   langMock.mockResolvedValue('es');
   isInfraMock.mockReturnValue(true);
+  prismaMock.user.findUnique.mockResolvedValue({ name: 'Tester' });
   prismaMock.project.findUnique.mockResolvedValue({ name: 'N', description: 'd', repoPath: '/repo' });
   prismaMock.codeAnalysis.findUnique.mockResolvedValue(null);
   prismaMock.projectFile.findMany.mockResolvedValue([]);
@@ -395,6 +403,29 @@ describe('updatePlanSprintAction', () => {
   });
 });
 
+describe('planTypingAction', () => {
+  it('rejects unauthenticated', async () => {
+    assertMock.mockResolvedValue({ ok: false, error: 'No autenticado' });
+    expect(await planTypingAction('slug')).toEqual({ ok: false, error: 'No autenticado' });
+  });
+
+  it('is a silent no-op for a VIEWER', async () => {
+    assertMock.mockResolvedValue({ ...okCtx, role: 'VIEWER' });
+    expect(await planTypingAction('slug')).toEqual({ ok: true });
+  });
+
+  it('publishes a typing event with the author name', async () => {
+    const { publish } = await import('@/lib/realtime');
+    prismaMock.projectPlan.findFirst.mockResolvedValue({ id: 'plan1' });
+    prismaMock.user.findUnique.mockResolvedValue({ name: 'Ana' });
+    expect(await planTypingAction('slug')).toEqual({ ok: true });
+    expect(publish).toHaveBeenCalledWith(
+      'plan:plan1',
+      expect.objectContaining({ type: 'typing', userId: 'u1', name: 'Ana' }),
+    );
+  });
+});
+
 describe('startPlanGenerationAction', () => {
   it('rejects a VIEWER', async () => {
     assertMock.mockResolvedValue({ ...okCtx, role: 'VIEWER' });
@@ -406,9 +437,30 @@ describe('startPlanGenerationAction', () => {
     expect(await startPlanGenerationAction('slug')).toEqual({ ok: false, error: 'Plan no encontrado' });
   });
 
-  it('is a no-op when already generating', async () => {
-    prismaMock.projectPlan.findFirst.mockResolvedValue({ ...planRow(), status: 'GENERATING' });
+  it('is a no-op when already generating with a fresh heartbeat', async () => {
+    prismaMock.projectPlan.findFirst.mockResolvedValue({
+      ...planRow(),
+      status: 'GENERATING',
+      heartbeatAt: new Date(),
+    });
     expect(await startPlanGenerationAction('slug')).toEqual({ ok: true });
+    expect(prismaMock.projectPlan.update).not.toHaveBeenCalled();
+  });
+
+  it('relaunches an orphaned generation (stale heartbeat)', async () => {
+    prismaMock.projectPlan.findFirst.mockResolvedValue({
+      ...planRow(),
+      status: 'GENERATING',
+      heartbeatAt: new Date(Date.now() - 10 * 60 * 1000), // 10 min old
+    });
+    prismaMock.planAttachment.findMany.mockResolvedValue([]);
+    plannerMock.generatePlan.mockResolvedValue(makeGen());
+    const res = await startPlanGenerationAction('slug');
+    expect(res).toEqual({ ok: true });
+    // It re-marks GENERATING (with fresh stats/heartbeat) and relaunches.
+    expect(prismaMock.projectPlan.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'GENERATING' }) }),
+    );
   });
 
   it('starts background generation', async () => {

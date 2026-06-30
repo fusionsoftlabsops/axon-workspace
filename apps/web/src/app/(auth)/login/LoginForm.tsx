@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { loginAction } from '@/lib/actions/auth';
@@ -92,6 +93,14 @@ export function LoginForm() {
             ? t('Verificar 2FA', 'Verify 2FA')
             : t('Iniciar sesión', 'Sign in')}
       </button>
+
+      {!needsTotp && (
+        <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', textAlign: 'center' }}>
+          <Link href="/forgot-password" style={{ color: 'var(--color-fg-muted)' }}>
+            {t('¿Olvidaste tu contraseña?', 'Forgot your password?')}
+          </Link>
+        </p>
+      )}
     </form>
   );
 }

@@ -35,6 +35,13 @@ export default async function ProjectSettingsPage({
     notFound();
   }
 
+  // Pending project invitations (unregistered invitees that haven't signed up yet).
+  const pendingInvites = await prisma.invitation.findMany({
+    where: { projectId: project.id, acceptedAt: null },
+    select: { id: true, email: true, projectRole: true, seniority: true, expiresAt: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+
   return (
     <div style={{ maxWidth: '900px', padding: '2rem 1.5rem' }}>
       <h2>{t('Miembros', 'Members')}</h2>
@@ -56,6 +63,13 @@ export default async function ProjectSettingsPage({
           name: m.user.name,
           email: m.user.email,
           joinedAt: m.joinedAt.toISOString(),
+        }))}
+        pendingInvites={pendingInvites.map((i) => ({
+          id: i.id,
+          email: i.email,
+          role: i.projectRole,
+          seniority: i.seniority,
+          expiresAt: i.expiresAt.toISOString(),
         }))}
       />
 

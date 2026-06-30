@@ -26,7 +26,7 @@ const {
     prismaMock: {
       project: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
       projectMember: { create: vi.fn(), updateMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
-      invitation: { deleteMany: vi.fn(), create: vi.fn() },
+      invitation: { deleteMany: vi.fn(), create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
       user: { findUnique: vi.fn() },
       credentialAccess: { deleteMany: vi.fn() },
       task: { deleteMany: vi.fn() },
@@ -63,6 +63,8 @@ vi.mock('@/lib/mailer', () => ({ sendMail: sendMailMock }));
 import {
   createProjectAction,
   inviteMemberAction,
+  resendInvitationAction,
+  transferOwnershipAction,
   setMemberSeniorityAction,
   updateMemberRoleAction,
   removeMemberAction,
@@ -186,7 +188,7 @@ describe('inviteMemberAction', () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: 'u2' });
     const res = await inviteMemberAction('slug', input);
     expect(prismaMock.projectMember.create).toHaveBeenCalled();
-    if (res.ok) expect(res.data).toEqual({ pending: false });
+    if (res.ok) expect(res.data).toEqual({ pending: false, email: 'new@x.com', emailSent: false });
   });
 
   it('reports when the user is already a member (P2002)', async () => {
@@ -196,6 +198,108 @@ describe('inviteMemberAction', () => {
       new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: '5' }),
     );
     expect(await inviteMemberAction('slug', input)).toEqual({ ok: false, error: 'Ese usuario ya es miembro del proyecto' });
+  });
+
+  it('emails an existing user when added and carries seniority', async () => {
+    prismaMock.project.findUnique.mockResolvedValue(projectAs('OWNER'));
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'u2' });
+    prismaMock.projectMember.create.mockResolvedValue({});
+    envMock.mockReturnValue({ AUTH_URL: 'https://axon.test' });
+    sendMailMock.mockResolvedValue(true);
+    const res = await inviteMemberAction('slug', { email: 'New@X.com', role: 'MEMBER', seniority: 'SENIOR' });
+    expect(prismaMock.projectMember.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ seniority: 'SENIOR' }) }),
+    );
+    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'new@x.com' }));
+    if (res.ok) expect(res.data).toEqual({ pending: false, email: 'new@x.com', emailSent: true });
+  });
+
+  it('stores seniority on a registration invite for a new email', async () => {
+    prismaMock.project.findUnique.mockResolvedValue(projectAs('OWNER'));
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    await inviteMemberAction('slug', { email: 'fresh@x.com', role: 'MEMBER', seniority: 'JUNIOR' });
+    expect(prismaMock.invitation.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ seniority: 'JUNIOR', projectRole: 'MEMBER' }) }),
+    );
+  });
+});
+
+describe('resendInvitationAction', () => {
+  it('rejects a non OWNER/ADMIN', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', name: 'Proj', members: [{ role: 'MEMBER' }] });
+    expect(await resendInvitationAction('slug', 'inv1')).toEqual({
+      ok: false,
+      error: 'Sin permisos para reenviar invitaciones',
+    });
+  });
+
+  it('rejects a missing/accepted invitation', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', name: 'Proj', members: [{ role: 'OWNER' }] });
+    prismaMock.invitation.findFirst.mockResolvedValue(null);
+    expect(await resendInvitationAction('slug', 'inv1')).toEqual({
+      ok: false,
+      error: 'Invitación no encontrada o ya aceptada',
+    });
+  });
+
+  it('rotates the token and re-emails a pending invite', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ id: 'p1', name: 'Proj', members: [{ role: 'OWNER' }] });
+    prismaMock.invitation.findFirst.mockResolvedValue({ id: 'inv1', email: 'pending@x.com' });
+    envMock.mockReturnValue({ AUTH_URL: 'https://axon.test' });
+    sendMailMock.mockResolvedValue(true);
+    const res = await resendInvitationAction('slug', 'inv1');
+    expect(prismaMock.invitation.update).toHaveBeenCalled();
+    expect(sendMailMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'pending@x.com' }));
+    expect(res.ok && res.data?.emailSent).toBe(true);
+  });
+});
+
+describe('transferOwnershipAction', () => {
+  const ownerProject = (extra: Record<string, unknown> = {}) => ({
+    id: 'p1',
+    ownerId: 'u1',
+    members: [
+      { userId: 'u1', role: 'OWNER' },
+      { userId: 'u2', role: 'ADMIN' },
+    ],
+    ...extra,
+  });
+
+  it('rejects when caller is not the owner', async () => {
+    prismaMock.project.findUnique.mockResolvedValue(ownerProject({ ownerId: 'someone-else' }));
+    expect(await transferOwnershipAction('slug', 'u2')).toEqual({
+      ok: false,
+      error: 'Solo el OWNER puede transferir la propiedad',
+    });
+  });
+
+  it('rejects when the target is not a member', async () => {
+    prismaMock.project.findUnique.mockResolvedValue(ownerProject());
+    expect(await transferOwnershipAction('slug', 'ghost')).toEqual({
+      ok: false,
+      error: 'El nuevo OWNER debe ser miembro del proyecto',
+    });
+  });
+
+  it('swaps roles and updates ownerId', async () => {
+    prismaMock.project.findUnique.mockResolvedValue(ownerProject());
+    const res = await transferOwnershipAction('slug', 'u2');
+    expect(res.ok).toBe(true);
+    expect(prismaMock.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { ownerId: 'u2' } }),
+    );
+    expect(prismaMock.projectMember.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { projectId_userId: { projectId: 'p1', userId: 'u2' } },
+        data: { role: 'OWNER' },
+      }),
+    );
+    expect(prismaMock.projectMember.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { projectId_userId: { projectId: 'p1', userId: 'u1' } },
+        data: { role: 'ADMIN' },
+      }),
+    );
   });
 });
 

@@ -83,6 +83,11 @@ const schema = z.object({
   // pins which host new apps deploy to (auto-picked when there's exactly one).
   FUSION_INFRA_TEAM_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   FUSION_INFRA_SERVER_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Redis for realtime pub/sub (collaborative plan chat: live messages, typing,
+  // presence) across replicas. Optional: if unset, realtime degrades to an
+  // in-process EventEmitter (works for a single replica). Redis already runs in
+  // fusion-infra. See lib/realtime.ts.
+  REDIS_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });

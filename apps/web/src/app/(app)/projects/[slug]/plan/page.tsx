@@ -51,6 +51,7 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
         <PlanChat
           slug={slug}
           canWrite={role !== 'VIEWER'}
+          currentUserId={session.user.id}
           initialPlan={res.data}
           contextFiles={contextFiles}
         />

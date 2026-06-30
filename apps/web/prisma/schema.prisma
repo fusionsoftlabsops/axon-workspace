@@ -166,6 +166,7 @@ model User {
   uploadedFiles    ProjectFile[]    @relation("FileUploader")
   authoredPlans    ProjectPlan[]    @relation("PlanAuthor")
   invitesSent      Invitation[]     @relation("InvitedBy")
+  passwordResets   PasswordResetToken[]
 
   @@index([email])
 }
@@ -186,10 +187,29 @@ model Invitation {
   // doesn't have an account yet.
   projectId   String?
   projectRole MemberRole?
+  // Optional seniority captured at invite time (for AI time estimation). Carried
+  // onto the ProjectMember when the invitee signs up and auto-joins the project.
+  seniority   Seniority?
 
   invitedBy   User @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([email])
+}
+
+// Login-password reset (separate from the E2E vault: this only restores server
+// authentication; the vault stays protected by its own passphrase / recovery
+// code). The recipient presents the token (only its sha256 is stored), one use.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique // sha256 hex of the plaintext token
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Auth.js v5 session storage (when using DB strategy).
@@ -534,6 +554,11 @@ model ProjectPlan {
   improvedIdea   String?    @db.Text
   error          String?
   contextGraph   String?    // which graph grounds this plan: 'CODE_GRAPH' | 'NONE' | null (auto)
+  // Live generation progress so the UI can show phase/elapsed and detect orphans
+  // (set while status=GENERATING): { phase, startedAt }. heartbeatAt is bumped as
+  // generation advances; a stale heartbeat with status=GENERATING ⇒ orphaned run.
+  stats          Json?
+  heartbeatAt    DateTime?
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 

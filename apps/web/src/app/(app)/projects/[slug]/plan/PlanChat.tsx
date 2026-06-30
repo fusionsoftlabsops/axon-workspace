@@ -7,6 +7,7 @@ import { Button, Card } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import {
   planChatAction,
+  planTypingAction,
   startPlanGenerationAction,
   publishPlanAction,
   addPlanLinkAction,
@@ -18,16 +19,19 @@ import type { GeneratedPlan } from '@/lib/ai/plan-schema';
 import { PlanTaskCard, PlanSprintHead } from './PlanEditors';
 import { PlanRepos } from './PlanRepos';
 import { PlanContext, type ContextFile } from './PlanContext';
+import { PlanProgress } from './PlanProgress';
 import styles from './plan.module.scss';
 
 export function PlanChat({
   slug,
   canWrite,
+  currentUserId,
   initialPlan,
   contextFiles = [],
 }: {
   slug: string;
   canWrite: boolean;
+  currentUserId?: string;
   initialPlan: PlanView;
   contextFiles?: ContextFile[];
 }) {
@@ -38,13 +42,20 @@ export function PlanChat({
   const [error, setError] = useState<string | null>(null);
   const [sending, startSend] = useTransition();
   const [generating, setGenerating] = useState(initialPlan.status === 'GENERATING');
+  const [progress, setProgress] = useState(initialPlan.progress);
+  const [heartbeatAt, setHeartbeatAt] = useState(initialPlan.heartbeatAt);
   const [publishing, startPublish] = useTransition();
   const [linkUrl, setLinkUrl] = useState('');
   const [attaching, setAttaching] = useState(false);
   const [openSprints, setOpenSprints] = useState<Set<number>>(new Set()); // accordion: all closed by default
   const [reestimating, setReestimating] = useState(false);
+  // Realtime collaboration: who's typing, and who's present on this plan.
+  const [typingName, setTypingName] = useState<string | null>(null);
+  const [presence, setPresence] = useState<{ userId: string; name: string }[]>([]);
   const msgRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSent = useRef(0);
 
   const generated: GeneratedPlan | null = plan.generated;
   const published = plan.status === 'PUBLISHED';
@@ -71,6 +82,7 @@ export function PlanChat({
         if (!alive || !p) return;
         if (p.status === 'READY' || p.status === 'FAILED' || p.status === 'PUBLISHED') {
           setGenerating(false);
+          setProgress(null);
           setPlan((prev) => ({
             ...prev,
             status: p.status,
@@ -79,6 +91,14 @@ export function PlanChat({
             error: p.error ?? null,
           }));
           if (p.status === 'FAILED') setError(p.error ?? t('Falló la generación', 'Generation failed'));
+        } else if (p.status === 'GENERATING') {
+          // Mirror live phase + heartbeat so the progress UI advances.
+          const prog =
+            p.stats && typeof p.stats === 'object' && typeof p.stats.phase === 'string'
+              ? { phase: p.stats.phase, startedAt: p.stats.startedAt }
+              : null;
+          setProgress(prog);
+          setHeartbeatAt(p.heartbeatAt ?? null);
         }
       } catch {
         /* transient — keep polling */
@@ -89,6 +109,68 @@ export function PlanChat({
       clearInterval(id);
     };
   }, [generating, slug, t]);
+
+  // Collaborative realtime: subscribe to the plan's SSE stream for live messages,
+  // typing indicators and presence. A 'message' event just nudges a refetch of
+  // the authoritative messages (avoids client-side dedup); typing/presence are
+  // ephemeral UI state.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
+    const es = new EventSource(`/api/v1/projects/${slug}/plan/stream`);
+
+    const refresh = async () => {
+      try {
+        const r = await fetch(`/api/v1/projects/${slug}/plan`, { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        if (Array.isArray(j.plan?.messages)) {
+          setPlan((prev) => ({ ...prev, messages: j.plan.messages }));
+        }
+      } catch {
+        /* transient */
+      }
+    };
+
+    es.onmessage = (ev) => {
+      let data: { type?: string; userId?: string; name?: string; state?: string };
+      try {
+        data = JSON.parse(ev.data);
+      } catch {
+        return;
+      }
+      if (data.type === 'message') {
+        void refresh();
+      } else if (data.type === 'typing') {
+        if (data.userId && data.userId !== currentUserId) {
+          setTypingName(data.name || t('Alguien', 'Someone'));
+          if (typingTimer.current) clearTimeout(typingTimer.current);
+          typingTimer.current = setTimeout(() => setTypingName(null), 3000);
+        }
+      } else if (data.type === 'presence' && data.userId && data.userId !== currentUserId) {
+        setPresence((prev) => {
+          const others = prev.filter((p) => p.userId !== data.userId);
+          return data.state === 'leave' ? others : [...others, { userId: data.userId!, name: data.name || '' }];
+        });
+      }
+    };
+    es.onerror = () => {
+      /* EventSource auto-reconnects; nothing to do */
+    };
+
+    return () => {
+      es.close();
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+    };
+  }, [slug, currentUserId, t]);
+
+  // Throttled "typing" ping while the user composes a message.
+  function pingTyping() {
+    if (!canWrite) return;
+    const now = Date.now();
+    if (now - lastTypingSent.current < 2000) return;
+    lastTypingSent.current = now;
+    void planTypingAction(slug);
+  }
 
   function send() {
     const text = input.trim();
@@ -115,6 +197,8 @@ export function PlanChat({
         return;
       }
       setPlan((prev) => ({ ...prev, status: 'GENERATING' }));
+      setProgress({ phase: 'starting', startedAt: new Date().toISOString() });
+      setHeartbeatAt(new Date().toISOString());
       setGenerating(true);
     });
   }
@@ -208,16 +292,32 @@ export function PlanChat({
         )}
         <div className={styles.chatRow}>
           <div className={styles.chat}>
+            {presence.length > 0 && (
+              <div className={styles.presence} style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)', padding: '0 0.25rem 0.4rem' }}>
+                {t('En línea', 'Online')}: {presence.map((p) => p.name || t('Anónimo', 'Anonymous')).join(', ')}
+              </div>
+            )}
             <div className={styles.messages} ref={msgRef}>
               {plan.messages.map((m, i) => (
                 <div
                   key={i}
                   className={`${styles.msg} ${m.role === 'assistant' ? styles.assistant : styles.user}`}
                 >
+                  {m.role === 'user' && m.authorName && (
+                    <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.7, marginBottom: '0.15rem' }}>
+                      {m.authorName}
+                    </span>
+                  )}
                   {m.content}
                 </div>
               ))}
               {sending && <div className={`${styles.msg} ${styles.assistant}`}>…</div>}
+            </div>
+            <div
+              aria-live="polite"
+              style={{ minHeight: '1.1rem', fontSize: '0.75rem', color: 'var(--color-fg-muted)', padding: '0 0.25rem' }}
+            >
+              {typingName ? t(`${typingName} está escribiendo…`, `${typingName} is typing…`) : ''}
             </div>
             {canWrite && !published && (
               <div className={styles.composer}>
@@ -226,7 +326,10 @@ export function PlanChat({
                   rows={2}
                   value={input}
                   placeholder={t('Escribe tu respuesta…', 'Type your answer…')}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    pingTyping();
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -347,7 +450,12 @@ export function PlanChat({
         <div className={styles.preview}>
           {generating && (
             <div className={styles.generating}>
-              {t('Generando el plan con Claude Opus…', 'Generating the plan with Claude Opus…')}
+              <PlanProgress
+                progress={progress}
+                heartbeatAt={heartbeatAt}
+                onRetry={generate}
+                retrying={sending}
+              />
             </div>
           )}
           {generated && !generating && (

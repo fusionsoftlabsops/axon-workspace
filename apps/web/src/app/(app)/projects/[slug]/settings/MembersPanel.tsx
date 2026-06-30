@@ -8,6 +8,8 @@ import {
   removeMemberAction,
   updateMemberRoleAction,
   setMemberSeniorityAction,
+  resendInvitationAction,
+  transferOwnershipAction,
 } from '@/lib/actions/projects';
 import { useI18n } from '@/lib/i18n/i18n';
 
@@ -19,6 +21,14 @@ interface MemberView {
   name: string;
   email: string;
   joinedAt: string;
+}
+
+interface PendingInvite {
+  id: string;
+  email: string;
+  role: MemberRole | null;
+  seniority: Seniority | null;
+  expiresAt: string;
 }
 
 const ROLES: MemberRole[] = ['ADMIN', 'MEMBER', 'VIEWER'];
@@ -33,42 +43,113 @@ export function MembersPanel({
   currentUserId,
   ownerId,
   members,
+  pendingInvites = [],
 }: {
   projectSlug: string;
   currentUserId: string;
   ownerId: string;
   members: MemberView[];
+  pendingInvites?: PendingInvite[];
 }) {
   const { t } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<{ link: string; email: string; emailSent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<MemberRole>('MEMBER');
+  const [seniority, setSeniority] = useState<Seniority | ''>('');
+  const [transferTo, setTransferTo] = useState('');
+
+  const isOwnerMe = currentUserId === ownerId;
 
   function invite(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setInviteLink(null);
     setCopied(false);
     startTransition(async () => {
-      const r = await inviteMemberAction(projectSlug, { email, role });
+      const r = await inviteMemberAction(projectSlug, {
+        email,
+        role,
+        seniority: seniority || undefined,
+      });
       if (!r.ok) {
         setError(r.error);
         return;
       }
       const invitedEmail = email;
       setEmail('');
+      setSeniority('');
       if (r.data?.pending && r.data.token) {
         setInviteLink({
           link: `${window.location.origin}/signup?token=${r.data.token}`,
           email: r.data.email ?? invitedEmail,
           emailSent: !!r.data.emailSent,
         });
+      } else if (r.data && !r.data.pending) {
+        // Existing account — added directly.
+        setNotice(
+          r.data.emailSent
+            ? t('Agregado y notificado por email.', 'Added and notified by email.')
+            : t('Agregado al proyecto.', 'Added to the project.'),
+        );
       }
+      router.refresh();
+    });
+  }
+
+  function resend(invitationId: string) {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const r = await resendInvitationAction(projectSlug, invitationId);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setNotice(
+        r.data?.emailSent
+          ? t('Invitación reenviada por email.', 'Invitation resent by email.')
+          : t('No se pudo enviar el email; copia el enlace nuevo.', 'Could not send email; copy the new link.'),
+      );
+      if (r.data && !r.data.emailSent) {
+        setInviteLink({
+          link: `${window.location.origin}/signup?token=${r.data.token}`,
+          email: r.data.email,
+          emailSent: false,
+        });
+      }
+      router.refresh();
+    });
+  }
+
+  function transfer() {
+    if (!transferTo) return;
+    const target = members.find((m) => m.userId === transferTo);
+    if (
+      !confirm(
+        t(
+          `¿Transferir la propiedad del proyecto a ${target?.name ?? ''}? Pasarás a ser ADMIN y no podrás revertirlo tú mismo.`,
+          `Transfer project ownership to ${target?.name ?? ''}? You will become ADMIN and cannot undo this yourself.`,
+        ),
+      )
+    )
+      return;
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const r = await transferOwnershipAction(projectSlug, transferTo);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      setTransferTo('');
+      setNotice(t('Propiedad transferida.', 'Ownership transferred.'));
       router.refresh();
     });
   }
@@ -145,6 +226,25 @@ export function MembersPanel({
             </option>
           ))}
         </select>
+        <select
+          value={seniority}
+          onChange={(e) => setSeniority(e.target.value as Seniority | '')}
+          title={t('Seniority (opcional)', 'Seniority (optional)')}
+          style={{
+            padding: '0.5rem',
+            border: '1px solid var(--color-border)',
+            borderRadius: '4px',
+            background: 'var(--color-bg)',
+            color: 'var(--color-fg)',
+          }}
+        >
+          <option value="">{t('Seniority (opcional)', 'Seniority (optional)')}</option>
+          {SENIORITIES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           disabled={pending}
@@ -160,6 +260,19 @@ export function MembersPanel({
           {t('Invitar', 'Invite')}
         </button>
       </form>
+
+      {notice && (
+        <p
+          style={{
+            color: 'var(--color-accent)',
+            padding: '0.5rem',
+            background: 'rgba(99,102,241,0.08)',
+            borderRadius: '4px',
+          }}
+        >
+          {notice}
+        </p>
+      )}
 
       {error && (
         <p
@@ -226,6 +339,43 @@ export function MembersPanel({
               {copied ? t('¡Copiado!', 'Copied!') : t('Copiar', 'Copy')}
             </button>
           </div>
+        </div>
+      )}
+
+      {pendingInvites.length > 0 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem' }}>
+            {t('Invitaciones pendientes', 'Pending invitations')}
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {pendingInvites.map((inv) => (
+                <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <td style={{ padding: '0.5rem' }}>{inv.email}</td>
+                  <td style={{ padding: '0.5rem', color: 'var(--color-fg-muted)' }}>
+                    {inv.role ?? '—'}
+                    {inv.seniority ? ` · ${inv.seniority}` : ''}
+                  </td>
+                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                    <button
+                      type="button"
+                      onClick={() => resend(inv.id)}
+                      disabled={pending}
+                      style={{
+                        padding: '0.3rem 0.75rem',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '4px',
+                        background: 'transparent',
+                        color: 'var(--color-fg)',
+                      }}
+                    >
+                      {t('Reenviar', 'Resend')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -326,6 +476,68 @@ export function MembersPanel({
           })}
         </tbody>
       </table>
+
+      {isOwnerMe && members.some((m) => m.userId !== ownerId) && (
+        <div
+          style={{
+            marginTop: '2rem',
+            padding: '1rem',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '8px',
+          }}
+        >
+          <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem' }}>
+            {t('Transferir propiedad', 'Transfer ownership')}
+          </h3>
+          <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>
+            {t(
+              'El nuevo dueño tendrá control total del proyecto. Tú pasarás a ADMIN.',
+              'The new owner will have full control of the project. You will become ADMIN.',
+            )}
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <select
+              value={transferTo}
+              onChange={(e) => setTransferTo(e.target.value)}
+              disabled={pending}
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                border: '1px solid var(--color-border)',
+                borderRadius: '4px',
+                background: 'var(--color-bg)',
+                color: 'var(--color-fg)',
+              }}
+            >
+              <option value="">{t('Elegí un miembro…', 'Choose a member…')}</option>
+              {members
+                .filter((m) => m.userId !== ownerId)
+                .map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.name} ({m.email})
+                  </option>
+                ))}
+            </select>
+            <button
+              type="button"
+              onClick={transfer}
+              disabled={pending || !transferTo}
+              style={{
+                padding: '0.5rem 1rem',
+                border: '1px solid var(--color-danger)',
+                borderRadius: '4px',
+                background: 'transparent',
+                color: 'var(--color-danger)',
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t('Transferir', 'Transfer')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

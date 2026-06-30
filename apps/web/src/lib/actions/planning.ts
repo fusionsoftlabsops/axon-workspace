@@ -33,6 +33,7 @@ import {
 } from '@/lib/ai/plan-schema';
 import { fetchUrlText, isImageMime } from '@/lib/ai/extract';
 import { getObjectBytes, deleteObject, putObject, buildKey, isStorageConfigured } from '@/lib/storage';
+import { publish, planChannel } from '@/lib/realtime';
 import type { ActionResult } from './projects';
 
 export interface AttachmentView {
@@ -46,6 +47,12 @@ export interface AttachmentView {
  *  knowledge graph when a READY analysis exists (the historical default). */
 export type ContextGraph = 'CODE_GRAPH' | 'NONE';
 
+/** Live generation progress (set while status=GENERATING). */
+export interface PlanProgress {
+  phase: 'starting' | 'resolving_context' | 'code_context' | 'calling_opus' | 'normalizing';
+  startedAt: string; // ISO
+}
+
 export interface PlanView {
   id: string;
   status: 'CHATTING' | 'GENERATING' | 'READY' | 'PUBLISHED' | 'FAILED';
@@ -55,7 +62,13 @@ export interface PlanView {
   error: string | null;
   attachments: AttachmentView[];
   contextGraph: ContextGraph | null;
+  progress: PlanProgress | null;
+  heartbeatAt: string | null; // ISO; last progress tick while GENERATING
 }
+
+// A GENERATING plan whose heartbeat is older than this is considered orphaned
+// (e.g. the server restarted mid-run) and may be safely relaunched.
+const PLAN_STALE_MS = 5 * 60 * 1000;
 
 const planInclude = { attachments: { orderBy: { createdAt: 'asc' as const } } };
 
@@ -78,6 +91,13 @@ async function codeContext(projectId: string, choice?: ContextGraph | null): Pro
   return row?.status === 'READY' && row.summary ? row.summary : undefined;
 }
 
+function toProgress(stats: unknown): PlanProgress | null {
+  if (!stats || typeof stats !== 'object') return null;
+  const s = stats as Record<string, unknown>;
+  if (typeof s.phase !== 'string' || typeof s.startedAt !== 'string') return null;
+  return { phase: s.phase as PlanProgress['phase'], startedAt: s.startedAt };
+}
+
 function toView(p: {
   id: string;
   status: string;
@@ -86,6 +106,8 @@ function toView(p: {
   improvedIdea: string | null;
   error: string | null;
   contextGraph: string | null;
+  stats?: unknown;
+  heartbeatAt?: Date | null;
   attachments: PlanAttachment[];
 }): PlanView {
   return {
@@ -96,6 +118,8 @@ function toView(p: {
     improvedIdea: p.improvedIdea,
     error: p.error,
     contextGraph: p.contextGraph === 'NONE' || p.contextGraph === 'CODE_GRAPH' ? p.contextGraph : null,
+    progress: p.status === 'GENERATING' ? toProgress(p.stats) : null,
+    heartbeatAt: p.heartbeatAt ? p.heartbeatAt.toISOString() : null,
     attachments: p.attachments.map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -185,7 +209,23 @@ export async function planChatAction(slug: string, userMessage: string): Promise
   if (plan.status === 'GENERATING') return { ok: false, error: 'Generando el plan…' };
 
   const history: ChatMsg[] = Array.isArray(plan.messages) ? (plan.messages as unknown as ChatMsg[]) : [];
-  const withUser: ChatMsg[] = [...history, { role: 'user', content: text.slice(0, 4000) }];
+  const author = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } });
+  const userMsg: ChatMsg = {
+    role: 'user',
+    content: text.slice(0, 4000),
+    authorId: ctx.userId,
+    authorName: author?.name ?? undefined,
+  };
+  const withUser: ChatMsg[] = [...history, userMsg];
+  const keepStatus = plan.status === 'PUBLISHED' ? 'PUBLISHED' : 'CHATTING';
+
+  // Persist + broadcast the user's message right away so collaborators see it
+  // live (and it survives a reload) even before the AI reply lands.
+  await prisma.projectPlan.update({
+    where: { id: plan.id },
+    data: { messages: withUser as unknown as Prisma.InputJsonValue, status: keepStatus },
+  });
+  await publish(planChannel(plan.id), { type: 'message', message: userMsg });
 
   const meta = await projectMeta(ctx.projectId);
   const lang = await getServerLang();
@@ -208,13 +248,35 @@ export async function planChatAction(slug: string, userMessage: string): Promise
     return { ok: false, error: err instanceof Error ? err.message : 'Error de IA' };
   }
 
-  const next: ChatMsg[] = [...withUser, { role: 'assistant', content: reply }];
+  const assistantMsg: ChatMsg = { role: 'assistant', content: reply };
+  const next: ChatMsg[] = [...withUser, assistantMsg];
   const updated = await prisma.projectPlan.update({
     where: { id: plan.id },
-    data: { messages: next as unknown as Prisma.InputJsonValue, status: plan.status === 'PUBLISHED' ? 'PUBLISHED' : 'CHATTING' },
+    data: { messages: next as unknown as Prisma.InputJsonValue, status: keepStatus },
     include: planInclude,
   });
+  await publish(planChannel(plan.id), { type: 'message', message: assistantMsg });
   return { ok: true, data: toView(updated) };
+}
+
+/** Broadcast a "typing" ping to other plan viewers (no persistence). */
+export async function planTypingAction(slug: string): Promise<ActionResult> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (ctx.role === 'VIEWER') return { ok: true }; // viewers don't type
+  const plan = await prisma.projectPlan.findFirst({
+    where: { projectId: ctx.projectId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  });
+  if (!plan) return { ok: true };
+  const author = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } });
+  await publish(planChannel(plan.id), {
+    type: 'typing',
+    userId: ctx.userId,
+    name: author?.name ?? '',
+  });
+  return { ok: true };
 }
 
 export async function addPlanLinkAction(slug: string, rawUrl: string): Promise<ActionResult<PlanView>> {
@@ -413,11 +475,25 @@ export async function startPlanGenerationAction(slug: string): Promise<ActionRes
 
   const plan = await loadPlan(ctx.projectId);
   if (!plan) return { ok: false, error: 'Plan no encontrado' };
-  if (plan.status === 'GENERATING') return { ok: true };
+  // Already running with a fresh heartbeat → no-op (avoid double generation).
+  // A stale heartbeat means the previous run was orphaned (e.g. server restart);
+  // fall through and relaunch.
+  if (plan.status === 'GENERATING') {
+    const fresh = plan.heartbeatAt && Date.now() - plan.heartbeatAt.getTime() < PLAN_STALE_MS;
+    if (fresh) return { ok: true };
+  }
 
   const messages: ChatMsg[] = Array.isArray(plan.messages) ? (plan.messages as unknown as ChatMsg[]) : [];
   const lang = await getServerLang();
-  await prisma.projectPlan.update({ where: { id: plan.id }, data: { status: 'GENERATING', error: null } });
+  await prisma.projectPlan.update({
+    where: { id: plan.id },
+    data: {
+      status: 'GENERATING',
+      error: null,
+      stats: { phase: 'starting', startedAt: new Date().toISOString() } as Prisma.InputJsonValue,
+      heartbeatAt: new Date(),
+    },
+  });
 
   void runPlanGeneration(plan.id, ctx.projectId, ctx.userId, messages, lang, plan.contextGraph as ContextGraph | null);
   return { ok: true };
@@ -510,6 +586,21 @@ async function resolveAttachments(
   return { images, docs };
 }
 
+/** Advance the visible generation phase + refresh the heartbeat (best-effort;
+ *  a progress write must never break generation). `startedAt` is preserved so
+ *  the UI can keep a stable elapsed timer across phases. */
+async function bumpPlanPhase(planId: string, phase: PlanProgress['phase'], startedAt: string): Promise<void> {
+  await prisma.projectPlan
+    .update({
+      where: { id: planId },
+      data: {
+        stats: { phase, startedAt } as Prisma.InputJsonValue,
+        heartbeatAt: new Date(),
+      },
+    })
+    .catch(() => {});
+}
+
 async function runPlanGeneration(
   planId: string,
   projectId: string,
@@ -518,10 +609,14 @@ async function runPlanGeneration(
   lang: Lang,
   contextGraph: ContextGraph | null,
 ): Promise<void> {
+  const startedAt = new Date().toISOString();
   try {
+    await bumpPlanPhase(planId, 'resolving_context', startedAt);
     const meta = await projectMeta(projectId);
     const { images, docs } = await resolveAttachments(planId, projectId);
+    await bumpPlanPhase(planId, 'code_context', startedAt);
     const code = await codeContext(projectId, contextGraph);
+    await bumpPlanPhase(planId, 'calling_opus', startedAt);
     const plan = await generatePlan(
       { name: meta?.name ?? '', description: meta?.description ?? null },
       messages,
@@ -532,6 +627,7 @@ async function runPlanGeneration(
       projectId,
       code,
     );
+    await bumpPlanPhase(planId, 'normalizing', startedAt);
     normalizeEstimates(plan); // derive "junior–senior" range per HU
     await prisma.projectPlan.update({
       where: { id: planId },
@@ -541,6 +637,8 @@ async function runPlanGeneration(
         improvedIdea: plan.improvedIdea || null,
         suggestedRepos: plan.suggestedRepos as unknown as Prisma.InputJsonValue,
         error: null,
+        stats: Prisma.JsonNull,
+        heartbeatAt: new Date(),
       },
     });
   } catch (err) {
@@ -549,7 +647,12 @@ async function runPlanGeneration(
     await prisma.projectPlan
       .update({
         where: { id: planId },
-        data: { status: 'FAILED', error: err instanceof Error ? err.message : 'Error generando el plan' },
+        data: {
+          status: 'FAILED',
+          error: err instanceof Error ? err.message : 'Error generando el plan',
+          stats: Prisma.JsonNull,
+          heartbeatAt: new Date(),
+        },
       })
       .catch(() => {});
   }
