@@ -83,7 +83,7 @@ export function NewMemoryForm({
       <div className={styles.formGrid}>
         <label>
           <span>{t('Tipo', 'Type')}</span>
-          <select value={type} onChange={(e) => setType(e.target.value as MemType)}>
+          <select name="type" value={type} onChange={(e) => setType(e.target.value as MemType)}>
             {TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -93,7 +93,7 @@ export function NewMemoryForm({
         </label>
         <label>
           <span>{t('Destino', 'Destination')}</span>
-          <select value={scope} onChange={(e) => setScope(e.target.value as 'LOCAL' | 'PROJECT')}>
+          <select name="scope" value={scope} onChange={(e) => setScope(e.target.value as 'LOCAL' | 'PROJECT')}>
             <option value="LOCAL">{t('Mi cerebro local', 'My local brain')}</option>
             <option value="PROJECT">{t('Publicar al principal directamente', 'Publish to main directly')}</option>
           </select>
@@ -102,6 +102,7 @@ export function NewMemoryForm({
           <span>{t('Tarea origen (opcional, número)', 'Source task (optional, number)')}</span>
           <input
             type="number"
+            name="sourceTaskNumber"
             min={1}
             value={taskNum}
             onChange={(e) => setTaskNum(e.target.value)}
@@ -112,6 +113,7 @@ export function NewMemoryForm({
           <span>{t('Tags (separados por coma, máx 8)', 'Tags (comma-separated, max 8)')}</span>
           <input
             type="text"
+            name="tags"
             value={tagsRaw}
             onChange={(e) => setTagsRaw(e.target.value)}
             placeholder="auth, gotcha, deploy"
@@ -122,6 +124,7 @@ export function NewMemoryForm({
         <span>{t('Título', 'Title')}</span>
         <input
           type="text"
+          name="title"
           required
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -131,6 +134,7 @@ export function NewMemoryForm({
       <label>
         <span>{t('Cuerpo (markdown)', 'Body (markdown)')}</span>
         <textarea
+          name="body"
           required
           value={body}
           onChange={(e) => setBody(e.target.value)}

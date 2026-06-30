@@ -59,6 +59,7 @@ export function NewTaskInline({
   return (
     <form className={styles.addForm} onSubmit={submit}>
       <textarea
+        name="title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Título"
