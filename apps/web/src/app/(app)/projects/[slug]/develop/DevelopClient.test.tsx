@@ -49,14 +49,25 @@ describe('DevelopClient', () => {
     expect(screen.getByText(/Pull the implementation plan into Qwen/i)).toBeInTheDocument();
     expect(screen.getByText(/Close the story \(QA handoff\)/i)).toBeInTheDocument();
     // The close command + the MCP tool it calls are shown.
-    expect(screen.getByText(/\/cerrar-hu 1/)).toBeInTheDocument();
+    expect(screen.getAllByText(/\/cerrar-hu 1/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/submit_qa_review/).length).toBeGreaterThan(0);
   });
 
   it('documents the skills package (/skills sync)', () => {
     renderClient();
     expect(screen.getByText(/Skills package \(best practices\)/i)).toBeInTheDocument();
-    expect(screen.getByText('/skills sync')).toBeInTheDocument();
+    expect(screen.getAllByText('/skills sync').length).toBeGreaterThan(0);
+  });
+
+  it('shows the reference sections (commands, skills, MCP tools) and the workflow overview', () => {
+    renderClient();
+    expect(screen.getByText(/The full loop, at a glance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reference — commands/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reference — skills/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reference — MCP tools/i)).toBeInTheDocument();
+    // a representative command + tool + skill are listed
+    expect(screen.getAllByText('submit_qa_review').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('verify').length).toBeGreaterThan(0);
   });
 
   it('generates a token and reveals the env line + config', async () => {
