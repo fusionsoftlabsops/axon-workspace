@@ -299,17 +299,6 @@ export function PlanChat({
   const attachIcon = (kind: PlanView['attachments'][number]['kind']) =>
     kind === 'IMAGE' ? '🖼' : kind === 'LINK' ? '🔗' : '📄';
 
-  // Context that will ground the NEXT message (live hint). Shows the graph (only
-  // when explicitly connected) + the project files marked as context. Plan
-  // attachments are omitted here — they're already listed in the "Attached
-  // context" section below. The accurate per-message snapshot (incl. attachments,
-  // and checking the analysis is READY) is recorded server-side.
-  const activeContext: string[] = [
-    ...(plan.contextGraph === 'CODE_GRAPH' ? [t('Grafo de código', 'Code graph')] : []),
-    ...contextFiles
-      .filter((f) => f.isContext && (f.category === 'IMAGE' || f.contextStatus === 'READY'))
-      .map((f) => f.name),
-  ];
   // Everyone connected to the live chat, including you.
   const onlineNames: string[] = [
     currentUserName ? `${currentUserName} (${t('vos', 'you')})` : t('Vos', 'You'),
@@ -366,12 +355,6 @@ export function PlanChat({
             >
               {typingName ? t(`${typingName} está escribiendo…`, `${typingName} is typing…`) : ''}
             </div>
-            {canWrite && !published && activeContext.length > 0 && (
-              <div className={styles.contextHint}>
-                <span className={styles.contextHintLabel}>{t('Se usará como contexto', 'Will be used as context')}:</span>{' '}
-                {activeContext.join(' · ')}
-              </div>
-            )}
             {canWrite && !published && (
               <div className={styles.composer}>
                 <textarea
