@@ -150,6 +150,39 @@ export function DevelopClient({
   const firstHu = hus.find((h) => !h.done) ?? hus[0];
   const exampleN = firstHu?.number ?? 1;
 
+  // ---- Reference data (rendered as tables at the bottom of the guide) ----
+  const commands: Array<{ cmd: string; ex: string; desc: string }> = [
+    { cmd: '/task', ex: `/task ${exampleN}`, desc: t('Baja una HU (título, descripción, criterios) + memorias del cerebro a .axon/current-task.md.', 'Pulls a story (title, description, criteria) + brain memories into .axon/current-task.md.') },
+    { cmd: '/cerrar-hu', ex: `/cerrar-hu ${exampleN}`, desc: t('Cierra la HU: verifica criterios, genera pruebas de QA, lista tareas ejecutadas y la mueve a Verificación (QA).', 'Closes the story: checks criteria, generates QA tests, lists executed tasks and moves it to Verification (QA).') },
+    { cmd: '/skills', ex: '/skills sync', desc: t('Sincroniza el paquete de skills del equipo a ~/.qwen (o contribuí uno con /skills contribute).', "Syncs the team's skills package into ~/.qwen (or contribute one with /skills contribute).") },
+    { cmd: '/sync', ex: '/sync', desc: t('Trae lo último del cerebro; con /sync done publica tus aprendizajes al equipo.', 'Pulls the latest brain; with /sync done it publishes your learnings to the team.') },
+    { cmd: '/plan', ex: '/plan', desc: t('Ejecuta un plan (de Opus) paso a paso y verifica al final.', 'Executes an (Opus) plan step by step and verifies at the end.') },
+    { cmd: '/doctor', ex: '/doctor', desc: t('Diagnostica el setup completo (qwen, extensión, tokens, modelo y salud de los MCP).', 'Diagnoses the whole setup (qwen, extension, tokens, model and MCP health).') },
+  ];
+  const skills: Array<{ name: string; desc: string }> = [
+    { name: 'verify', desc: t('Corre tests + lint + type-check + build en contexto aislado y reporta el resultado REAL. Usalo antes de cerrar la HU.', 'Runs tests + lint + type-check + build in an isolated context and reports the REAL result. Use it before closing the story.') },
+    { name: 'commit', desc: t('Genera un mensaje de commit convencional a partir del diff.', 'Generates a conventional commit message from the diff.') },
+    { name: 'pr', desc: t('Redacta la descripción del Pull Request (resumen + plan de pruebas).', 'Drafts the Pull Request description (summary + test plan).') },
+    { name: 'review', desc: t('Revisa el cambio buscando bugs, riesgos y mejoras antes de subirlo.', 'Reviews the change for bugs, risks and improvements before pushing.') },
+    { name: 'test', desc: t('Escribe/actualiza pruebas para el código que tocaste.', 'Writes/updates tests for the code you touched.') },
+    { name: 'debug', desc: t('Diagnóstico sistemático de un fallo (reproducir → aislar → arreglar).', 'Systematic diagnosis of a failure (reproduce → isolate → fix).') },
+    { name: 'axon', desc: t('El ciclo completo con Axon (tarea → cerebro → cierre) como skill.', 'The full Axon loop (task → brain → close) as a skill.') },
+  ];
+  const mcpTools: Array<{ name: string; desc: string }> = [
+    { name: 'get_task', desc: t('Lee una HU (descripción, subtareas, comentarios).', 'Reads a story (description, subtasks, comments).') },
+    { name: 'list_my_tasks', desc: t('Lista las tareas asignadas a vos.', 'Lists tasks assigned to you.') },
+    { name: 'recall', desc: t('Busca memorias relevantes del cerebro del proyecto.', 'Searches relevant memories in the project brain.') },
+    { name: 'pull_project_brain', desc: t('Trae las novedades del cerebro central.', 'Pulls the latest from the central brain.') },
+    { name: 'capture_memory / publish_memory / cite_memory', desc: t('Registra, publica y cita aprendizajes.', 'Captures, publishes and cites learnings.') },
+    { name: 'update_task_status', desc: t('Mueve una tarea a otro estado del tablero.', 'Moves a task to another board state.') },
+    { name: 'add_comment', desc: t('Comenta una tarea (progreso, decisiones, contexto).', 'Comments on a task (progress, decisions, context).') },
+    { name: 'create_task', desc: t('Crea una tarea o subtarea descubierta durante el desarrollo.', 'Creates a task/subtask discovered during development.') },
+    { name: 'submit_qa_review', desc: t('Entrega la HU a QA (lo usa /cerrar-hu).', 'Hands the story to QA (used by /cerrar-hu).') },
+    { name: 'list_skills / submit_skill', desc: t('Baja el paquete de skills / contribuye uno (lo usa /skills).', 'Pulls the skills package / contributes one (used by /skills).') },
+    { name: 'generate_commit_message / generate_pr_description', desc: t('Genera commit y descripción de PR (lo usan las skills commit/pr).', 'Generates commit and PR description (used by the commit/pr skills).') },
+    { name: 'list_repo_tree / grep_repo', desc: t('Explora el repo del proyecto (sandbox de solo lectura).', 'Explores the project repo (read-only sandbox).') },
+  ];
+
   function generate() {
     setError(null);
     start(async () => {
@@ -168,10 +201,45 @@ export function DevelopClient({
       <section style={card}>
         <p style={{ ...lead, margin: 0 }}>
           {t(
-            'Fusion Code es nuestro editor de terminal (una extensión de Qwen Code) que corre sobre nuestro modelo Qwen3-Coder-Next en GPU propia. El flujo es: en Axon planeás con Opus y generás las HU; en tu máquina, Fusion Code ejecuta cada HU leyendo su contexto y el "cerebro" del proyecto por MCP. Seguí los 4 pasos — toma ~5 minutos la primera vez.',
-            'Fusion Code is our terminal editor (a Qwen Code extension) running on our own Qwen3-Coder-Next model on a dedicated GPU. The flow: in Axon you plan with Opus and generate the stories; on your machine, Fusion Code executes each story by reading its context and the project "brain" over MCP. Follow the 4 steps — it takes ~5 minutes the first time.',
+            'Fusion Code es nuestro editor de terminal (una extensión de Qwen Code) que corre sobre nuestro modelo Qwen3-Coder-Next en GPU propia. El flujo es: en Axon planeás con Opus y generás las HU; en tu máquina, Fusion Code ejecuta cada HU leyendo su contexto y el "cerebro" del proyecto por MCP. Configurás una sola vez (pasos 1–2, ~5 min) y después repetís el ciclo por cada HU (pasos 3–5).',
+            'Fusion Code is our terminal editor (a Qwen Code extension) running on our own Qwen3-Coder-Next model on a dedicated GPU. The flow: in Axon you plan with Opus and generate the stories; on your machine, Fusion Code executes each story by reading its context and the project "brain" over MCP. You set it up once (steps 1–2, ~5 min) and then repeat the loop per story (steps 3–5).',
           )}
         </p>
+      </section>
+
+      {/* Workflow at a glance */}
+      <section style={card}>
+        <h3 style={{ margin: '0 0 0.5rem' }}>{t('El ciclo completo, de un vistazo', 'The full loop, at a glance')}</h3>
+        <Sample>
+          {t(
+            `CONFIGURAR (una vez)
+  1. instalar Fusion Code   →  curl … | sh   (URL + token del modelo)
+  2. conectar el proyecto   →  token ad_pk_ en ~/.qwen/.env  +  .axon/config.json
+     /skills sync           →  baja el paquete de skills del equipo
+
+POR CADA HU (repetir)
+  3. /task <N>              →  baja la HU + criterios + cerebro a .axon/current-task.md
+     (opcional) ⚙ Plan de implementación en Axon → seguilo con Qwen
+     … implementás con Qwen …
+  4. verify                 →  corre tests + lint + build (resultado real)
+     /cerrar-hu <N>         →  verifica criterios, genera pruebas QA, → Verificación (QA)
+  5. commit / pr            →  commit y PR;  /sync  publica aprendizajes al cerebro
+     /task <siguiente>      →  próxima HU`,
+            `SET UP (once)
+  1. install Fusion Code    →  curl … | sh   (model URL + token)
+  2. connect the project    →  ad_pk_ token in ~/.qwen/.env  +  .axon/config.json
+     /skills sync           →  pull the team's skills package
+
+PER STORY (repeat)
+  3. /task <N>              →  pulls the story + criteria + brain into .axon/current-task.md
+     (optional) ⚙ Implementation plan in Axon → have Qwen follow it
+     … you implement with Qwen …
+  4. verify                 →  runs tests + lint + build (real result)
+     /cerrar-hu <N>         →  checks criteria, generates QA tests, → Verification (QA)
+  5. commit / pr            →  commit and PR;  /sync  publishes learnings to the brain
+     /task <next>           →  next story`,
+          )}
+        </Sample>
       </section>
 
       {/* Prerequisites */}
@@ -521,6 +589,56 @@ Dado … Cuando … Entonces …
           <code style={mono}>submit_skill</code>
           {t(' para compartirlo con el equipo.', ' to share it with the team.')}
         </p>
+      </section>
+
+      {/* Reference — commands */}
+      <section style={card}>
+        <h3 style={{ margin: '0 0 0.5rem' }}>{t('Referencia — comandos', 'Reference — commands')}</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <tbody>
+            {commands.map((c) => (
+              <tr key={c.cmd} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <td style={{ padding: '0.4rem 0.5rem 0.4rem 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                  <code style={mono}>{c.cmd}</code>
+                </td>
+                <td style={{ padding: '0.4rem 0.5rem', verticalAlign: 'top', color: 'var(--color-fg-muted)' }}>{c.desc}</td>
+                <td style={{ padding: '0.4rem 0 0.4rem 0.5rem', textAlign: 'right', verticalAlign: 'top' }}>
+                  <CopyRow value={c.ex} label={t('Copiar', 'Copy')} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      {/* Reference — skills */}
+      <section style={card}>
+        <h3 style={{ margin: '0 0 0.3rem' }}>{t('Referencia — skills', 'Reference — skills')}</h3>
+        <p style={{ ...lead, margin: '0 0 0.4rem' }}>
+          {t('Los skills se invocan pidiéndoselo a Qwen en lenguaje natural (p. ej. «usá la skill verify»).', 'Invoke a skill by asking Qwen in plain language (e.g. "use the verify skill").')}
+        </p>
+        <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--color-fg-muted)', fontSize: '0.86rem', lineHeight: 1.7 }}>
+          {skills.map((s) => (
+            <li key={s.name}>
+              <code style={mono}>{s.name}</code> — {s.desc}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Reference — MCP tools */}
+      <section style={card}>
+        <h3 style={{ margin: '0 0 0.3rem' }}>{t('Referencia — tools MCP (axon)', 'Reference — MCP tools (axon)')}</h3>
+        <p style={{ ...lead, margin: '0 0 0.4rem' }}>
+          {t('Qwen usa estas herramientas del MCP «axon» por vos; no hace falta invocarlas a mano.', 'Qwen uses these "axon" MCP tools for you; you rarely call them by hand.')}
+        </p>
+        <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--color-fg-muted)', fontSize: '0.86rem', lineHeight: 1.7 }}>
+          {mcpTools.map((m) => (
+            <li key={m.name}>
+              <code style={mono}>{m.name}</code> — {m.desc}
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* Troubleshooting */}
