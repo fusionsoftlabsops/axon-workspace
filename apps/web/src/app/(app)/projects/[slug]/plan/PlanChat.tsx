@@ -72,6 +72,9 @@ export function PlanChat({
   const published = plan.status === 'PUBLISHED';
   const showPreview = generating || !!generated;
   const canEdit = canWrite && !published && plan.status === 'READY' && !generating;
+  // Generating an HU's implementation plan is a read-only action, useful right when
+  // you're developing — so allow it once a plan exists (READY *or* published).
+  const canGenImpl = canWrite && !generating && (plan.status === 'READY' || published);
 
   useEffect(() => {
     msgRef.current?.scrollTo({ top: msgRef.current.scrollHeight });
@@ -573,6 +576,7 @@ export function PlanChat({
                             taskIndex={ti}
                             task={tk}
                             canEdit={canEdit}
+                            canGenImpl={canGenImpl}
                             repoNames={generated.suggestedRepos?.map((r) => r.name) ?? []}
                             onChange={setPlan}
                             onError={(m) => setError(m || null)}

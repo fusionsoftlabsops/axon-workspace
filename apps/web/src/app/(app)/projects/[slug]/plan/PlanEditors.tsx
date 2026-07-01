@@ -32,6 +32,7 @@ export function PlanTaskCard({
   taskIndex,
   task,
   canEdit,
+  canGenImpl = false,
   repoNames = [],
   onChange,
   onError,
@@ -41,6 +42,7 @@ export function PlanTaskCard({
   taskIndex: number;
   task: PlanTask;
   canEdit: boolean;
+  canGenImpl?: boolean;
   repoNames?: string[];
   onChange: (p: PlanView) => void;
   onError: (msg: string) => void;
@@ -370,31 +372,40 @@ export function PlanTaskCard({
             {task.repo && <span>◆ {task.repo}</span>}
             {task.recommendedRoles?.length > 0 && <span>{task.recommendedRoles.join(', ')}</span>}
           </div>
-          {canEdit && (
+          {(canEdit || canGenImpl) && (
             <div className={styles.rowActions}>
-              <button type="button" className={styles.miniBtn} onClick={openEdit} disabled={busy}>
-                ✎ {t('Editar', 'Edit')}
-              </button>
-              <button
-                type="button"
-                className={styles.miniBtn}
-                onClick={() => setRefineOpen((v) => !v)}
-                disabled={busy}
-              >
-                ↻ {busy ? t('Analizando…', 'Analyzing…') : t('Re-analizar', 'Re-analyze')}
-              </button>
-              <button type="button" className={`${styles.miniBtn} ${styles.miniDanger}`} onClick={remove} disabled={busy}>
-                🗑 {t('Quitar', 'Remove')}
-              </button>
-              <button
-                type="button"
-                className={styles.miniBtn}
-                onClick={genImplPlan}
-                disabled={busy || implBusy}
-                title={t('Lee el repo y genera un plan de implementación descargable', 'Reads the repo and generates a downloadable implementation plan')}
-              >
-                ⚙ {implBusy ? t('Generando… (puede tardar)', 'Generating… (may take a while)') : t('Plan de implementación', 'Implementation plan')}
-              </button>
+              {canEdit && (
+                <>
+                  <button type="button" className={styles.miniBtn} onClick={openEdit} disabled={busy}>
+                    ✎ {t('Editar', 'Edit')}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.miniBtn}
+                    onClick={() => setRefineOpen((v) => !v)}
+                    disabled={busy}
+                  >
+                    ↻ {busy ? t('Analizando…', 'Analyzing…') : t('Re-analizar', 'Re-analyze')}
+                  </button>
+                  <button type="button" className={`${styles.miniBtn} ${styles.miniDanger}`} onClick={remove} disabled={busy}>
+                    🗑 {t('Quitar', 'Remove')}
+                  </button>
+                </>
+              )}
+              {canGenImpl && (
+                <button
+                  type="button"
+                  className={styles.miniBtn}
+                  onClick={genImplPlan}
+                  disabled={busy || implBusy}
+                  title={t(
+                    'Genera un plan de implementación de la HU (usa el código del repo si hay uno configurado)',
+                    'Generates an implementation plan for the story (uses the repo code if one is configured)',
+                  )}
+                >
+                  ⚙ {implBusy ? t('Generando… (puede tardar)', 'Generating… (may take a while)') : t('Plan de implementación', 'Implementation plan')}
+                </button>
+              )}
             </div>
           )}
           {implDone && (

@@ -50,6 +50,7 @@ function taskProps(over: Record<string, unknown> = {}) {
     taskIndex: 1,
     task: task(),
     canEdit: true,
+    canGenImpl: true,
     repoNames: ['api', 'web'],
     onChange: vi.fn(),
     onError: vi.fn(),
@@ -74,6 +75,18 @@ describe('PlanTaskCard', () => {
     render(<PlanTaskCard {...(taskProps({ canEdit: false }) as never)} />);
     expect(screen.getByText('⏱ 2d')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Edit/i })).toBeNull();
+  });
+
+  it('shows the implementation-plan button even when not editable (published)', () => {
+    render(<PlanTaskCard {...(taskProps({ canEdit: false, canGenImpl: true }) as never)} />);
+    expect(screen.getByRole('button', { name: /Implementation plan/i })).toBeInTheDocument();
+    // ...but not the mutating edit controls.
+    expect(screen.queryByRole('button', { name: /Edit/i })).toBeNull();
+  });
+
+  it('hides the implementation-plan button when it is not allowed', () => {
+    render(<PlanTaskCard {...(taskProps({ canEdit: false, canGenImpl: false }) as never)} />);
+    expect(screen.queryByRole('button', { name: /Implementation plan/i })).toBeNull();
   });
 
   it('shows an assignment tag and can clear it', async () => {

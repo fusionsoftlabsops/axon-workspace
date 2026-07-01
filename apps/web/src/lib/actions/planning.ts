@@ -947,56 +947,53 @@ export async function generateImplPlanAction(
     chosen = projectRepos.find((r) => r.kind.toLowerCase() === task.category.toLowerCase());
   const repoPath = chosen?.repoPath ?? project?.repoPath ?? null;
 
-  const reader = await repoReaderFor({ repoPath });
-  if (!reader) {
-    return {
-      ok: false,
-      error: chosen
-        ? `El repo "${chosen.name}" no tiene una ruta local configurada (Ajustes → Repositorios).`
-        : 'No hay un repositorio configurado o accesible para esta HU (Ajustes → Repositorios).',
-    };
-  }
+  // The repo is optional: brownfield → ground the plan in the existing code;
+  // greenfield (no repo/local path) → still produce a plan from the HU + context.
+  const reader = repoPath ? await repoReaderFor({ repoPath }) : null;
 
-  // Outline + automatic relevant-file selection.
-  let tree: TreeNode[] = [];
-  try {
-    tree = await reader.tree({ maxDepth: 3 });
-  } catch {
-    /* repo unreadable — outline stays empty */
-  }
-  const outline = outlineTree(tree).slice(0, 400).join('\n');
-  const allFiles = flattenFiles(tree);
-
-  const kws = keywordsFrom(task);
-  const candidates = new Set<string>();
-  for (const kw of kws.slice(0, 6)) {
-    if (candidates.size >= 30) break;
-    try {
-      const hits = await reader.grep(kw);
-      for (const h of hits) {
-        candidates.add(h.path);
-        if (candidates.size >= 30) break;
-      }
-    } catch {
-      /* skip this keyword */
-    }
-  }
-  for (const p of allFiles) {
-    if (candidates.size >= 30) break;
-    if (kws.some((k) => p.toLowerCase().includes(k))) candidates.add(p);
-  }
-  if (candidates.size < 5) for (const p of allFiles.slice(0, 20)) candidates.add(p);
-
+  // Outline + automatic relevant-file selection (only when a repo is readable).
+  let outline = '';
   let repoFiles: ImplRepoFile[] = [];
-  try {
-    const { files } = await reader.readFiles([...candidates].slice(0, 25), {
-      maxFiles: 25,
-      maxBytesTotal: 140_000,
-      maxPerFile: 20_000,
-    });
-    repoFiles = files.map((f) => ({ path: f.path, content: f.content, language: f.language, truncated: f.truncated }));
-  } catch {
-    /* proceed with outline only */
+  if (reader) {
+    let tree: TreeNode[] = [];
+    try {
+      tree = await reader.tree({ maxDepth: 3 });
+    } catch {
+      /* repo unreadable — outline stays empty */
+    }
+    outline = outlineTree(tree).slice(0, 400).join('\n');
+    const allFiles = flattenFiles(tree);
+
+    const kws = keywordsFrom(task);
+    const candidates = new Set<string>();
+    for (const kw of kws.slice(0, 6)) {
+      if (candidates.size >= 30) break;
+      try {
+        const hits = await reader.grep(kw);
+        for (const h of hits) {
+          candidates.add(h.path);
+          if (candidates.size >= 30) break;
+        }
+      } catch {
+        /* skip this keyword */
+      }
+    }
+    for (const p of allFiles) {
+      if (candidates.size >= 30) break;
+      if (kws.some((k) => p.toLowerCase().includes(k))) candidates.add(p);
+    }
+    if (candidates.size < 5) for (const p of allFiles.slice(0, 20)) candidates.add(p);
+
+    try {
+      const { files } = await reader.readFiles([...candidates].slice(0, 25), {
+        maxFiles: 25,
+        maxBytesTotal: 140_000,
+        maxPerFile: 20_000,
+      });
+      repoFiles = files.map((f) => ({ path: f.path, content: f.content, language: f.language, truncated: f.truncated }));
+    } catch {
+      /* proceed with outline only */
+    }
   }
 
   const lang = await getServerLang();
