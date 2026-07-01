@@ -25,6 +25,10 @@ import {
 export interface ChatMsg {
   role: 'user' | 'assistant';
   content: string;
+  // Author attribution for collaborative chat (user messages). Optional and
+  // back-compatible: older messages have no author. The assistant has none.
+  authorId?: string;
+  authorName?: string;
 }
 export type Lang = 'es' | 'en';
 

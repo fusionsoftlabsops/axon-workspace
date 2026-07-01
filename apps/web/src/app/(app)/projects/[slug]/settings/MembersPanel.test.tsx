@@ -8,6 +8,8 @@ const h = vi.hoisted(() => ({
   removeMemberAction: vi.fn(),
   updateMemberRoleAction: vi.fn(),
   setMemberSeniorityAction: vi.fn(),
+  resendInvitationAction: vi.fn(),
+  transferOwnershipAction: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -16,6 +18,8 @@ vi.mock('@/lib/actions/projects', () => ({
   removeMemberAction: h.removeMemberAction,
   updateMemberRoleAction: h.updateMemberRoleAction,
   setMemberSeniorityAction: h.setMemberSeniorityAction,
+  resendInvitationAction: h.resendInvitationAction,
+  transferOwnershipAction: h.transferOwnershipAction,
 }));
 
 import { MembersPanel } from './MembersPanel';
@@ -175,5 +179,52 @@ describe('MembersPanel', () => {
     render(<MembersPanel {...props()} />);
     await user.click(screen.getByRole('button', { name: 'Remove' }));
     expect(await screen.findByText('rm err')).toBeInTheDocument();
+  });
+
+  it('invites with an explicit seniority', async () => {
+    const user = userEvent.setup();
+    h.inviteMemberAction.mockResolvedValue({ ok: true, data: { pending: false, email: 'new@x.com', emailSent: true } });
+    render(<MembersPanel {...props()} />);
+    await user.type(screen.getByPlaceholderText(/email@domain/i), 'new@x.com');
+    // form-level selects: [0] role, [1] seniority
+    await user.selectOptions(screen.getAllByRole('combobox')[1], 'SENIOR');
+    await user.click(screen.getByRole('button', { name: 'Invite' }));
+    expect(h.inviteMemberAction).toHaveBeenCalledWith('p', expect.objectContaining({ email: 'new@x.com', seniority: 'SENIOR' }));
+    expect(await screen.findByText(/notified by email/i)).toBeInTheDocument();
+  });
+
+  it('lists and resends a pending invitation', async () => {
+    const user = userEvent.setup();
+    h.resendInvitationAction.mockResolvedValue({ ok: true, data: { emailSent: true, token: 'tok', email: 'p@x.com' } });
+    render(
+      <MembersPanel
+        {...props({
+          pendingInvites: [{ id: 'inv1', email: 'p@x.com', role: 'MEMBER', seniority: 'JUNIOR', expiresAt: '2030-01-01' }],
+        })}
+      />,
+    );
+    expect(screen.getByText('p@x.com')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Resend' }));
+    expect(h.resendInvitationAction).toHaveBeenCalledWith('p', 'inv1');
+    expect(await screen.findByText(/resent by email/i)).toBeInTheDocument();
+  });
+
+  it('lets the owner transfer ownership and hides it for non-owners', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    h.transferOwnershipAction.mockResolvedValue({ ok: true });
+    // Owner viewing: currentUserId === ownerId
+    const ownerProps = props({ currentUserId: 'owner' });
+    const { unmount } = render(<MembersPanel {...ownerProps} />);
+    expect(screen.getByText(/Transfer ownership/i)).toBeInTheDocument();
+    const selects = screen.getAllByRole('combobox');
+    const transferSelect = selects[selects.length - 1];
+    await user.selectOptions(transferSelect, 'u1');
+    await user.click(screen.getByRole('button', { name: 'Transfer' }));
+    expect(h.transferOwnershipAction).toHaveBeenCalledWith('p', 'u1');
+    unmount();
+
+    render(<MembersPanel {...props({ currentUserId: 'me' })} />);
+    expect(screen.queryByText(/Transfer ownership/i)).toBeNull();
   });
 });

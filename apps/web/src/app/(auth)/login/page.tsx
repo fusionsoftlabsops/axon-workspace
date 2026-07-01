@@ -5,7 +5,7 @@ import { getServerT } from '@/lib/i18n/server';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ signed_up?: string; callbackUrl?: string }>;
+  searchParams: Promise<{ signed_up?: string; reset?: string; callbackUrl?: string }>;
 }) {
   const t = await getServerT();
   return (
@@ -28,14 +28,16 @@ export default async function LoginPage({
 async function AwaitedFlash({
   searchParams,
 }: {
-  searchParams: Promise<{ signed_up?: string }>;
+  searchParams: Promise<{ signed_up?: string; reset?: string }>;
 }) {
   const params = await searchParams;
-  if (params.signed_up === '1') {
+  if (params.signed_up === '1' || params.reset === '1') {
     const t = await getServerT();
     return (
       <p style={{ color: 'var(--color-success)', fontSize: '0.9rem' }}>
-        {t('Cuenta creada. Inicia sesión.', 'Account created. Sign in.')}
+        {params.reset === '1'
+          ? t('Contraseña actualizada. Inicia sesión.', 'Password updated. Sign in.')
+          : t('Cuenta creada. Inicia sesión.', 'Account created. Sign in.')}
       </p>
     );
   }

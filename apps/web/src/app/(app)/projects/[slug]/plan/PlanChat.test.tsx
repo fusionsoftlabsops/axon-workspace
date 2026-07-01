@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn() }));
 const h = vi.hoisted(() => ({
   planChatAction: vi.fn(),
+  planTypingAction: vi.fn(),
   startPlanGenerationAction: vi.fn(),
   publishPlanAction: vi.fn(),
   addPlanLinkAction: vi.fn(),
@@ -24,12 +25,33 @@ vi.mock('./PlanEditors', () => ({
 }));
 vi.mock('@/lib/actions/planning', () => ({
   planChatAction: h.planChatAction,
+  planTypingAction: h.planTypingAction,
   startPlanGenerationAction: h.startPlanGenerationAction,
   publishPlanAction: h.publishPlanAction,
   addPlanLinkAction: h.addPlanLinkAction,
   removePlanAttachmentAction: h.removePlanAttachmentAction,
   reestimatePlanAction: h.reestimatePlanAction,
 }));
+
+// Minimal EventSource stub so the collaborative SSE effect can mount and we can
+// drive typing/presence/message events in tests.
+class FakeEventSource {
+  static instances: FakeEventSource[] = [];
+  url: string;
+  onmessage: ((ev: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+  constructor(url: string) {
+    this.url = url;
+    FakeEventSource.instances.push(this);
+  }
+  emit(obj: unknown) {
+    this.onmessage?.({ data: JSON.stringify(obj) });
+  }
+  close() {
+    this.closed = true;
+  }
+}
 
 import { PlanChat } from './PlanChat';
 
@@ -64,7 +86,10 @@ beforeEach(() => {
   router.push.mockReset();
   router.refresh.mockReset();
   Object.values(h).forEach((fn) => fn.mockReset());
+  h.planTypingAction.mockResolvedValue({ ok: true });
   vi.stubGlobal('fetch', vi.fn());
+  FakeEventSource.instances = [];
+  vi.stubGlobal('EventSource', FakeEventSource as unknown as typeof EventSource);
   (Element.prototype as unknown as { scrollTo: unknown }).scrollTo = vi.fn();
 });
 
@@ -104,7 +129,7 @@ describe('PlanChat', () => {
     render(<PlanChat slug="p" canWrite initialPlan={plan()} />);
     await user.click(screen.getByRole('button', { name: /Generate plan/i }));
     expect(h.startPlanGenerationAction).toHaveBeenCalledWith('p');
-    expect(await screen.findByText(/Generating the plan with Claude Opus/i)).toBeInTheDocument();
+    expect(await screen.findByText(/close this tab and come back/i)).toBeInTheDocument();
   });
 
   it('shows an error when generation fails to start', async () => {
@@ -149,7 +174,7 @@ describe('PlanChat', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2500);
     });
-    expect(screen.getByText(/Generating the plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/close this tab and come back/i)).toBeInTheDocument();
     vi.useRealTimers();
   });
 
@@ -280,5 +305,60 @@ describe('PlanChat', () => {
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Generate plan/i })).toBeNull();
     expect(screen.getByText(/Skip to board/i)).toBeInTheDocument();
+  });
+
+  it('renders the author name on a user message', () => {
+    render(
+      <PlanChat
+        slug="p"
+        canWrite
+        currentUserId="me"
+        initialPlan={plan({
+          messages: [{ role: 'user', content: 'hola', authorId: 'u2', authorName: 'Ana' }],
+        })}
+      />,
+    );
+    expect(screen.getByText('Ana')).toBeInTheDocument();
+    expect(screen.getByText('hola')).toBeInTheDocument();
+  });
+
+  it('shows a typing indicator from another member via SSE', async () => {
+    render(<PlanChat slug="p" canWrite currentUserId="me" initialPlan={plan()} />);
+    const es = FakeEventSource.instances[0];
+    expect(es.url).toContain('/plan/stream');
+    await act(async () => {
+      es.emit({ type: 'typing', userId: 'u2', name: 'Ana' });
+    });
+    expect(await screen.findByText(/Ana is typing/i)).toBeInTheDocument();
+  });
+
+  it('ignores own typing events', async () => {
+    render(<PlanChat slug="p" canWrite currentUserId="me" initialPlan={plan()} />);
+    const es = FakeEventSource.instances[0];
+    await act(async () => {
+      es.emit({ type: 'typing', userId: 'me', name: 'Me' });
+    });
+    expect(screen.queryByText(/is typing/i)).toBeNull();
+  });
+
+  it('tracks presence join and leave from SSE', async () => {
+    render(<PlanChat slug="p" canWrite currentUserId="me" initialPlan={plan()} />);
+    const es = FakeEventSource.instances[0];
+    await act(async () => {
+      es.emit({ type: 'presence', state: 'join', userId: 'u2', name: 'Ana' });
+    });
+    expect(await screen.findByText(/Online/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ana/)).toBeInTheDocument();
+    await act(async () => {
+      es.emit({ type: 'presence', state: 'leave', userId: 'u2', name: 'Ana' });
+    });
+    expect(screen.queryByText(/Online/i)).toBeNull();
+  });
+
+  it('pings typing while composing', async () => {
+    const user = userEvent.setup();
+    render(<PlanChat slug="p" canWrite currentUserId="me" initialPlan={plan()} />);
+    await user.type(screen.getByPlaceholderText(/Type your answer/i), 'h');
+    expect(h.planTypingAction).toHaveBeenCalledWith('p');
   });
 });

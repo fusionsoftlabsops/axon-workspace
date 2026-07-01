@@ -77,12 +77,12 @@ export async function signupAction(input: SignupInput): Promise<SignupActionResu
       // just consumed) so invited collaborators land in their project on signup.
       const projInvites = await tx.invitation.findMany({
         where: { email, projectId: { not: null } },
-        select: { id: true, projectId: true, projectRole: true },
+        select: { id: true, projectId: true, projectRole: true, seniority: true },
       });
       for (const pi of projInvites) {
         if (!pi.projectId || !pi.projectRole) continue;
         await tx.projectMember.createMany({
-          data: { projectId: pi.projectId, userId: user.id, role: pi.projectRole },
+          data: { projectId: pi.projectId, userId: user.id, role: pi.projectRole, seniority: pi.seniority },
           skipDuplicates: true,
         });
       }

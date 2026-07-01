@@ -71,11 +71,31 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 export const memberRoleSchema = z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER']);
 
+export const senioritySchema = z.enum(['JUNIOR', 'SEMI_SENIOR', 'SENIOR']);
+export type SeniorityInput = z.infer<typeof senioritySchema>;
+
 export const inviteMemberSchema = z.object({
   email: z.string().email(),
   role: memberRoleSchema,
+  // Optional seniority for AI time estimation, captured at invite time.
+  seniority: senioritySchema.optional(),
 });
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
+
+// Request a login-password reset link by email (always responds ok to avoid
+// account enumeration). The vault is unaffected — see resetPasswordSchema.
+export const requestPasswordResetSchema = z.object({
+  email: z.string().email(),
+});
+export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
+
+// Set a new login password from a reset token. Only updates server auth; the
+// E2E vault stays protected by its own passphrase / recovery code.
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(12, 'Mínimo 12 caracteres'),
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 // ---------- Task ----------
 
