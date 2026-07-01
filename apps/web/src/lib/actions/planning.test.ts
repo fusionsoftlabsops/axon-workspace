@@ -631,11 +631,18 @@ describe('generateImplPlanAction', () => {
     expect(await generateImplPlanAction('slug', 9, 0)).toEqual({ ok: false, error: 'HU no encontrada' });
   });
 
-  it('rejects when there is no readable repo', async () => {
+  it('generates a context-only plan when there is no readable repo (greenfield)', async () => {
     prismaMock.projectRepo.findMany.mockResolvedValue([]);
     repoReaderMock.mockResolvedValue(null);
+    plannerMock.generateImplementationPlan.mockResolvedValue('# IMPL (no repo)');
+    storageMock.isStorageConfigured.mockReturnValue(false);
     const res = await generateImplPlanAction('slug', 0, 0);
-    expect(res.ok).toBe(false);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.data.markdown).toBe('# IMPL (no repo)');
+    // Called with an empty outline + no repo files (context-only).
+    const args = plannerMock.generateImplementationPlan.mock.calls[0]!;
+    expect(args[4]).toBe(''); // outline
+    expect(args[5]).toEqual([]); // repoFiles
   });
 
   it('returns an AI error', async () => {
