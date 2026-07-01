@@ -554,6 +554,9 @@ model ProjectPlan {
   improvedIdea   String?    @db.Text
   error          String?
   contextGraph   String?    // which graph grounds this plan: 'CODE_GRAPH' | 'NONE' | null (auto)
+  // Per-user chat bubble colors, shared across the project (one plan per project):
+  // { [userId]: "#rrggbb" }. Anyone can recolor anyone; synced live over SSE.
+  chatColors     Json?
   // Live generation progress so the UI can show phase/elapsed and detect orphans
   // (set while status=GENERATING): { phase, startedAt }. heartbeatAt is bumped as
   // generation advances; a stale heartbeat with status=GENERATING ⇒ orphaned run.

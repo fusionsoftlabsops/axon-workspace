@@ -7,6 +7,7 @@ const h = vi.hoisted(() => ({
   planChatAction: vi.fn(),
   planTypingAction: vi.fn(),
   clearPlanChatAction: vi.fn(),
+  setChatColorAction: vi.fn(),
   startPlanGenerationAction: vi.fn(),
   publishPlanAction: vi.fn(),
   addPlanLinkAction: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('@/lib/actions/planning', () => ({
   planChatAction: h.planChatAction,
   planTypingAction: h.planTypingAction,
   clearPlanChatAction: h.clearPlanChatAction,
+  setChatColorAction: h.setChatColorAction,
   startPlanGenerationAction: h.startPlanGenerationAction,
   publishPlanAction: h.publishPlanAction,
   addPlanLinkAction: h.addPlanLinkAction,
@@ -387,19 +389,50 @@ describe('PlanChat', () => {
     expect(screen.getByText(/Manu \(you\)/i)).toBeInTheDocument();
   });
 
-  it('renders per-message context chips', () => {
+  it('does not render context in the chat', () => {
     render(
       <PlanChat
         slug="p"
         canWrite
         initialPlan={plan({
-          messages: [{ role: 'user', content: 'usa esto', context: { sources: ['spec.md', 'Code graph'] } }],
+          messages: [{ role: 'user', content: 'usa esto', context: { sources: ['spec.md'] } }],
         })}
       />,
     );
-    expect(screen.getByText('Context:')).toBeInTheDocument();
-    expect(screen.getByText('spec.md')).toBeInTheDocument();
-    expect(screen.getByText('Code graph')).toBeInTheDocument();
+    expect(screen.queryByText('Context:')).toBeNull();
+    expect(screen.queryByText('spec.md')).toBeNull();
+  });
+
+  it('colors a user message by its author', () => {
+    render(
+      <PlanChat
+        slug="p"
+        canWrite
+        currentUserId="me"
+        members={[{ userId: 'u2', name: 'Ana' }]}
+        initialPlan={plan({ messages: [{ role: 'user', content: 'hola', authorId: 'u2', authorName: 'Ana' }] })}
+      />,
+    );
+    // Default palette color for the first member is #3b82f6 → rgb(59, 130, 246).
+    const style = screen.getByText('hola').getAttribute('style') ?? '';
+    expect(style).toMatch(/#3b82f6|rgb\(59, 130, 246\)/i);
+  });
+
+  it('applies live color changes from a colors SSE event', async () => {
+    render(
+      <PlanChat
+        slug="p"
+        canWrite
+        currentUserId="me"
+        members={[{ userId: 'u2', name: 'Ana' }]}
+        initialPlan={plan({ messages: [{ role: 'user', content: 'hola', authorId: 'u2', authorName: 'Ana' }] })}
+      />,
+    );
+    await act(async () => {
+      FakeEventSource.instances[0].emit({ type: 'colors', colors: { u2: '#ff0000' } });
+    });
+    const style = screen.getByText('hola').getAttribute('style') ?? '';
+    expect(style).toMatch(/#ff0000|rgb\(255, 0, 0\)/i);
   });
 
   it('restarts the conversation after confirmation', async () => {

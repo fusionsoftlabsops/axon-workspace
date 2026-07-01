@@ -5,6 +5,7 @@ const m = vi.hoisted(() => ({
   auth: vi.fn(),
   findUnique: vi.fn(),
   userFindUnique: vi.fn(() => Promise.resolve({ name: 'Me' })),
+  memberFindMany: vi.fn(() => Promise.resolve([])),
   findMany: vi.fn(() => Promise.resolve([])),
   getOrCreatePlanAction: vi.fn(),
   notFound: vi.fn(() => {
@@ -17,6 +18,7 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     project: { findUnique: m.findUnique },
     user: { findUnique: m.userFindUnique },
+    projectMember: { findMany: m.memberFindMany },
     projectFile: { findMany: m.findMany },
   },
 }));
@@ -35,6 +37,7 @@ beforeEach(() => {
   Object.values(m).forEach((fn) => (fn as any).mockReset?.());
   m.findMany.mockResolvedValue([]);
   m.userFindUnique.mockResolvedValue({ name: 'Me' });
+  m.memberFindMany.mockResolvedValue([]);
   m.notFound.mockImplementation(() => {
     throw new Error('NEXT_NOT_FOUND');
   });

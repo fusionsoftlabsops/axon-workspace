@@ -21,6 +21,15 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
   const role = project.members[0]!.role;
 
   const me = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
+  // All members (name + id) so the chat can color each person and offer the
+  // color-picker card. Stable order → stable default color assignment.
+  const members = (
+    await prisma.projectMember.findMany({
+      where: { projectId: project.id },
+      orderBy: { joinedAt: 'asc' },
+      select: { userId: true, user: { select: { name: true } } },
+    })
+  ).map((m) => ({ userId: m.userId, name: m.user.name ?? '' }));
   const res = await getOrCreatePlanAction(slug);
   // The project's uploaded files, so the user can mark which feed the plan
   // straight from the chat view (no trip to the Files tab).
@@ -56,6 +65,7 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
           currentUserName={me?.name ?? undefined}
           initialPlan={res.data}
           contextFiles={contextFiles}
+          members={members}
         />
       ) : (
         <p className={styles.error}>{res.ok ? t('No se pudo cargar el plan', 'Could not load the plan') : res.error}</p>

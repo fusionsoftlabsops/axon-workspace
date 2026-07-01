@@ -35,6 +35,7 @@ import { fetchUrlText, isImageMime } from '@/lib/ai/extract';
 import { getObjectBytes, deleteObject, putObject, buildKey, isStorageConfigured } from '@/lib/storage';
 import { publish, planChannel } from '@/lib/realtime';
 import { seedBrainFromPlan } from '@/lib/brain/seed-from-plan';
+import { HEX_COLOR } from '@/lib/plan-colors';
 import type { ActionResult } from './projects';
 
 export interface AttachmentView {
@@ -65,6 +66,7 @@ export interface PlanView {
   contextGraph: ContextGraph | null;
   progress: PlanProgress | null;
   heartbeatAt: string | null; // ISO; last progress tick while GENERATING
+  chatColors: Record<string, string>; // { [userId]: "#rrggbb" }, shared per project
 }
 
 // A GENERATING plan whose heartbeat is older than this is considered orphaned
@@ -109,6 +111,7 @@ function toView(p: {
   contextGraph: string | null;
   stats?: unknown;
   heartbeatAt?: Date | null;
+  chatColors?: unknown;
   attachments: PlanAttachment[];
 }): PlanView {
   return {
@@ -121,6 +124,8 @@ function toView(p: {
     contextGraph: p.contextGraph === 'NONE' || p.contextGraph === 'CODE_GRAPH' ? p.contextGraph : null,
     progress: p.status === 'GENERATING' ? toProgress(p.stats) : null,
     heartbeatAt: p.heartbeatAt ? p.heartbeatAt.toISOString() : null,
+    chatColors:
+      p.chatColors && typeof p.chatColors === 'object' ? (p.chatColors as Record<string, string>) : {},
     attachments: p.attachments.map((a) => ({
       id: a.id,
       kind: a.kind,
@@ -162,32 +167,6 @@ async function contextFilesManifest(projectId: string): Promise<string> {
       return excerpt ? `${head}: ${excerpt}` : head;
     })
     .join('\n');
-}
-
-/** The context sources active for the current iteration (short labels), so each
- *  chat message / generation can record "what the AI had in mind": the code graph
- *  (when connected + READY), the plan's own attachments, and the project files
- *  marked as context (only the usable ones — images or READY documents). */
-async function describeActiveContext(
-  projectId: string,
-  plan: { attachments: PlanAttachment[]; contextGraph: string | null },
-): Promise<string[]> {
-  const sources: string[] = [];
-  if (plan.contextGraph !== 'NONE') {
-    const row = await prisma.codeAnalysis.findUnique({ where: { projectId }, select: { status: true } });
-    if (row?.status === 'READY') sources.push('Grafo de código');
-  }
-  for (const a of plan.attachments) sources.push(a.name);
-  const files = await prisma.projectFile.findMany({
-    where: { projectId, isContext: true },
-    orderBy: { createdAt: 'asc' },
-    select: { name: true, mimeType: true, category: true, contextStatus: true },
-  });
-  for (const f of files) {
-    const usable = isImageMime(f.mimeType) || f.category === 'IMAGE' || f.contextStatus === 'READY';
-    if (usable) sources.push(f.name);
-  }
-  return sources;
 }
 
 async function loadPlan(projectId: string) {
@@ -241,15 +220,11 @@ export async function planChatAction(slug: string, userMessage: string): Promise
 
   const history: ChatMsg[] = Array.isArray(plan.messages) ? (plan.messages as unknown as ChatMsg[]) : [];
   const author = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } });
-  // Snapshot the context the AI will take into account for this iteration, so the
-  // message records which files/graph grounded it.
-  const sources = await describeActiveContext(ctx.projectId, plan);
   const userMsg: ChatMsg = {
     role: 'user',
     content: text.slice(0, 4000),
     authorId: ctx.userId,
     authorName: author?.name ?? undefined,
-    ...(sources.length > 0 ? { context: { sources } } : {}),
   };
   const withUser: ChatMsg[] = [...history, userMsg];
   const keepStatus = plan.status === 'PUBLISHED' ? 'PUBLISHED' : 'CHATTING';
@@ -320,6 +295,36 @@ export async function clearPlanChatAction(slug: string): Promise<ActionResult<Pl
   });
   await publish(planChannel(plan.id), { type: 'message', message: messages[0]! });
   return { ok: true, data: toView(updated) };
+}
+
+/**
+ * Set a user's chat bubble color for this project (shared state — anyone can
+ * recolor anyone). Persists the map and broadcasts it so all viewers update live.
+ */
+export async function setChatColorAction(
+  slug: string,
+  targetUserId: string,
+  color: string,
+): Promise<ActionResult<Record<string, string>>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (!HEX_COLOR.test(color)) return { ok: false, error: 'Color inválido' };
+
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+
+  const current =
+    plan.chatColors && typeof plan.chatColors === 'object'
+      ? (plan.chatColors as Record<string, string>)
+      : {};
+  const colors = { ...current, [targetUserId]: color.toLowerCase() };
+
+  await prisma.projectPlan.update({
+    where: { id: plan.id },
+    data: { chatColors: colors as unknown as Prisma.InputJsonValue },
+  });
+  await publish(planChannel(plan.id), { type: 'colors', colors });
+  return { ok: true, data: colors };
 }
 
 /** Broadcast a "typing" ping to other plan viewers (no persistence). */
@@ -693,21 +698,6 @@ async function runPlanGeneration(
     await bumpPlanPhase(planId, 'normalizing', startedAt);
     normalizeEstimates(plan); // derive "junior–senior" range per HU
 
-    // Record, in the chat history, which context grounded this generation.
-    const attachments = await prisma.planAttachment.findMany({ where: { planId } });
-    const sources = await describeActiveContext(projectId, { attachments, contextGraph });
-    const noteMsgs: ChatMsg[] =
-      sources.length > 0
-        ? [
-            {
-              role: 'assistant',
-              content: (lang === 'es' ? '✦ Plan generado usando: ' : '✦ Plan generated using: ') + sources.join(' · '),
-              context: { sources },
-            },
-          ]
-        : [];
-    const nextMessages = [...messages, ...noteMsgs];
-
     await prisma.projectPlan.update({
       where: { id: planId },
       data: {
@@ -718,10 +708,8 @@ async function runPlanGeneration(
         error: null,
         stats: Prisma.JsonNull,
         heartbeatAt: new Date(),
-        ...(noteMsgs.length > 0 ? { messages: nextMessages as unknown as Prisma.InputJsonValue } : {}),
       },
     });
-    if (noteMsgs.length > 0) await publish(planChannel(planId), { type: 'message', message: noteMsgs[0]! });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[planning] generation failed:', err);
