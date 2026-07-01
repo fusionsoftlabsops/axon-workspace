@@ -9,6 +9,7 @@ import {
   planChatAction,
   planTypingAction,
   clearPlanChatAction,
+  setChatColorAction,
   startPlanGenerationAction,
   publishPlanAction,
   addPlanLinkAction,
@@ -17,9 +18,11 @@ import {
   type PlanView,
 } from '@/lib/actions/planning';
 import type { GeneratedPlan } from '@/lib/ai/plan-schema';
+import { effectiveColor, contrastText } from '@/lib/plan-colors';
 import { PlanTaskCard, PlanSprintHead } from './PlanEditors';
 import { PlanRepos } from './PlanRepos';
 import { PlanContext, type ContextFile } from './PlanContext';
+import { ChatColors } from './ChatColors';
 import { PlanProgress } from './PlanProgress';
 import styles from './plan.module.scss';
 
@@ -30,6 +33,7 @@ export function PlanChat({
   currentUserName,
   initialPlan,
   contextFiles = [],
+  members = [],
 }: {
   slug: string;
   canWrite: boolean;
@@ -37,6 +41,7 @@ export function PlanChat({
   currentUserName?: string;
   initialPlan: PlanView;
   contextFiles?: ContextFile[];
+  members?: { userId: string; name: string }[];
 }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -56,6 +61,8 @@ export function PlanChat({
   const [connected, setConnected] = useState(false);
   const [typingName, setTypingName] = useState<string | null>(null);
   const [presence, setPresence] = useState<{ userId: string; name: string }[]>([]);
+  // Per-user chat colors (shared per project, synced live).
+  const [chatColors, setChatColors] = useState<Record<string, string>>(initialPlan.chatColors ?? {});
   const msgRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,7 +144,7 @@ export function PlanChat({
     };
 
     es.onmessage = (ev) => {
-      let data: { type?: string; userId?: string; name?: string; state?: string };
+      let data: { type?: string; userId?: string; name?: string; state?: string; colors?: Record<string, string> };
       try {
         data = JSON.parse(ev.data);
       } catch {
@@ -145,6 +152,8 @@ export function PlanChat({
       }
       if (data.type === 'message') {
         void refresh();
+      } else if (data.type === 'colors' && data.colors) {
+        setChatColors(data.colors);
       } else if (data.type === 'typing') {
         if (data.userId && data.userId !== currentUserId) {
           setTypingName(data.name || t('Alguien', 'Someone'));
@@ -326,27 +335,29 @@ export function PlanChat({
               <span>· {t('En línea', 'Online')}: {onlineNames.join(', ')}</span>
             </div>
             <div className={styles.messages} ref={msgRef}>
-              {plan.messages.map((m, i) => (
+              {plan.messages.map((m, i) => {
+                const bubble =
+                  m.role === 'user' && m.authorId
+                    ? (() => {
+                        const bg = effectiveColor(m.authorId, chatColors, members);
+                        return { background: bg, color: contrastText(bg) };
+                      })()
+                    : undefined;
+                return (
                 <div
                   key={i}
                   className={`${styles.msg} ${m.role === 'assistant' ? styles.assistant : styles.user}`}
+                  style={bubble}
                 >
                   {m.role === 'user' && m.authorName && (
-                    <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.7, marginBottom: '0.15rem' }}>
+                    <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.75, marginBottom: '0.15rem' }}>
                       {m.authorName}
                     </span>
                   )}
                   {m.content}
-                  {m.context?.sources && m.context.sources.length > 0 && (
-                    <div className={styles.msgContext}>
-                      <span className={styles.msgContextLabel}>{t('Contexto', 'Context')}:</span>
-                      {m.context.sources.map((s, k) => (
-                        <span key={k} className={styles.msgContextChip}>{s}</span>
-                      ))}
-                    </div>
-                  )}
                 </div>
-              ))}
+                );
+              })}
               {sending && <div className={`${styles.msg} ${styles.assistant}`}>…</div>}
             </div>
             <div
@@ -382,13 +393,21 @@ export function PlanChat({
               </div>
             )}
           </div>
-          <PlanContext
-            slug={slug}
-            canWrite={canWrite}
-            contextGraph={plan.contextGraph}
-            contextFiles={contextFiles}
-            onChange={setPlan}
-          />
+          <div className={styles.sideCol}>
+            <PlanContext
+              slug={slug}
+              canWrite={canWrite}
+              contextGraph={plan.contextGraph}
+              contextFiles={contextFiles}
+              onChange={setPlan}
+            />
+            <ChatColors
+              slug={slug}
+              members={members}
+              colors={chatColors}
+              onColorsChange={setChatColors}
+            />
+          </div>
         </div>
         {/* Link repos BEFORE a plan exists so an existing project can be analyzed
             (brownfield). Once a plan is generated, the repos section also appears

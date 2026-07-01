@@ -94,6 +94,7 @@ import {
   planChatAction,
   planTypingAction,
   clearPlanChatAction,
+  setChatColorAction,
   addPlanLinkAction,
   removePlanAttachmentAction,
   refinePlanTaskAction,
@@ -256,21 +257,37 @@ describe('planChatAction', () => {
     expect(manifestArg).toContain('IMPORTANT SPEC');
   });
 
-  it('records the context snapshot on the user message', async () => {
+  it('does not attach context to the user message (kept out of the chat)', async () => {
     prismaMock.projectFile.findMany.mockResolvedValue([
       { name: 'spec.md', mimeType: 'text/markdown', category: 'DOCUMENT', contextStatus: 'READY' },
     ]);
     plannerMock.planChatReply.mockResolvedValue('ok');
     prismaMock.projectPlan.update.mockResolvedValue(planRow());
     await planChatAction('slug', 'hi');
-    // First update persists the user message; its context.sources include the file.
     const firstUpdate = prismaMock.projectPlan.update.mock.calls[0]![0].data.messages as Array<{
       role: string;
-      context?: { sources: string[] };
+      context?: unknown;
     }>;
     const userMsg = firstUpdate[firstUpdate.length - 1]!;
     expect(userMsg.role).toBe('user');
-    expect(userMsg.context?.sources).toContain('spec.md');
+    expect(userMsg.context).toBeUndefined();
+  });
+});
+
+describe('setChatColorAction', () => {
+  it('rejects an invalid color', async () => {
+    expect(await setChatColorAction('slug', 'u2', 'red')).toEqual({ ok: false, error: 'Color inválido' });
+  });
+
+  it('merges + persists the color and broadcasts it', async () => {
+    const { publish } = await import('@/lib/realtime');
+    prismaMock.projectPlan.findFirst.mockResolvedValue({ ...planRow(), chatColors: { u1: '#111111' } });
+    prismaMock.projectPlan.update.mockResolvedValue(planRow());
+    const r = await setChatColorAction('slug', 'u2', '#AABBCC');
+    expect(r).toEqual({ ok: true, data: { u1: '#111111', u2: '#aabbcc' } });
+    const data = prismaMock.projectPlan.update.mock.calls[0]![0].data as { chatColors: Record<string, string> };
+    expect(data.chatColors).toEqual({ u1: '#111111', u2: '#aabbcc' });
+    expect(publish).toHaveBeenCalledWith('plan:plan1', { type: 'colors', colors: { u1: '#111111', u2: '#aabbcc' } });
   });
 });
 
