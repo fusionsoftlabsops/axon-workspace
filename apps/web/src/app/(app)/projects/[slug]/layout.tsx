@@ -43,6 +43,7 @@ export default async function ProjectLayout({
     { href: `${base}/vault`, label: '※ Vault' },
     { href: `${base}/brain`, label: `⁂ ${t('Cerebro', 'Brain')}` },
     { href: `${base}/stories`, label: `✎ ${t('HUs', 'Stories')}` },
+    { href: `${base}/develop`, label: `⌘ ${t('Desarrollar', 'Develop')}` },
     { href: `${base}/deploy`, label: `⚡ ${t('Deploy', 'Deploy')}` },
     ...(canManage
       ? [

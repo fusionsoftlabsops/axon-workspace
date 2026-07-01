@@ -287,7 +287,8 @@ export function PlanChat({
           <Card className={styles.idea} style={{ marginBottom: '1rem' }}>
             ✓ {t('Plan publicado al tablero.', 'Plan published to the board.')}{' '}
             <Link href={`/projects/${slug}/board`}>{t('Ir al tablero', 'Go to board')}</Link> ·{' '}
-            <Link href={`/projects/${slug}/roadmap`}>{t('Ver roadmap', 'View roadmap')}</Link>
+            <Link href={`/projects/${slug}/roadmap`}>{t('Ver roadmap', 'View roadmap')}</Link> ·{' '}
+            <Link href={`/projects/${slug}/develop`}>{t('▶ Trabajá las HU con Fusion Code', '▶ Work the stories with Fusion Code')}</Link>
           </Card>
         )}
         <div className={styles.chatRow}>

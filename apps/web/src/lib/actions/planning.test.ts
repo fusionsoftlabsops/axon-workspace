@@ -87,6 +87,7 @@ vi.mock('@/lib/realtime', () => ({
   subscribe: vi.fn(async () => () => {}),
   planChannel: (id: string) => `plan:${id}`,
 }));
+vi.mock('@/lib/brain/seed-from-plan', () => ({ seedBrainFromPlan: vi.fn(async () => 3) }));
 
 import {
   getOrCreatePlanAction,
@@ -654,5 +655,28 @@ describe('publishPlanAction', () => {
     expect(txMock.sprint.create).toHaveBeenCalled();
     expect(txMock.task.create).toHaveBeenCalled();
     expect(res).toEqual({ ok: true, data: { tasks: 1, sprints: 1 } });
+  });
+
+  it('auto-seeds the brain from the plan after publishing', async () => {
+    const { seedBrainFromPlan } = await import('@/lib/brain/seed-from-plan');
+    prismaMock.workflow.findFirst.mockResolvedValue({ states: [{ id: 'st1' }] });
+    txMock.projectTaskCounter.update.mockResolvedValue({ next: 5 });
+    txMock.sprint.create.mockResolvedValue({ id: 'sp1' });
+    txMock.task.create.mockResolvedValue({ id: 't1' });
+    await publishPlanAction('slug');
+    expect(seedBrainFromPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p1', authorId: 'u1' }),
+    );
+  });
+
+  it('still succeeds if brain seeding throws', async () => {
+    const { seedBrainFromPlan } = await import('@/lib/brain/seed-from-plan');
+    (seedBrainFromPlan as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('brain down'));
+    prismaMock.workflow.findFirst.mockResolvedValue({ states: [{ id: 'st1' }] });
+    txMock.projectTaskCounter.update.mockResolvedValue({ next: 5 });
+    txMock.sprint.create.mockResolvedValue({ id: 'sp1' });
+    txMock.task.create.mockResolvedValue({ id: 't1' });
+    const res = await publishPlanAction('slug');
+    expect(res.ok).toBe(true);
   });
 });

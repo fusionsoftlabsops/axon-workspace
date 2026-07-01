@@ -88,6 +88,17 @@ const schema = z.object({
   // in-process EventEmitter (works for a single replica). Redis already runs in
   // fusion-infra. See lib/realtime.ts.
   REDIS_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  // Public base URL of the fusion-infra control-plane that serves the "Fusion
+  // Code" installer (`${base}/api/coding-tools/install.{sh,ps1}`) and hosts the
+  // Coding Tools page. Used by the project "Desarrollar" onboarding to build the
+  // one-line install command. Optional: if unset, the guide shows manual steps.
+  FUSION_CODE_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  // Public URL of the Axon MCP (the `axon` MCP server Fusion Code / Qwen talks
+  // to). Shown in the onboarding config snippet. Defaults to the deployed one.
+  AXON_MCP_URL: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().url().default('https://mcp-axon.fusion-soft-lab.com/mcp'),
+  ),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
