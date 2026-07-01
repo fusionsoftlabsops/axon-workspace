@@ -72,9 +72,10 @@ export function PlanChat({
   const published = plan.status === 'PUBLISHED';
   const showPreview = generating || !!generated;
   const canEdit = canWrite && !published && plan.status === 'READY' && !generating;
-  // Generating an HU's implementation plan is a read-only action, useful right when
-  // you're developing — so allow it once a plan exists (READY *or* published).
-  const canGenImpl = canWrite && !generating && (plan.status === 'READY' || published);
+  // Generating an HU's implementation plan is a read-only action, useful whenever
+  // the HU cards are on screen — i.e. whenever a generated plan exists (READY,
+  // published, or CHATTING after a further message) and we're not mid-generation.
+  const canGenImpl = canWrite && !generating && !!generated;
 
   useEffect(() => {
     msgRef.current?.scrollTo({ top: msgRef.current.scrollHeight });
