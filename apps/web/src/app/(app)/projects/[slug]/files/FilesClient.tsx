@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { FileCategory, MemberRole } from '@prisma/client';
 import { Button, EmptyState } from '@/components/ui';
-import { CATEGORY_ORDER, CATEGORY_LABEL, formatBytes, MAX_FILE_BYTES } from '@/lib/files';
+import { CATEGORY_ORDER, CATEGORY_LABEL, categorize, formatBytes, MAX_FILE_BYTES } from '@/lib/files';
 import { setFileContextAction, generateFileContextAction, type ContextStatus } from '@/lib/actions/files';
 import { useI18n } from '@/lib/i18n/i18n';
 import styles from './files.module.scss';
@@ -40,11 +40,13 @@ export function FilesClient({
   slug,
   role,
   currentUserId,
+  currentUserName,
   files,
 }: {
   slug: string;
   role: MemberRole;
   currentUserId: string;
+  currentUserName?: string;
   files: FileView[];
 }) {
   const { t, lang } = useI18n();
@@ -53,11 +55,28 @@ export function FilesClient({
   const [pending, startTransition] = useTransition();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  // Optimistic overlays by file id, layered over the server-rendered values.
-  const [ctxOverride, setCtxOverride] = useState<Record<string, boolean>>({});
-  const [genOverride, setGenOverride] = useState<Record<string, ContextStatus>>({});
+  // Local, authoritative-once-mutated copy of the file list. Mutations patch it
+  // directly from the API/action response (no dependency on router.refresh()
+  // completing to reflect success — see incident: refresh() wrapped in a
+  // transition can hang indefinitely on this deployment, freezing the UI).
+  const [fileList, setFileList] = useState<FileView[]>(files);
+  useEffect(() => setFileList(files), [files]);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (successTimer.current) clearTimeout(successTimer.current);
+  }, []);
+  function flashSuccess(msg: string) {
+    setSuccess(msg);
+    if (successTimer.current) clearTimeout(successTimer.current);
+    successTimer.current = setTimeout(() => setSuccess(null), 4000);
+  }
+  function patchFile(id: string, patch: Partial<FileView>) {
+    setFileList((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  }
   // Category accordions — all collapsed by default.
   const [openCats, setOpenCats] = useState<Set<FileCategory>>(() => new Set());
   const toggleCat = (cat: FileCategory) =>
@@ -71,58 +90,69 @@ export function FilesClient({
   const canWrite = role !== 'VIEWER';
   const canManage = role === 'OWNER' || role === 'ADMIN';
 
-  const isContext = (f: FileView) => ctxOverride[f.id] ?? f.isContext;
+  const isContext = (f: FileView) => f.isContext;
   const isImage = (f: FileView) => f.category === 'IMAGE';
-  // Prefer the server's terminal state; otherwise show the optimistic overlay.
-  const statusOf = (f: FileView): ContextStatus =>
-    f.contextStatus === 'READY' || f.contextStatus === 'FAILED'
-      ? f.contextStatus
-      : genOverride[f.id] ?? f.contextStatus;
-  const contextCount = files.filter(isContext).length;
+  const statusOf = (f: FileView): ContextStatus => f.contextStatus;
+  const contextCount = fileList.filter(isContext).length;
 
-  // Poll while any document is still generating its context artifact.
-  const anyGenerating = files.some((f) => statusOf(f) === 'GENERATING');
+  // Poll (via the action itself, not a full page refresh) while any document is
+  // still generating its context artifact — this is a background job.
+  const generatingKey = fileList
+    .filter((f) => statusOf(f) === 'GENERATING')
+    .map((f) => f.id)
+    .sort()
+    .join(',');
   useEffect(() => {
-    if (!anyGenerating) return;
-    const id = setInterval(() => router.refresh(), 3000);
-    return () => clearInterval(id);
-  }, [anyGenerating, router]);
+    if (!generatingKey) return;
+    const ids = generatingKey.split(',');
+    const timer = setInterval(() => {
+      ids.forEach((fid) => {
+        void generateFileContextAction(slug, fid).then((r) => {
+          if (r.ok && r.data) patchFile(fid, { contextStatus: r.data.contextStatus });
+        });
+      });
+    }, 3000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatingKey, slug]);
 
   function toggleContext(file: FileView) {
     const next = !isContext(file);
     setError(null);
     setTogglingId(file.id);
-    setCtxOverride((prev) => ({ ...prev, [file.id]: next }));
+    patchFile(file.id, { isContext: next }); // optimistic
     startTransition(async () => {
       const r = await setFileContextAction(slug, file.id, next);
       setTogglingId(null);
       if (!r.ok) {
-        setCtxOverride((prev) => ({ ...prev, [file.id]: !next })); // revert
+        patchFile(file.id, { isContext: !next }); // revert
         setError(r.error);
         return;
       }
-      router.refresh();
+      // The action already returns the authoritative post-write state.
+      patchFile(r.data!.id, { isContext: r.data!.isContext, contextStatus: r.data!.contextStatus });
     });
   }
 
   function generateContext(file: FileView) {
     setError(null);
-    setGenOverride((prev) => ({ ...prev, [file.id]: 'GENERATING' }));
+    patchFile(file.id, { contextStatus: 'GENERATING' }); // optimistic
     startTransition(async () => {
       const r = await generateFileContextAction(slug, file.id);
       if (!r.ok) {
-        setGenOverride((prev) => ({ ...prev, [file.id]: 'FAILED' }));
+        patchFile(file.id, { contextStatus: 'FAILED' });
         setError(r.error);
         return;
       }
-      router.refresh();
+      patchFile(file.id, { contextStatus: r.data!.contextStatus });
     });
   }
 
   async function upload(list: FileList | null) {
     if (!list || list.length === 0) return;
     setError(null);
-    const tooBig = Array.from(list).find((f) => f.size > MAX_FILE_BYTES);
+    const items = Array.from(list);
+    const tooBig = items.find((f) => f.size > MAX_FILE_BYTES);
     if (tooBig) {
       setError(
         t(
@@ -133,17 +163,44 @@ export function FilesClient({
       return;
     }
     const form = new FormData();
-    Array.from(list).forEach((f) => form.append('file', f));
+    items.forEach((f) => form.append('file', f));
     setUploading(true);
     try {
       const res = await fetch(`/api/v1/projects/${slug}/files`, { method: 'POST', body: form });
+      let body: { ids?: string[]; error?: string } | null = null;
+      try {
+        body = await res.json();
+      } catch {
+        /* no/invalid body */
+      }
       if (!res.ok) {
-        const j = await res.json().catch(() => null);
-        setError(j?.error ?? t('Error al subir', 'Upload failed'));
+        setError(body?.error ?? t('Error al subir', 'Upload failed'));
         return;
       }
       if (inputRef.current) inputRef.current.value = '';
-      startTransition(() => router.refresh());
+      const ids = Array.isArray(body?.ids) ? body!.ids : [];
+      const now = new Date().toISOString();
+      const added: FileView[] = items.map((f, i) => ({
+        id: ids[i] ?? `tmp-${Date.now()}-${i}`,
+        name: f.name || 'archivo',
+        mimeType: f.type || 'application/octet-stream',
+        size: f.size,
+        category: categorize(f.type || '', f.name || ''),
+        createdAt: now,
+        uploadedById: currentUserId,
+        uploaderName: currentUserName ?? t('Vos', 'You'),
+        isContext: false,
+        contextStatus: 'NONE',
+      }));
+      setFileList((prev) => [...added, ...prev]);
+      flashSuccess(
+        items.length === 1
+          ? t(`"${items[0]!.name}" se subió correctamente`, `"${items[0]!.name}" uploaded successfully`)
+          : t(`${items.length} archivos se subieron correctamente`, `${items.length} files uploaded successfully`),
+      );
+      // Best-effort background reconciliation (e.g. other users' uploads too).
+      // The UI above already reflects success regardless of whether this succeeds.
+      router.refresh();
     } catch {
       setError(t('Error de red al subir', 'Network error while uploading'));
     } finally {
@@ -154,15 +211,24 @@ export function FilesClient({
   function remove(file: FileView) {
     if (!confirm(t(`¿Eliminar "${file.name}"?`, `Delete "${file.name}"?`))) return;
     setError(null);
-    startTransition(async () => {
-      const res = await fetch(`/api/v1/projects/${slug}/files/${file.id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const j = await res.json().catch(() => null);
-        setError(j?.error ?? t('Error al eliminar', 'Delete failed'));
-        return;
+    setDeletingId(file.id);
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v1/projects/${slug}/files/${file.id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const j = await res.json().catch(() => null);
+          setError(j?.error ?? t('Error al eliminar', 'Delete failed'));
+          return;
+        }
+        setFileList((prev) => prev.filter((x) => x.id !== file.id));
+        flashSuccess(t(`"${file.name}" se eliminó correctamente`, `"${file.name}" deleted successfully`));
+        router.refresh(); // best-effort background reconciliation
+      } catch {
+        setError(t('Error de red al eliminar', 'Network error while deleting'));
+      } finally {
+        setDeletingId(null);
       }
-      router.refresh();
-    });
+    })();
   }
 
   const fmtDate = (iso: string) =>
@@ -174,7 +240,7 @@ export function FilesClient({
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
     cat,
-    items: files.filter((f) => f.category === cat),
+    items: fileList.filter((f) => f.category === cat),
   })).filter((g) => g.items.length > 0);
 
   const busy = uploading || pending;
@@ -220,6 +286,11 @@ export function FilesClient({
       )}
 
       {error && <p className={styles.error}>{error}</p>}
+      {success && (
+        <p className={styles.success} role="status">
+          ✓ {success}
+        </p>
+      )}
 
       {contextCount > 0 ? (
         <p className={styles.ctxSummary}>
@@ -450,9 +521,9 @@ export function FilesClient({
                           type="button"
                           className={styles.deleteBtn}
                           onClick={() => remove(f)}
-                          disabled={busy}
+                          disabled={deletingId === f.id}
                         >
-                          {t('Eliminar', 'Delete')}
+                          {deletingId === f.id ? t('Eliminando…', 'Deleting…') : t('Eliminar', 'Delete')}
                         </button>
                       )}
                     </div>

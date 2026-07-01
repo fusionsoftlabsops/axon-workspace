@@ -88,14 +88,29 @@ describe('FilesClient', () => {
     expect(await screen.findByText(/exceeds the/)).toBeInTheDocument();
   });
 
-  it('uploads successfully and refreshes', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+  it('uploads successfully: the file shows up immediately (no manual refresh needed) with a success message', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true, ids: ['new-id'] }) });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
     render(<FilesClient {...baseProps({ files: [] })} />);
     await user.upload(fileInput(), new File(['x'], 'small.txt'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/v1/projects/proj/files', expect.objectContaining({ method: 'POST' })));
+    // The uploaded file is visible right away, from local state — not from a page refresh.
+    expandAll();
+    expect(await screen.findByText('small.txt')).toBeInTheDocument();
+    expect(await screen.findByText(/uploaded successfully/i)).toBeInTheDocument();
+    // Best-effort background reconciliation still happens, but the UI doesn't wait on it.
     await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+  });
+
+  it('does not hang the "Choose files" button on a background refresh that never resolves', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true, ids: ['new-id'] }) });
+    vi.stubGlobal('fetch', fetchMock);
+    nav.refresh.mockImplementation(() => new Promise(() => {})); // never resolves
+    const user = userEvent.setup();
+    render(<FilesClient {...baseProps({ files: [] })} />);
+    await user.upload(fileInput(), new File(['x'], 'small.txt'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose files' })).not.toBeDisabled());
   });
 
   it('shows server error on failed upload', async () => {
@@ -114,7 +129,7 @@ describe('FilesClient', () => {
     expect(await screen.findByText(/Network error/)).toBeInTheDocument();
   });
 
-  it('deletes a file after confirm', async () => {
+  it('deletes a file after confirm: it disappears immediately (no manual refresh needed) with a success message', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
@@ -124,7 +139,22 @@ describe('FilesClient', () => {
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/projects/proj/files/f1', { method: 'DELETE' }),
     );
+    // f1 (photo.png) is gone from the DOM right away, from local state.
+    await waitFor(() => expect(screen.queryByText('photo.png')).not.toBeInTheDocument());
+    expect(await screen.findByText(/deleted successfully/i)).toBeInTheDocument();
     await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+  });
+
+  it('does not hang the delete button on a background refresh that never resolves', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+    nav.refresh.mockImplementation(() => new Promise(() => {})); // never resolves
+    const user = userEvent.setup();
+    render(<FilesClient {...baseProps()} />);
+    expandAll();
+    await user.click(screen.getAllByText('Delete')[0]!);
+    await waitFor(() => expect(screen.queryByText('photo.png')).not.toBeInTheDocument());
+    // The remaining file's delete button is not stuck disabled.
+    await waitFor(() => expect(screen.getByText('Delete')).not.toBeDisabled());
   });
 
   it('shows an error when delete fails', async () => {
@@ -154,7 +184,7 @@ describe('FilesClient', () => {
     expect(screen.getAllByText('Delete').length).toBe(1);
   });
 
-  it('marks an image as context directly (no generation) and refreshes', async () => {
+  it('marks an image as context directly (no generation) from the action response, no full-page refresh needed', async () => {
     h.setFileContextAction.mockResolvedValue({ ok: true, data: { id: 'f1', isContext: true, contextStatus: 'NONE' } });
     const user = userEvent.setup();
     render(<FilesClient {...baseProps({ files: [file()] })} />); // f1 = image
@@ -162,7 +192,8 @@ describe('FilesClient', () => {
     await user.click(screen.getByRole('button', { name: /Use as context/i }));
     expect(h.setFileContextAction).toHaveBeenCalledWith('proj', 'f1', true);
     expect(await screen.findByText(/feed AI planning|feeds AI planning/i)).toBeInTheDocument();
-    await waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+    // The action already returns the authoritative state — no router.refresh() dependency.
+    expect(nav.refresh).not.toHaveBeenCalled();
   });
 
   it('generates context for a document (step 1)', async () => {
