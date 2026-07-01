@@ -493,6 +493,11 @@ model Task {
   category           String?  // infra/backend/frontend/design/qa/devops/docs/other (roadmap lanes)
   recommendedRoles   String[] // perfiles sugeridos
   sprintId           String?
+  // QA workflow. qaHandoff = lo que el dev entrega al cerrar la HU (criterios ✓/✗,
+  // pruebas sugeridas, tareas ejecutadas, notas); qaTests = pruebas propias del QA
+  // (generadas por IA / editadas). Ambos opcionales y retro-compatibles.
+  qaHandoff          Json?
+  qaTests            Json?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

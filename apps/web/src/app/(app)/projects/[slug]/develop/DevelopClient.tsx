@@ -389,6 +389,25 @@ Dado … Cuando … Entonces …
           {t('(este último corre tests/lint/build y reporta el resultado real).', '(the last one runs tests/lint/build and reports the real result).')}
         </p>
 
+        <h4 style={{ margin: '0.9rem 0 0.3rem', fontSize: '0.9rem' }}>
+          {t('Bajar el plan de implementación a Qwen', 'Pull the implementation plan into Qwen')}
+        </h4>
+        <p style={lead}>
+          {t(
+            'Para HUs con código existente, generá en Axon el ⚙ «Plan de implementación» de la HU (pestaña Plan): lee el repo real y produce un .md que se guarda en Archivos. Descargalo, ponelo en el repo y pedile a Qwen que lo siga junto con el contexto de /task:',
+            'For stories with existing code, generate the ⚙ "Implementation plan" of the story in Axon (Plan tab): it reads the real repo and produces a .md saved to Files. Download it, drop it in the repo, and ask Qwen to follow it together with the /task context:',
+          )}
+        </p>
+        <CopyRow
+          value={`# 1) guardá el plan descargado en el repo, p. ej.:\n#    .axon/impl-PROJ-${exampleN}.md\n# 2) en qwen:\n/task ${exampleN}\n> seguí el plan de .axon/impl-PROJ-${exampleN}.md e implementá la HU`}
+        />
+        <p style={{ ...lead, margin: '0.3rem 0 0' }}>
+          {t(
+            'Así combinás el contexto de la HU (/task: título, descripción, criterios + cerebro) con el plan aterrizado en tu código. Para proyectos sin código aún, el plan se genera igual desde el contexto.',
+            'This combines the story context (/task: title, description, criteria + brain) with the plan grounded in your code. For projects without code yet, the plan is still generated from the context.',
+          )}
+        </p>
+
         <h4 style={{ margin: '0.9rem 0 0.3rem', fontSize: '0.9rem' }}>{t('Tus HUs', 'Your stories')}</h4>
         {hus.length === 0 ? (
           <p style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>
@@ -421,11 +440,54 @@ Dado … Cuando … Entonces …
         </p>
       </section>
 
-      {/* Step 4 — finish */}
+      {/* Step 4 — close the HU (QA handoff) */}
       <section style={card}>
         <h3 style={{ margin: '0 0 0.5rem' }}>
           <span style={stepNum}>4</span>
-          {t('Al terminar la HU', 'When you finish the story')}
+          {t('Cerrar la HU (entrega a QA)', 'Close the story (QA handoff)')}
+        </h3>
+        <p style={lead}>
+          {t(
+            'Cuando terminaste el desarrollo, corré el comando de cierre. Evalúa que se cumplieron los criterios de aceptación, genera pruebas de QA sugeridas, arma el listado de tareas ejecutadas, actualiza el checklist de cumplimiento y publica todo en los comentarios de la HU; además mueve la HU a Verificación para que la tome QA.',
+            'When development is done, run the close command. It checks the acceptance criteria, generates suggested QA tests, builds the executed-tasks list, updates the compliance checklist, and posts everything to the story comments; it also moves the story to Verification for QA to pick up.',
+          )}
+        </p>
+        <CopyRow value={`/cerrar-hu ${exampleN}`} />
+        <p style={{ ...lead, margin: '0.5rem 0 0.2rem' }}>
+          {t('Por dentro llama a la herramienta MCP ', 'Under the hood it calls the MCP tool ')}
+          <code style={mono}>submit_qa_review</code>
+          {t(' con un payload como:', ' with a payload like:')}
+        </p>
+        <Sample>
+          {`submit_qa_review {
+  projectSlug: "${slug}", taskNumber: ${exampleN},
+  criteria: [{ text: "El login valida credenciales", met: true }, ...],
+  suggestedTests: [
+    { title: "Login OK", steps: "1) credenciales válidas 2) enviar", expected: "entra al dashboard" },
+    { title: "Login inválido", steps: "clave incorrecta", expected: "muestra error, no entra" }
+  ],
+  executedTasks: ["Formulario de login", "Endpoint POST /login", "Tests unitarios"],
+  notes: "Contexto adicional para QA (decisiones, riesgos, cómo probar)."
+}`}
+        </Sample>
+        <p style={{ ...lead, margin: '0.4rem 0 0' }}>
+          {t('La HU pasa a ', 'The story moves to ')}
+          <strong>{t('Verificación', 'Verification')}</strong>
+          {t(' y aparece en la pestaña ', ' and shows up in the ')}
+          <Link href={`/projects/${slug}/qa`}>QA</Link>
+          {t(', donde QA ve tus pruebas sugeridas, genera las suyas y aprueba o rechaza.', ', where QA sees your suggested tests, generates its own, and approves or rejects.')}
+        </p>
+        <p style={{ ...lead, margin: '0.4rem 0 0', fontSize: '0.8rem' }}>
+          {t('Nota: el comando /cerrar-hu se instala con Fusion Code; si no lo ves, actualizá con ', 'Note: the /cerrar-hu command ships with Fusion Code; if you do not see it, update with ')}
+          <code style={mono}>qwen extensions update --all</code>.
+        </p>
+      </section>
+
+      {/* Step 5 — sync + next */}
+      <section style={card}>
+        <h3 style={{ margin: '0 0 0.5rem' }}>
+          <span style={stepNum}>5</span>
+          {t('Sincronizar y seguir', 'Sync and continue')}
         </h3>
         <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--color-fg-muted)', fontSize: '0.88rem', lineHeight: 1.7 }}>
           <li>

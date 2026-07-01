@@ -11,9 +11,16 @@ beforeEach(() => {
 });
 
 describe('task tools', () => {
-  it('registers all five task tools', () => {
+  it('registers all task tools', () => {
     expect([...tools.keys()].sort()).toEqual(
-      ['add_comment', 'create_task', 'get_task', 'list_my_tasks', 'update_task_status'].sort(),
+      [
+        'add_comment',
+        'create_task',
+        'get_task',
+        'list_my_tasks',
+        'submit_qa_review',
+        'update_task_status',
+      ].sort(),
     );
   });
 
@@ -81,5 +88,33 @@ describe('task tools', () => {
     expect(api.post).toHaveBeenCalledWith('/projects/proj/tasks/3/comments', {
       body: 'progress note',
     });
+  });
+
+  it('submit_qa_review: POSTs the handoff to the qa-review endpoint', async () => {
+    api.post.mockResolvedValue({ ok: true, movedToVerification: true });
+    await tools.get('submit_qa_review')!.handler({
+      projectSlug: 'proj',
+      taskNumber: 9,
+      criteria: [{ text: 'works', met: true }],
+      suggestedTests: ['login ok'],
+      executedTasks: ['form', 'endpoint'],
+      notes: 'context',
+    });
+    expect(api.post).toHaveBeenCalledWith('/projects/proj/tasks/9/qa-review', {
+      criteria: [{ text: 'works', met: true }],
+      suggestedTests: ['login ok'],
+      executedTasks: ['form', 'endpoint'],
+      notes: 'context',
+    });
+  });
+
+  it('submit_qa_review: rejects an invalid criterion', async () => {
+    await expect(
+      tools.get('submit_qa_review')!.handler({
+        projectSlug: 'proj',
+        taskNumber: 9,
+        criteria: [{ text: 'x' }],
+      }),
+    ).rejects.toThrow();
   });
 });

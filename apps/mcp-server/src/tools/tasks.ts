@@ -27,6 +27,20 @@ const addCommentSchema = z.object({
   taskNumber: z.number().int().positive(),
   body: z.string().min(1).max(20_000),
 });
+const qaTestCaseSchema = z.object({
+  title: z.string().min(1).max(500),
+  steps: z.string().max(4000).optional(),
+  expected: z.string().max(2000).optional(),
+});
+const submitQaReviewSchema = z.object({
+  projectSlug: z.string(),
+  taskNumber: z.number().int().positive(),
+  criteria: z.array(z.object({ text: z.string().min(1).max(1000), met: z.boolean() })).max(50).optional(),
+  suggestedTests: z.array(z.union([z.string().min(1).max(2000), qaTestCaseSchema])).max(50).optional(),
+  executedTasks: z.array(z.string().min(1).max(1000)).max(100).optional(),
+  notes: z.string().max(8000).optional(),
+  moveToVerification: z.boolean().optional(),
+});
 
 function asText(value: unknown) {
   return {
@@ -148,6 +162,66 @@ export function registerTaskTools(registry: ToolRegistry, api: ApiClient) {
           body: input.body,
         }),
       );
+    },
+  });
+
+  registry.register({
+    tool: {
+      name: 'submit_qa_review',
+      description:
+        'Cierra una HU y la entrega a QA: registra el checklist de criterios de aceptación (cumplidos/no), ' +
+        'las pruebas de QA sugeridas, el listado de tareas ejecutadas y notas de contexto; publica un ' +
+        'comentario con el resumen y mueve la HU al estado de Verificación. Úsalo al terminar el desarrollo.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectSlug: { type: 'string' },
+          taskNumber: { type: 'number' },
+          criteria: {
+            type: 'array',
+            description: 'Checklist de criterios de aceptación evaluados.',
+            items: {
+              type: 'object',
+              properties: { text: { type: 'string' }, met: { type: 'boolean' } },
+              required: ['text', 'met'],
+            },
+          },
+          suggestedTests: {
+            type: 'array',
+            description: 'Pruebas de QA sugeridas (texto simple o {title, steps, expected}).',
+            items: {
+              oneOf: [
+                { type: 'string' },
+                {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string' },
+                    steps: { type: 'string' },
+                    expected: { type: 'string' },
+                  },
+                  required: ['title'],
+                },
+              ],
+            },
+          },
+          executedTasks: {
+            type: 'array',
+            description: 'Listado de tareas/pasos ejecutados durante el desarrollo.',
+            items: { type: 'string' },
+          },
+          notes: { type: 'string', description: 'Contexto adicional para QA.' },
+          moveToVerification: {
+            type: 'boolean',
+            description: 'Mover la HU a Verificación (por defecto true).',
+          },
+        },
+        required: ['projectSlug', 'taskNumber'],
+      },
+    },
+    handler: async (args) => {
+      const input = submitQaReviewSchema.parse(args);
+      const { projectSlug, taskNumber, ...payload } = input;
+      return asText(await api.post(`/projects/${projectSlug}/tasks/${taskNumber}/qa-review`, payload));
     },
   });
 }
