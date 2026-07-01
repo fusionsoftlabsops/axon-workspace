@@ -17,6 +17,8 @@ const SCOPES: ApiScope[] = [
   'stories:read',
   'stories:write',
   'repo:read',
+  'skills:read',
+  'skills:write',
 ];
 
 interface TokenRow {

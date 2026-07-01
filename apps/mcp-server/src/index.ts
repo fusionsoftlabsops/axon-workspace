@@ -21,6 +21,7 @@ import { registerCommitTools } from './tools/commits.js';
 import { registerBugTools } from './tools/bugs.js';
 import { registerBrainTools } from './tools/brain.js';
 import { registerStoryTools } from './tools/stories.js';
+import { registerSkillTools } from './tools/skills.js';
 
 async function main() {
   const baseUrl = process.env.ADMIN_API_BASE_URL;
@@ -42,6 +43,7 @@ async function main() {
   registerBugTools(registry, api);
   registerBrainTools(registry, api);
   registerStoryTools(registry, api);
+  registerSkillTools(registry, api);
 
   const server = new Server(
     { name: 'admin-data-project', version: '0.1.0' },

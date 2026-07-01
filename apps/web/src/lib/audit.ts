@@ -66,7 +66,11 @@ export type AuditAction =
   | 'deploy.unlink'
   | 'deploy.destroy'
   | 'llm_credential.create'
-  | 'llm_credential.revoke';
+  | 'llm_credential.revoke'
+  | 'skill.contribute'
+  | 'skill.review'
+  | 'skill.update'
+  | 'skill.delete';
 
 export interface AuditOptions {
   actorId: string | null;

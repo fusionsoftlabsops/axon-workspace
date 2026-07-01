@@ -6,6 +6,7 @@ import { buildOpenApiDocument, OPENAPI_VERSION } from '@/lib/openapi/spec';
 const EXPECTED_PATHS = [
   '/api/v1/openapi.json',
   '/api/v1/tasks',
+  '/api/v1/skills',
   '/api/v1/projects/{slug}/tasks',
   '/api/v1/projects/{slug}/tasks/{taskNumber}',
   '/api/v1/projects/{slug}/tasks/{taskNumber}/comments',

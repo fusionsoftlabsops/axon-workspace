@@ -156,6 +156,7 @@ export function buildOpenApiDocument(baseUrl = '/'): OpenApiDocument {
       { name: 'repo', description: 'Sandboxed read-only access to the project repository' },
       { name: 'stories', description: 'AI story drafts and publishing' },
       { name: 'bugs', description: 'Bug reporting' },
+      { name: 'skills', description: 'Shared skills package (best-practice commands/guidelines)' },
     ],
     components: {
       securitySchemes: {
@@ -429,6 +430,59 @@ export function buildOpenApiDocument(baseUrl = '/'): OpenApiDocument {
             query('state', 'Filter by workflow state name.', { type: 'string' }),
           ],
           responses: { '200': ok('A list of tasks.') },
+        }),
+      },
+      '/api/v1/skills': {
+        get: op({
+          summary: 'List the approved skills package',
+          description:
+            'The org-wide best-practice skills that Fusion Code syncs into ~/.qwen. ' +
+            'Optionally filter by category.',
+          tags: ['skills'],
+          operationId: 'listSkills',
+          security: 'token',
+          scopes: ['skills:read'],
+          parameters: [
+            query('category', 'Filter by category.', {
+              type: 'string',
+              enum: ['TESTING', 'QUALITY', 'WORKFLOW', 'ARCHITECTURE', 'GIT', 'OTHER'],
+            }),
+          ],
+          responses: { '200': ok('Approved skills, official first.') },
+        }),
+        post: op({
+          summary: 'Contribute a new skill',
+          description:
+            'Submit a new skill; it enters PENDING for review before an admin makes ' +
+            'it part of the package.',
+          tags: ['skills'],
+          operationId: 'contributeSkill',
+          security: 'token',
+          scopes: ['skills:write'],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['slug', 'name', 'description', 'body'],
+                  properties: {
+                    slug: { type: 'string', description: 'kebab-case unique id' },
+                    name: { type: 'string' },
+                    description: { type: 'string' },
+                    category: {
+                      type: 'string',
+                      enum: ['TESTING', 'QUALITY', 'WORKFLOW', 'ARCHITECTURE', 'GIT', 'OTHER'],
+                    },
+                    kind: { type: 'string', enum: ['COMMAND', 'GUIDELINE'] },
+                    body: { type: 'string', description: 'Markdown skill/command definition' },
+                    tags: { type: 'array', items: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+          responses: { '201': ok('The created (pending) skill.') },
         }),
       },
       '/api/v1/projects/{slug}/tasks': {
