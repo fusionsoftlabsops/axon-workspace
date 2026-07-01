@@ -8,6 +8,7 @@ import { useI18n } from '@/lib/i18n/i18n';
 import {
   planChatAction,
   planTypingAction,
+  clearPlanChatAction,
   startPlanGenerationAction,
   publishPlanAction,
   addPlanLinkAction,
@@ -26,12 +27,14 @@ export function PlanChat({
   slug,
   canWrite,
   currentUserId,
+  currentUserName,
   initialPlan,
   contextFiles = [],
 }: {
   slug: string;
   canWrite: boolean;
   currentUserId?: string;
+  currentUserName?: string;
   initialPlan: PlanView;
   contextFiles?: ContextFile[];
 }) {
@@ -49,7 +52,8 @@ export function PlanChat({
   const [attaching, setAttaching] = useState(false);
   const [openSprints, setOpenSprints] = useState<Set<number>>(new Set()); // accordion: all closed by default
   const [reestimating, setReestimating] = useState(false);
-  // Realtime collaboration: who's typing, and who's present on this plan.
+  // Realtime collaboration: connection state, who's typing, who's present.
+  const [connected, setConnected] = useState(false);
   const [typingName, setTypingName] = useState<string | null>(null);
   const [presence, setPresence] = useState<{ userId: string; name: string }[]>([]);
   const msgRef = useRef<HTMLDivElement>(null);
@@ -117,6 +121,7 @@ export function PlanChat({
   useEffect(() => {
     if (typeof window === 'undefined' || typeof EventSource === 'undefined') return;
     const es = new EventSource(`/api/v1/projects/${slug}/plan/stream`);
+    es.onopen = () => setConnected(true);
 
     const refresh = async () => {
       try {
@@ -154,11 +159,13 @@ export function PlanChat({
       }
     };
     es.onerror = () => {
-      /* EventSource auto-reconnects; nothing to do */
+      // EventSource auto-reconnects; reflect the interim disconnect.
+      setConnected(false);
     };
 
     return () => {
       es.close();
+      setConnected(false);
       if (typingTimer.current) clearTimeout(typingTimer.current);
     };
   }, [slug, currentUserId, t]);
@@ -200,6 +207,19 @@ export function PlanChat({
       setProgress({ phase: 'starting', startedAt: new Date().toISOString() });
       setHeartbeatAt(new Date().toISOString());
       setGenerating(true);
+    });
+  }
+
+  function clearChat() {
+    if (!confirm(t('¿Reiniciar la conversación? Se borra el historial del chat (el plan generado se conserva).', 'Restart the conversation? The chat history is cleared (the generated plan is kept).'))) return;
+    setError(null);
+    startSend(async () => {
+      const r = await clearPlanChatAction(slug);
+      if (!r.ok) {
+        setError(r.error);
+        return;
+      }
+      if (r.data) setPlan(r.data);
     });
   }
 
@@ -279,6 +299,23 @@ export function PlanChat({
   const attachIcon = (kind: PlanView['attachments'][number]['kind']) =>
     kind === 'IMAGE' ? '🖼' : kind === 'LINK' ? '🔗' : '📄';
 
+  // Context that will ground the NEXT message (live hint). Shows the graph (only
+  // when explicitly connected) + the project files marked as context. Plan
+  // attachments are omitted here — they're already listed in the "Attached
+  // context" section below. The accurate per-message snapshot (incl. attachments,
+  // and checking the analysis is READY) is recorded server-side.
+  const activeContext: string[] = [
+    ...(plan.contextGraph === 'CODE_GRAPH' ? [t('Grafo de código', 'Code graph')] : []),
+    ...contextFiles
+      .filter((f) => f.isContext && (f.category === 'IMAGE' || f.contextStatus === 'READY'))
+      .map((f) => f.name),
+  ];
+  // Everyone connected to the live chat, including you.
+  const onlineNames: string[] = [
+    currentUserName ? `${currentUserName} (${t('vos', 'you')})` : t('Vos', 'You'),
+    ...presence.map((p) => p.name || t('Anónimo', 'Anonymous')),
+  ];
+
   return (
     <div className={`${styles.layout} ${showPreview ? styles.withPreview : ''}`}>
       {/* ---- Chat ---- */}
@@ -293,11 +330,12 @@ export function PlanChat({
         )}
         <div className={styles.chatRow}>
           <div className={styles.chat}>
-            {presence.length > 0 && (
-              <div className={styles.presence} style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)', padding: '0 0.25rem 0.4rem' }}>
-                {t('En línea', 'Online')}: {presence.map((p) => p.name || t('Anónimo', 'Anonymous')).join(', ')}
-              </div>
-            )}
+            <div className={styles.presence} style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)', padding: '0 0.25rem 0.4rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ color: connected ? 'var(--color-success, #3fb950)' : 'var(--color-fg-muted)' }}>
+                {connected ? t('● Conectado', '● Connected') : t('○ Conectando…', '○ Connecting…')}
+              </span>
+              <span>· {t('En línea', 'Online')}: {onlineNames.join(', ')}</span>
+            </div>
             <div className={styles.messages} ref={msgRef}>
               {plan.messages.map((m, i) => (
                 <div
@@ -310,6 +348,14 @@ export function PlanChat({
                     </span>
                   )}
                   {m.content}
+                  {m.context?.sources && m.context.sources.length > 0 && (
+                    <div className={styles.msgContext}>
+                      <span className={styles.msgContextLabel}>{t('Contexto', 'Context')}:</span>
+                      {m.context.sources.map((s, k) => (
+                        <span key={k} className={styles.msgContextChip}>{s}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {sending && <div className={`${styles.msg} ${styles.assistant}`}>…</div>}
@@ -320,6 +366,12 @@ export function PlanChat({
             >
               {typingName ? t(`${typingName} está escribiendo…`, `${typingName} is typing…`) : ''}
             </div>
+            {canWrite && !published && activeContext.length > 0 && (
+              <div className={styles.contextHint}>
+                <span className={styles.contextHintLabel}>{t('Se usará como contexto', 'Will be used as context')}:</span>{' '}
+                {activeContext.join(' · ')}
+              </div>
+            )}
             {canWrite && !published && (
               <div className={styles.composer}>
                 <textarea
@@ -340,6 +392,9 @@ export function PlanChat({
                 />
                 <Button variant="secondary" onClick={send} disabled={sending || !input.trim()}>
                   {t('Enviar', 'Send')}
+                </Button>
+                <Button variant="primary" onClick={generate} disabled={sending || generating}>
+                  {generating ? t('Generando…', 'Generating…') : t('Generar plan', 'Generate plan')}
                 </Button>
               </div>
             )}
@@ -433,14 +488,14 @@ export function PlanChat({
         )}
         {!published && (
           <div className={styles.toolbar}>
-            {canWrite && (
-              <Button variant="primary" onClick={generate} disabled={sending || generating}>
-                {generating ? t('Generando…', 'Generating…') : t('Generar plan', 'Generate plan')}
-              </Button>
-            )}
             <Link className={styles.skip} href={`/projects/${slug}/board`}>
               {t('Saltar al tablero', 'Skip to board')}
             </Link>
+            {canWrite && (
+              <button type="button" className={styles.linkBtn} onClick={clearChat} disabled={sending || generating}>
+                {t('Reiniciar conversación', 'Restart conversation')}
+              </button>
+            )}
             {error && <span className={styles.error}>{error}</span>}
           </div>
         )}

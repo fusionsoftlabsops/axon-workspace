@@ -164,12 +164,45 @@ async function contextFilesManifest(projectId: string): Promise<string> {
     .join('\n');
 }
 
+/** The context sources active for the current iteration (short labels), so each
+ *  chat message / generation can record "what the AI had in mind": the code graph
+ *  (when connected + READY), the plan's own attachments, and the project files
+ *  marked as context (only the usable ones — images or READY documents). */
+async function describeActiveContext(
+  projectId: string,
+  plan: { attachments: PlanAttachment[]; contextGraph: string | null },
+): Promise<string[]> {
+  const sources: string[] = [];
+  if (plan.contextGraph !== 'NONE') {
+    const row = await prisma.codeAnalysis.findUnique({ where: { projectId }, select: { status: true } });
+    if (row?.status === 'READY') sources.push('Grafo de código');
+  }
+  for (const a of plan.attachments) sources.push(a.name);
+  const files = await prisma.projectFile.findMany({
+    where: { projectId, isContext: true },
+    orderBy: { createdAt: 'asc' },
+    select: { name: true, mimeType: true, category: true, contextStatus: true },
+  });
+  for (const f of files) {
+    const usable = isImageMime(f.mimeType) || f.category === 'IMAGE' || f.contextStatus === 'READY';
+    if (usable) sources.push(f.name);
+  }
+  return sources;
+}
+
 async function loadPlan(projectId: string) {
   return prisma.projectPlan.findFirst({
     where: { projectId },
     orderBy: { createdAt: 'desc' },
     include: planInclude,
   });
+}
+
+/** The assistant's opening greeting for a fresh planning conversation. */
+function planOpening(name: string | undefined, lang: Lang): string {
+  return lang === 'es'
+    ? `¡Hola! Vamos a planear «${name}». Para empezar: ¿cuál es el problema principal que resuelve y para quién? Puedes adjuntar imágenes, documentos o enlaces como contexto, y cuando termines pulsa "Generar plan".`
+    : `Hi! Let's plan "${name}". To start: what's the core problem it solves, and for whom? You can attach images, documents or links as context, and hit "Generate plan" when you're done.`;
 }
 
 export async function getOrCreatePlanAction(slug: string): Promise<ActionResult<PlanView>> {
@@ -181,10 +214,7 @@ export async function getOrCreatePlanAction(slug: string): Promise<ActionResult<
 
   const meta = await projectMeta(ctx.projectId);
   const lang = await getServerLang();
-  const opening =
-    lang === 'es'
-      ? `¡Hola! Vamos a planear «${meta?.name}». Para empezar: ¿cuál es el problema principal que resuelve y para quién? Puedes adjuntar imágenes, documentos o enlaces como contexto, y cuando termines pulsa "Generar plan".`
-      : `Hi! Let's plan "${meta?.name}". To start: what's the core problem it solves, and for whom? You can attach images, documents or links as context, and hit "Generate plan" when you're done.`;
+  const opening = planOpening(meta?.name, lang);
 
   const created = await prisma.projectPlan.create({
     data: {
@@ -211,11 +241,15 @@ export async function planChatAction(slug: string, userMessage: string): Promise
 
   const history: ChatMsg[] = Array.isArray(plan.messages) ? (plan.messages as unknown as ChatMsg[]) : [];
   const author = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } });
+  // Snapshot the context the AI will take into account for this iteration, so the
+  // message records which files/graph grounded it.
+  const sources = await describeActiveContext(ctx.projectId, plan);
   const userMsg: ChatMsg = {
     role: 'user',
     content: text.slice(0, 4000),
     authorId: ctx.userId,
     authorName: author?.name ?? undefined,
+    ...(sources.length > 0 ? { context: { sources } } : {}),
   };
   const withUser: ChatMsg[] = [...history, userMsg];
   const keepStatus = plan.status === 'PUBLISHED' ? 'PUBLISHED' : 'CHATTING';
@@ -257,6 +291,34 @@ export async function planChatAction(slug: string, userMessage: string): Promise
     include: planInclude,
   });
   await publish(planChannel(plan.id), { type: 'message', message: assistantMsg });
+  return { ok: true, data: toView(updated) };
+}
+
+/** Reset the planning conversation to a fresh greeting (keeps the generated plan,
+ *  if any). Lets the team restart the chat after a wrong turn. Broadcasts so
+ *  collaborators see the reset live. OWNER/ADMIN/MEMBER (not viewers). */
+export async function clearPlanChatAction(slug: string): Promise<ActionResult<PlanView>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+
+  const plan = await loadPlan(ctx.projectId);
+  if (!plan) return { ok: false, error: 'Plan no encontrado' };
+
+  const meta = await projectMeta(ctx.projectId);
+  const lang = await getServerLang();
+  const opening = planOpening(meta?.name, lang);
+  const messages: ChatMsg[] = [{ role: 'assistant', content: opening }];
+
+  const updated = await prisma.projectPlan.update({
+    where: { id: plan.id },
+    data: {
+      messages: messages as unknown as Prisma.InputJsonValue,
+      status: plan.status === 'PUBLISHED' ? 'PUBLISHED' : 'CHATTING',
+    },
+    include: planInclude,
+  });
+  await publish(planChannel(plan.id), { type: 'message', message: messages[0]! });
   return { ok: true, data: toView(updated) };
 }
 
@@ -630,6 +692,22 @@ async function runPlanGeneration(
     );
     await bumpPlanPhase(planId, 'normalizing', startedAt);
     normalizeEstimates(plan); // derive "junior–senior" range per HU
+
+    // Record, in the chat history, which context grounded this generation.
+    const attachments = await prisma.planAttachment.findMany({ where: { planId } });
+    const sources = await describeActiveContext(projectId, { attachments, contextGraph });
+    const noteMsgs: ChatMsg[] =
+      sources.length > 0
+        ? [
+            {
+              role: 'assistant',
+              content: (lang === 'es' ? '✦ Plan generado usando: ' : '✦ Plan generated using: ') + sources.join(' · '),
+              context: { sources },
+            },
+          ]
+        : [];
+    const nextMessages = [...messages, ...noteMsgs];
+
     await prisma.projectPlan.update({
       where: { id: planId },
       data: {
@@ -640,8 +718,10 @@ async function runPlanGeneration(
         error: null,
         stats: Prisma.JsonNull,
         heartbeatAt: new Date(),
+        ...(noteMsgs.length > 0 ? { messages: nextMessages as unknown as Prisma.InputJsonValue } : {}),
       },
     });
+    if (noteMsgs.length > 0) await publish(planChannel(planId), { type: 'message', message: noteMsgs[0]! });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[planning] generation failed:', err);

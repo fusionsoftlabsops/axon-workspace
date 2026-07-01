@@ -93,6 +93,7 @@ import {
   getOrCreatePlanAction,
   planChatAction,
   planTypingAction,
+  clearPlanChatAction,
   addPlanLinkAction,
   removePlanAttachmentAction,
   refinePlanTaskAction,
@@ -253,6 +254,42 @@ describe('planChatAction', () => {
     const manifestArg = plannerMock.planChatReply.mock.calls[0]![3] as string;
     expect(manifestArg).toContain('spec.md');
     expect(manifestArg).toContain('IMPORTANT SPEC');
+  });
+
+  it('records the context snapshot on the user message', async () => {
+    prismaMock.projectFile.findMany.mockResolvedValue([
+      { name: 'spec.md', mimeType: 'text/markdown', category: 'DOCUMENT', contextStatus: 'READY' },
+    ]);
+    plannerMock.planChatReply.mockResolvedValue('ok');
+    prismaMock.projectPlan.update.mockResolvedValue(planRow());
+    await planChatAction('slug', 'hi');
+    // First update persists the user message; its context.sources include the file.
+    const firstUpdate = prismaMock.projectPlan.update.mock.calls[0]![0].data.messages as Array<{
+      role: string;
+      context?: { sources: string[] };
+    }>;
+    const userMsg = firstUpdate[firstUpdate.length - 1]!;
+    expect(userMsg.role).toBe('user');
+    expect(userMsg.context?.sources).toContain('spec.md');
+  });
+});
+
+describe('clearPlanChatAction', () => {
+  it('rejects a VIEWER', async () => {
+    assertMock.mockResolvedValue({ ...okCtx, role: 'VIEWER' });
+    expect(await clearPlanChatAction('slug')).toEqual({ ok: false, error: 'Sin permisos' });
+  });
+
+  it('resets messages to a single greeting', async () => {
+    prismaMock.projectPlan.update.mockResolvedValue(planRow());
+    await clearPlanChatAction('slug');
+    const data = prismaMock.projectPlan.update.mock.calls[0]![0].data as {
+      messages: Array<{ role: string; content: string }>;
+      status: string;
+    };
+    expect(data.messages).toHaveLength(1);
+    expect(data.messages[0]!.role).toBe('assistant');
+    expect(data.status).toBe('CHATTING');
   });
 });
 

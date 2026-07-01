@@ -29,6 +29,10 @@ export interface ChatMsg {
   // back-compatible: older messages have no author. The assistant has none.
   authorId?: string;
   authorName?: string;
+  // Snapshot of the context sources the AI had in mind for THIS iteration
+  // (attachment/file names + "Grafo de código"). Optional and back-compatible:
+  // older messages have none. Set when a user message is sent and on generation.
+  context?: { sources: string[] };
 }
 export type Lang = 'es' | 'en';
 
@@ -152,6 +156,13 @@ function textOf(resp: Anthropic.Messages.Message): string {
     .trim();
 }
 
+/** Strip collaboration-only fields (authorId/authorName/context) before sending
+ *  ChatMsg[] to the Anthropic API, which rejects any keys beyond {role, content}
+ *  ("Extra inputs are not permitted"). Exported for testing. */
+export function toApiMessages(messages: ChatMsg[]): { role: 'user' | 'assistant'; content: string }[] {
+  return messages.map((m) => ({ role: m.role, content: m.content }));
+}
+
 /** One chat turn (or the opening greeting when `messages` is empty). */
 export async function planChatReply(
   project: { name: string; description: string | null },
@@ -171,7 +182,7 @@ export async function planChatReply(
     model,
     max_tokens: 700,
     system: chatSystem(lang, codeContext),
-    messages: [{ role: 'user', content: lead }, ...messages],
+    messages: [{ role: 'user', content: lead }, ...toApiMessages(messages)],
   });
   await record('plan.chat', model, resp.usage, userId, projectId);
   return textOf(resp) || (lang === 'es' ? '¿Podrías contarme un poco más?' : 'Could you tell me a bit more?');
@@ -223,7 +234,7 @@ export async function generatePlan(
     tool_choice: { type: 'tool', name: 'EmitPlan' },
     messages: [
       { role: 'user', content: brief(project.name, project.description) },
-      ...messages,
+      ...toApiMessages(messages),
       { role: 'user', content: finalBlocks },
     ],
   });
