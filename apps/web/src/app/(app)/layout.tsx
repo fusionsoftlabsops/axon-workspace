@@ -20,6 +20,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </Link>
         <nav className={styles.nav}>
           <Link href="/projects">{t('Proyectos', 'Projects')}</Link>
+          <Link href="/skills">{t('Skills', 'Skills')}</Link>
           <Link href="/settings/2fa">2FA</Link>
           <Link href="/settings/recovery">{t('Recuperación', 'Recovery')}</Link>
           <Link href="/settings/tokens">API tokens</Link>

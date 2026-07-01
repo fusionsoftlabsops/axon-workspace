@@ -54,7 +54,7 @@ describe('createProjectAgentTokenAction', () => {
           userId: 'u1',
           name: 'Fusion Code – my-proj',
           projectSlugs: ['my-proj'],
-          scopes: ['tasks:read', 'tasks:write', 'comments:write', 'brain:read', 'brain:write'],
+          scopes: ['tasks:read', 'tasks:write', 'comments:write', 'brain:read', 'brain:write', 'skills:read', 'skills:write'],
         }),
       }),
     );

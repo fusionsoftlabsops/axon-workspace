@@ -502,6 +502,27 @@ Dado … Cuando … Entonces …
         </ul>
       </section>
 
+      {/* Skills package */}
+      <section style={card}>
+        <h3 style={{ margin: '0 0 0.5rem' }}>{t('Paquete de skills (buenas prácticas)', 'Skills package (best practices)')}</h3>
+        <p style={lead}>
+          {t(
+            'El equipo comparte un paquete de skills: comandos y guías de buenas prácticas (E2E obligatorio, cobertura unitaria ≥ 90%, lint + tests antes del push, principios SOLID, y /cerrar-hu). Sincronizalos a Fusion Code con un comando:',
+            'The team shares a skills package: best-practice commands and guidelines (E2E required, ≥ 90% unit coverage, lint + tests before push, SOLID principles, and /cerrar-hu). Sync them into Fusion Code with one command:',
+          )}
+        </p>
+        <CopyRow value={'/skills sync'} />
+        <p style={{ ...lead, margin: '0.4rem 0 0' }}>
+          {t('Los skills quedan disponibles como comandos en ', 'The skills become commands in ')}
+          <code style={mono}>~/.qwen</code>
+          {t('. Podés ver el catálogo completo, descargar cualquiera como .md, o contribuir uno nuevo (entra a revisión) en la vista ', '. You can browse the full catalog, download any as .md, or contribute a new one (goes to review) in the ')}
+          <a href="/skills" target="_blank" rel="noreferrer">{t('Skills', 'Skills')}</a>
+          {t(' de Axon. Si escribís un skill útil, subilo con ', ' view in Axon. If you write a useful skill, submit it with ')}
+          <code style={mono}>submit_skill</code>
+          {t(' para compartirlo con el equipo.', ' to share it with the team.')}
+        </p>
+      </section>
+
       {/* Troubleshooting */}
       <section style={card}>
         <h3 style={{ margin: '0 0 0.5rem' }}>{t('Solución de problemas', 'Troubleshooting')}</h3>

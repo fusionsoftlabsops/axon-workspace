@@ -18,8 +18,17 @@ export interface ProjectAgentSetup {
 }
 
 // Scopes a Fusion Code / Qwen agent needs to work a project's HUs end to end:
-// read tasks + update status, comment, and read/write the brain (recall + /sync).
-const AGENT_SCOPES = ['tasks:read', 'tasks:write', 'comments:write', 'brain:read', 'brain:write'];
+// read tasks + update status, comment, read/write the brain (recall + /sync), and
+// read/contribute the shared skills package (/skills sync + submit_skill).
+const AGENT_SCOPES = [
+  'tasks:read',
+  'tasks:write',
+  'comments:write',
+  'brain:read',
+  'brain:write',
+  'skills:read',
+  'skills:write',
+];
 
 /**
  * Mint a project-scoped `ad_pk_` API token for Fusion Code (the Qwen editor) so

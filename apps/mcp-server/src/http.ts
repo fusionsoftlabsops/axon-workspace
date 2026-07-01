@@ -31,6 +31,7 @@ import { registerCommitTools } from './tools/commits.js';
 import { registerBugTools } from './tools/bugs.js';
 import { registerBrainTools } from './tools/brain.js';
 import { registerStoryTools } from './tools/stories.js';
+import { registerSkillTools } from './tools/skills.js';
 
 const BASE_URL = process.env.ADMIN_API_BASE_URL;
 const PORT = Number(process.env.PORT ?? 3040);
@@ -49,6 +50,7 @@ function buildServer(token: string): Server {
   registerBugTools(registry, api);
   registerBrainTools(registry, api);
   registerStoryTools(registry, api);
+  registerSkillTools(registry, api);
 
   const server = new Server(
     { name: 'admin-data-project', version: '0.1.0' },

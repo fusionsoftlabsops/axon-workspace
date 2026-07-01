@@ -155,6 +155,8 @@ export const apiScopeSchema = z.enum([
   'stories:read',
   'stories:write',
   'repo:read',
+  'skills:read',
+  'skills:write',
 ]);
 
 export const createApiTokenSchema = z.object({

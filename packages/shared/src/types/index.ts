@@ -28,7 +28,9 @@ export type ApiScope =
   | 'brain:write'
   | 'stories:read'
   | 'stories:write'
-  | 'repo:read';
+  | 'repo:read'
+  | 'skills:read'
+  | 'skills:write';
 
 export interface DefaultWorkflowState {
   name: string;

@@ -53,6 +53,12 @@ describe('DevelopClient', () => {
     expect(screen.getAllByText(/submit_qa_review/).length).toBeGreaterThan(0);
   });
 
+  it('documents the skills package (/skills sync)', () => {
+    renderClient();
+    expect(screen.getByText(/Skills package \(best practices\)/i)).toBeInTheDocument();
+    expect(screen.getByText('/skills sync')).toBeInTheDocument();
+  });
+
   it('generates a token and reveals the env line + config', async () => {
     const user = userEvent.setup();
     h.createToken.mockResolvedValue({
