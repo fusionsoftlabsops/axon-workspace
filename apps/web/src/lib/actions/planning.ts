@@ -34,6 +34,7 @@ import {
 import { fetchUrlText, isImageMime } from '@/lib/ai/extract';
 import { getObjectBytes, deleteObject, putObject, buildKey, isStorageConfigured } from '@/lib/storage';
 import { publish, planChannel } from '@/lib/realtime';
+import { seedBrainFromPlan } from '@/lib/brain/seed-from-plan';
 import type { ActionResult } from './projects';
 
 export interface AttachmentView {
@@ -1045,8 +1046,17 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
     await tx.projectPlan.update({ where: { id: plan.id }, data: { status: 'PUBLISHED' } });
   });
 
+  // Auto-seed the project brain from the plan so an external coding agent (Fusion
+  // Code / Qwen) has the plan's context via `recall` from the start. Best-effort:
+  // a brain hiccup must not fail the publish.
+  await seedBrainFromPlan({ projectId: ctx.projectId, authorId: ctx.userId, plan: gen }).catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error('[planning] seedBrainFromPlan failed:', err);
+  });
+
   revalidatePath(`/projects/${slug}/board`);
   revalidatePath(`/projects/${slug}/roadmap`);
   revalidatePath(`/projects/${slug}/plan`);
+  revalidatePath(`/projects/${slug}/brain`);
   return { ok: true, data: { tasks: totalTasks, sprints: gen.sprints.length } };
 }
