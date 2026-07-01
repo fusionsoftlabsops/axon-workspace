@@ -35,8 +35,10 @@
   border: 1px solid var(--rule);
   border-radius: t.$radius-lg;
   background: var(--paper-elev);
-  min-height: 420px;
-  max-height: 70vh;
+  // Generous height so the full project chat history is comfortably visible
+  // (scroll within .messages reveals everything, incl. once a plan is generated).
+  min-height: 520px;
+  max-height: 80vh;
 }
 
 .messages {
@@ -70,9 +72,44 @@
 
 .composer {
   display: flex;
+  align-items: flex-end;
   gap: t.$space-sm;
   padding: t.$space-md;
   border-top: 1px solid var(--rule);
+}
+
+// Live hint of what will ground the next message (context files/graph).
+.contextHint {
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  padding: 0 t.$space-md;
+  margin-bottom: 0.15rem;
+  line-height: 1.4;
+}
+.contextHintLabel {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+// Per-message context snapshot (chips under a message).
+.msgContext {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  font-size: 0.68rem;
+  opacity: 0.85;
+}
+.msgContextLabel {
+  font-weight: 700;
+  opacity: 0.8;
+}
+.msgContextChip {
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.18);
+  border: 1px solid rgba(127, 127, 127, 0.32);
 }
 .input {
   flex: 1;

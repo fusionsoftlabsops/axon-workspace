@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 const m = vi.hoisted(() => ({
   auth: vi.fn(),
   findUnique: vi.fn(),
+  userFindUnique: vi.fn(() => Promise.resolve({ name: 'Me' })),
   findMany: vi.fn(() => Promise.resolve([])),
   getOrCreatePlanAction: vi.fn(),
   notFound: vi.fn(() => {
@@ -13,7 +14,11 @@ const m = vi.hoisted(() => ({
 
 vi.mock('@/auth', () => ({ auth: m.auth }));
 vi.mock('@/lib/db', () => ({
-  prisma: { project: { findUnique: m.findUnique }, projectFile: { findMany: m.findMany } },
+  prisma: {
+    project: { findUnique: m.findUnique },
+    user: { findUnique: m.userFindUnique },
+    projectFile: { findMany: m.findMany },
+  },
 }));
 vi.mock('@/lib/i18n/server', () => ({ getServerT: async () => (_es: string, en: string) => en }));
 vi.mock('next/navigation', () => ({ notFound: m.notFound }));
@@ -29,6 +34,7 @@ const params = (slug = 'p') => Promise.resolve({ slug });
 beforeEach(() => {
   Object.values(m).forEach((fn) => (fn as any).mockReset?.());
   m.findMany.mockResolvedValue([]);
+  m.userFindUnique.mockResolvedValue({ name: 'Me' });
   m.notFound.mockImplementation(() => {
     throw new Error('NEXT_NOT_FOUND');
   });

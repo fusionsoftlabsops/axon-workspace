@@ -20,6 +20,7 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
   if (!project || project.members.length === 0) notFound();
   const role = project.members[0]!.role;
 
+  const me = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
   const res = await getOrCreatePlanAction(slug);
   // The project's uploaded files, so the user can mark which feed the plan
   // straight from the chat view (no trip to the Files tab).
@@ -52,6 +53,7 @@ export default async function PlanPage({ params }: { params: Promise<{ slug: str
           slug={slug}
           canWrite={role !== 'VIEWER'}
           currentUserId={session.user.id}
+          currentUserName={me?.name ?? undefined}
           initialPlan={res.data}
           contextFiles={contextFiles}
         />

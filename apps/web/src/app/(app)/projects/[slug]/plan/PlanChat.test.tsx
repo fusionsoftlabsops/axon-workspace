@@ -6,6 +6,7 @@ const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn(
 const h = vi.hoisted(() => ({
   planChatAction: vi.fn(),
   planTypingAction: vi.fn(),
+  clearPlanChatAction: vi.fn(),
   startPlanGenerationAction: vi.fn(),
   publishPlanAction: vi.fn(),
   addPlanLinkAction: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('./PlanEditors', () => ({
 vi.mock('@/lib/actions/planning', () => ({
   planChatAction: h.planChatAction,
   planTypingAction: h.planTypingAction,
+  clearPlanChatAction: h.clearPlanChatAction,
   startPlanGenerationAction: h.startPlanGenerationAction,
   publishPlanAction: h.publishPlanAction,
   addPlanLinkAction: h.addPlanLinkAction,
@@ -40,10 +42,14 @@ class FakeEventSource {
   url: string;
   onmessage: ((ev: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
+  onopen: (() => void) | null = null;
   closed = false;
   constructor(url: string) {
     this.url = url;
     FakeEventSource.instances.push(this);
+  }
+  open() {
+    this.onopen?.();
   }
   emit(obj: unknown) {
     this.onmessage?.({ data: JSON.stringify(obj) });
@@ -341,18 +347,21 @@ describe('PlanChat', () => {
     expect(screen.queryByText(/is typing/i)).toBeNull();
   });
 
-  it('tracks presence join and leave from SSE', async () => {
+  it('tracks presence join and leave from SSE (self always online)', async () => {
     render(<PlanChat slug="p" canWrite currentUserId="me" initialPlan={plan()} />);
     const es = FakeEventSource.instances[0];
+    // The presence bar is always shown (you are always online).
+    expect(screen.getByText(/Online/i)).toBeInTheDocument();
     await act(async () => {
       es.emit({ type: 'presence', state: 'join', userId: 'u2', name: 'Ana' });
     });
-    expect(await screen.findByText(/Online/i)).toBeInTheDocument();
     expect(screen.getByText(/Ana/)).toBeInTheDocument();
     await act(async () => {
       es.emit({ type: 'presence', state: 'leave', userId: 'u2', name: 'Ana' });
     });
-    expect(screen.queryByText(/Online/i)).toBeNull();
+    // Ana left, but the presence bar (with you) stays.
+    expect(screen.queryByText(/Ana/)).toBeNull();
+    expect(screen.getByText(/Online/i)).toBeInTheDocument();
   });
 
   it('pings typing while composing', async () => {
@@ -360,5 +369,72 @@ describe('PlanChat', () => {
     render(<PlanChat slug="p" canWrite currentUserId="me" initialPlan={plan()} />);
     await user.type(screen.getByPlaceholderText(/Type your answer/i), 'h');
     expect(h.planTypingAction).toHaveBeenCalledWith('p');
+  });
+
+  it('shows Enviar and Generar plan together in the composer', () => {
+    render(<PlanChat slug="p" canWrite initialPlan={plan()} />);
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Generate plan/i })).toBeInTheDocument();
+  });
+
+  it('shows the connection status once the SSE opens, incl. you', async () => {
+    render(<PlanChat slug="p" canWrite currentUserId="me" currentUserName="Manu" initialPlan={plan()} />);
+    expect(screen.getByText(/Connecting/i)).toBeInTheDocument();
+    await act(async () => {
+      FakeEventSource.instances[0].open();
+    });
+    expect(screen.getByText(/Connected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Manu \(you\)/i)).toBeInTheDocument();
+  });
+
+  it('renders per-message context chips', () => {
+    render(
+      <PlanChat
+        slug="p"
+        canWrite
+        initialPlan={plan({
+          messages: [{ role: 'user', content: 'usa esto', context: { sources: ['spec.md', 'Code graph'] } }],
+        })}
+      />,
+    );
+    expect(screen.getByText('Context:')).toBeInTheDocument();
+    expect(screen.getByText('spec.md')).toBeInTheDocument();
+    expect(screen.getByText('Code graph')).toBeInTheDocument();
+  });
+
+  it('shows the live context hint from the current context files', () => {
+    render(
+      <PlanChat
+        slug="p"
+        canWrite
+        initialPlan={plan()}
+        contextFiles={[
+          { id: 'f1', name: 'spec.md', category: 'DOCUMENT', isContext: true, contextStatus: 'READY' },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/Will be used as context/i)).toBeInTheDocument();
+    expect(screen.getByText(/spec\.md/)).toBeInTheDocument();
+  });
+
+  it('restarts the conversation after confirmation', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    h.clearPlanChatAction.mockResolvedValue({
+      ok: true,
+      data: plan({ messages: [{ role: 'assistant', content: 'Fresh start' }] }),
+    });
+    render(<PlanChat slug="p" canWrite initialPlan={plan()} />);
+    await user.click(screen.getByRole('button', { name: /Restart conversation/i }));
+    expect(h.clearPlanChatAction).toHaveBeenCalledWith('p');
+    expect(await screen.findByText('Fresh start')).toBeInTheDocument();
+  });
+
+  it('does not restart when confirmation is declined', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<PlanChat slug="p" canWrite initialPlan={plan()} />);
+    await user.click(screen.getByRole('button', { name: /Restart conversation/i }));
+    expect(h.clearPlanChatAction).not.toHaveBeenCalled();
   });
 });
