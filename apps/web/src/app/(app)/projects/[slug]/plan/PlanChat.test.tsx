@@ -23,7 +23,12 @@ vi.mock('./PlanEditors', () => ({
   PlanSprintHead: ({ sprintIndex, onToggle }: any) => (
     <button onClick={onToggle}>toggle-{sprintIndex}</button>
   ),
-  PlanTaskCard: ({ task }: any) => <div>taskcard:{task.title}</div>,
+  PlanTaskCard: ({ task, canGenImpl }: any) => (
+    <div>
+      <span>taskcard:{task.title}</span>
+      {canGenImpl && <span>impl-ok:{task.title}</span>}
+    </div>
+  ),
 }));
 vi.mock('@/lib/actions/planning', () => ({
   planChatAction: h.planChatAction,
@@ -218,6 +223,36 @@ describe('PlanChat', () => {
     expect(screen.getByText('A better idea')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'toggle-0' }));
     expect(await screen.findByText('taskcard:T1')).toBeInTheDocument();
+    expect(screen.getByText('impl-ok:T1')).toBeInTheDocument();
+  });
+
+  it('still allows the implementation plan after chatting past READY (status CHATTING)', async () => {
+    const user = userEvent.setup();
+    render(
+      <PlanChat
+        slug="p"
+        canWrite
+        initialPlan={plan({ status: 'CHATTING', generated: genPlan() })}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'toggle-0' }));
+    // Generated plan exists → the impl-plan affordance is available even though
+    // the status is no longer READY.
+    expect(await screen.findByText('impl-ok:T1')).toBeInTheDocument();
+  });
+
+  it('does not offer the implementation plan to viewers', async () => {
+    const user = userEvent.setup();
+    render(
+      <PlanChat
+        slug="p"
+        canWrite={false}
+        initialPlan={plan({ status: 'READY', generated: genPlan() })}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'toggle-0' }));
+    expect(await screen.findByText('taskcard:T1')).toBeInTheDocument();
+    expect(screen.queryByText('impl-ok:T1')).toBeNull();
   });
 
   it('reestimates the plan from the preview', async () => {
