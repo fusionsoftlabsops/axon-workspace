@@ -51,6 +51,7 @@ export default async function FilesPage({ params }: { params: Promise<{ slug: st
         slug={slug}
         role={role}
         currentUserId={session.user.id}
+        currentUserName={session.user.name ?? undefined}
         files={files.map((f) => ({
           id: f.id,
           name: f.name,
