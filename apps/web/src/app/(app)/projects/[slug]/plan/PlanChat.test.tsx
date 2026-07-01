@@ -402,21 +402,6 @@ describe('PlanChat', () => {
     expect(screen.getByText('Code graph')).toBeInTheDocument();
   });
 
-  it('shows the live context hint from the current context files', () => {
-    render(
-      <PlanChat
-        slug="p"
-        canWrite
-        initialPlan={plan()}
-        contextFiles={[
-          { id: 'f1', name: 'spec.md', category: 'DOCUMENT', isContext: true, contextStatus: 'READY' },
-        ]}
-      />,
-    );
-    expect(screen.getByText(/Will be used as context/i)).toBeInTheDocument();
-    expect(screen.getByText(/spec\.md/)).toBeInTheDocument();
-  });
-
   it('restarts the conversation after confirmation', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);

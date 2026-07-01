@@ -78,19 +78,6 @@
   border-top: 1px solid var(--rule);
 }
 
-// Live hint of what will ground the next message (context files/graph).
-.contextHint {
-  font-size: 0.72rem;
-  color: var(--ink-muted);
-  padding: 0 t.$space-md;
-  margin-bottom: 0.15rem;
-  line-height: 1.4;
-}
-.contextHintLabel {
-  font-weight: 700;
-  color: var(--ink);
-}
-
 // Per-message context snapshot (chips under a message).
 .msgContext {
   display: flex;
