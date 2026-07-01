@@ -46,6 +46,10 @@ export default async function HomePage() {
           </Link>
         </div>
 
+        <p className={styles.recover}>
+          <Link href="/forgot-password">{t('¿Olvidaste tu contraseña?', 'Forgot your password?')}</Link>
+        </p>
+
         <div className={styles.pillars}>
           <article className={styles.pillar} style={{ '--index': 0 } as React.CSSProperties}>
             <span className={styles.pillarNum}>I.</span>

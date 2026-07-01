@@ -126,6 +126,24 @@
   }
 }
 
+.recover {
+  // Pull up under the action buttons (which carry a large bottom margin),
+  // keep breathing room before the pillars.
+  margin: calc(-1 * #{t.$space-2xl}) 0 t.$space-3xl;
+  font-size: 0.8rem;
+
+  a {
+    color: var(--ink-muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color t.$dur-quick t.$ease-editorial;
+
+    &:hover {
+      color: var(--accent-ink);
+    }
+  }
+}
+
 // Pilares como TOC editorial
 .pillars {
   display: grid;

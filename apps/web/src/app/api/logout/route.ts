@@ -8,7 +8,13 @@ import { signOut } from '@/auth';
  * page never redirected. A plain route handler is addressed by URL, so it
  * survives redeploys. The header form POSTs here.
  */
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   await signOut({ redirect: false });
-  return NextResponse.redirect(new URL('/login', req.url), { status: 303 });
+  // Use a RELATIVE Location, not new URL('/login', req.url): behind the proxy
+  // (cloudflared → Traefik → container) req.url reflects the internal bind
+  // (http://0.0.0.0:3000), so an absolute redirect would send the browser to an
+  // unroutable 0.0.0.0:3000/login. A relative Location is resolved by the browser
+  // against the public origin. (NextResponse.redirect requires an absolute URL,
+  // so we set the header manually.)
+  return new NextResponse(null, { status: 303, headers: { Location: '/login' } });
 }
