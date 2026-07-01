@@ -38,6 +38,7 @@ export default async function ProjectLayout({
     { href: `${base}/plan`, label: `✦ ${t('Plan', 'Plan')}` },
     { href: `${base}/roadmap`, label: `⊞ ${t('Roadmap', 'Roadmap')}` },
     { href: `${base}/board`, label: `§ ${t('Tablero', 'Board')}` },
+    { href: `${base}/qa`, label: `✓ ${t('QA', 'QA')}` },
     { href: `${base}/context`, label: `◆ ${t('Contexto', 'Context')}` },
     { href: `${base}/files`, label: `❏ ${t('Archivos', 'Files')}` },
     { href: `${base}/vault`, label: '※ Vault' },

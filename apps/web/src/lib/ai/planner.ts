@@ -14,12 +14,15 @@ import {
   PLAN_TOOL_SCHEMA,
   PLAN_TASK_TOOL_SCHEMA,
   REESTIMATE_TOOL_SCHEMA,
+  QA_TESTS_TOOL_SCHEMA,
   generatedPlanSchema,
   planTaskSchema,
   reestimateResultSchema,
+  qaTestsResultSchema,
   type GeneratedPlan,
   type PlanTask,
   type ReestimateItem,
+  type QaTestCaseAI,
 } from './plan-schema';
 
 export interface ChatMsg {
@@ -369,6 +372,45 @@ export async function generateImplementationPlan(
   const md = textOf(resp);
   if (!md) throw new Error('El modelo no devolvió el plan de implementación');
   return md;
+}
+
+/** Generate QA test cases for ONE story from its title/description/acceptance
+ *  criteria (+ optional developer handoff), for the QA reviewer (Opus, tool-use). */
+export async function generateQaTests(
+  story: { title: string; description: string; acceptanceCriteria: string; handoffContext?: string },
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<QaTestCaseAI[]> {
+  const model = env().AI_MODEL_DEEP;
+  const system = `Eres un ingeniero de QA senior. A partir de la historia de usuario y sus criterios de aceptación, escribe CASOS DE PRUEBA de QA concretos y verificables (camino feliz, casos borde, validaciones y errores). Cada caso: title (qué verifica), steps (pasos para ejecutarlo) y expected (resultado esperado). Cubre TODOS los criterios de aceptación. Todo en ${langName(lang)}. Devuelve SOLO la herramienta EmitQaTests.`;
+
+  const user =
+    `## Historia de usuario\n${story.title}\n\n${story.description || '(sin descripción)'}\n\n` +
+    `## Criterios de aceptación\n${story.acceptanceCriteria || '(no especificados)'}\n` +
+    (story.handoffContext ? `\n## Contexto del desarrollador (cierre de HU)\n${story.handoffContext}\n` : '');
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 3000,
+    system,
+    tools: [
+      {
+        name: 'EmitQaTests',
+        description: 'Emit QA test cases for the story.',
+        input_schema: QA_TESTS_TOOL_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'EmitQaTests' },
+    messages: [{ role: 'user', content: user }],
+  });
+  await record('plan.qatests', model, resp.usage, userId, projectId);
+
+  const toolUse = resp.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitQaTests',
+  );
+  if (!toolUse) throw new Error('El modelo no devolvió las pruebas de QA');
+  return qaTestsResultSchema.parse(toolUse.input).tests;
 }
 
 export interface ReestimateItemInput {

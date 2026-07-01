@@ -44,6 +44,15 @@ describe('DevelopClient', () => {
     expect(screen.getByText(/Install Fusion Code from the platform/i)).toBeInTheDocument();
   });
 
+  it('documents pulling the implementation plan and closing the HU', () => {
+    renderClient();
+    expect(screen.getByText(/Pull the implementation plan into Qwen/i)).toBeInTheDocument();
+    expect(screen.getByText(/Close the story \(QA handoff\)/i)).toBeInTheDocument();
+    // The close command + the MCP tool it calls are shown.
+    expect(screen.getByText(/\/cerrar-hu 1/)).toBeInTheDocument();
+    expect(screen.getAllByText(/submit_qa_review/).length).toBeGreaterThan(0);
+  });
+
   it('generates a token and reveals the env line + config', async () => {
     const user = userEvent.setup();
     h.createToken.mockResolvedValue({

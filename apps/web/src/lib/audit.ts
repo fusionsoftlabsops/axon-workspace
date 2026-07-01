@@ -26,6 +26,8 @@ export type AuditAction =
   | 'task.update'
   | 'task.move'
   | 'task.delete'
+  | 'task.qa_review'
+  | 'task.qa_decision'
   | 'auth.login'
   | 'auth.totp_enable'
   | 'auth.totp_disable'
