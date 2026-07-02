@@ -6,26 +6,27 @@
 @use '@/styles/motion';
 
 // ============================================================
-// Paleta · tinta sobre papel envejecido
+// Paleta · Corporate Precision
 // ============================================================
 
 :root {
-  // ---------- Graphite — SaaS neutral, alta legibilidad ----------
+  // ---------- Corporate Precision — escala de grises + acento índigo ----------
   // Nombres canónicos heredados del sistema editorial anterior; sólo
   // cambian los valores, así que cada alias --color-* y cada module.scss
-  // legacy se actualiza gratis. (Audit "Graphite", light mode.)
-  --paper: #fbfbfc;             // --bg
+  // legacy se actualiza gratis. Paleta alineada 1:1 al design system
+  // "Corporate Precision" (Neutral/Secondary/Tertiary/Primary).
+  --paper: #f8f8f8;             // --bg · Neutral
   --paper-elev: #ffffff;        // --surface
-  --paper-deep: #f4f5f7;        // --sunken
+  --paper-deep: #ececed;        // --sunken · un paso más oscuro que Neutral
 
-  --ink: #16181d;
-  --ink-muted: #5b616e;
-  --ink-subtle: #8b909c;
+  --ink: #111827;               // Secondary
+  --ink-muted: #687280;         // Tertiary
+  --ink-subtle: #9aa1ac;
 
   --rule: #e7e9ee;              // --line
   --rule-strong: #d6d9e0;       // --line-strong
 
-  --accent-ink: #4f46e5;        // índigo — único acento
+  --accent-ink: #4f46e5;        // Primary — índigo, único acento
   --accent-marginalia: #4f46e5; // info → mismo acento (un solo acento)
   --accent-correction: #15803d; // success (--ok)
   --accent-amber: #b4530a;      // warning (--warn)
@@ -65,15 +66,14 @@
   --color-info: var(--accent-marginalia);
 
   // ---------- Fuentes ----------
-  // Las variables --font-* las inyecta `next/font/google` desde
-  // src/app/layout.tsx. Aquí solo definimos los stacks completos
-  // con fallbacks decentes.
-  --font-display: var(--font-display, 'Space Grotesk'), system-ui, -apple-system, sans-serif;
-  // "Editorial" ahora apunta al stack sans: la app es una herramienta, un solo
-  // idioma visual (audit: claridad sobre carácter). Cada `var(--font-editorial)`
-  // heredado en los module.scss legacy deja de ser serif sin tocar cada hoja.
-  --font-editorial: var(--font-sans, 'IBM Plex Sans'), system-ui, -apple-system, sans-serif;
-  --font-sans: var(--font-sans, 'IBM Plex Sans'), system-ui, -apple-system, sans-serif;
+  // Sistema "Corporate Precision": una sola familia (Hanken Grotesk, inyectada
+  // por `next/font/google` desde src/app/layout.tsx como --font-hanken) para
+  // títulos, navegación, botones y cuerpo. --font-display/--font-editorial/
+  // --font-sans son alias hacia el mismo stack para no reescribir cada
+  // module.scss legacy que ya los referencia.
+  --font-display: var(--font-hanken, 'Hanken Grotesk'), system-ui, -apple-system, sans-serif;
+  --font-editorial: var(--font-hanken, 'Hanken Grotesk'), system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-hanken, 'Hanken Grotesk'), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-mono, 'JetBrains Mono'), 'SF Mono', Consolas, monospace;
 }
 

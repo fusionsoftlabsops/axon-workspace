@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Space_Grotesk, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
+import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { cookies } from 'next/headers';
 import { Providers } from './providers';
@@ -7,20 +7,13 @@ import { LANG_COOKIE, type Lang } from '@/lib/i18n/lang';
 import { THEME_COOKIE, type Theme } from '@/lib/theme';
 import './globals.scss';
 
-// Display sans — Space Grotesk para títulos y encabezados (sustituye a
-// Fraunces/Newsreader; la app es una herramienta, no una pieza editorial).
-const display = Space_Grotesk({
+// Sistema "Corporate Precision": una sola familia (Hanken Grotesk) para
+// títulos, navegación, botones y cuerpo — profesional, técnica, sin mezclar
+// voces tipográficas.
+const hanken = Hanken_Grotesk({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-display',
-  weight: ['400', '500', '600', '700'],
-});
-
-// UI sans — neutral con character. Navegación, botones, labels, cuerpo.
-const plex = IBM_Plex_Sans({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-sans',
+  variable: '--font-hanken',
   weight: ['400', '500', '600', '700'],
 });
 
@@ -56,7 +49,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const lang = await serverLang();
   const theme = await serverTheme();
-  const fontClasses = [display.variable, plex.variable, mono.variable].join(' ');
+  const fontClasses = [hanken.variable, mono.variable].join(' ');
 
   return (
     <html lang={lang} data-theme={theme} className={fontClasses}>
