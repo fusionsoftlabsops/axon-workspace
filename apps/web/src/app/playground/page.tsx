@@ -165,7 +165,7 @@ export default async function Playground() {
               'Editorial body · Newsreader · 17 / 1.7. Designed for long reading of technical memories. Italics are reserved for quotes and decks.',
             )}
           </p>
-          <p className={styles.tUi}>UI sans · IBM Plex Sans · 15 / 1.5.</p>
+          <p className={styles.tUi}>UI sans · Hanken Grotesk · 15 / 1.5.</p>
           <p className={styles.tMono}>
             <code>mono · JetBrains Mono · 14 / 1.5 · ad_pk_q2tOIkHL0OJp9_kK</code>
           </p>

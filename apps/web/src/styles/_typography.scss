@@ -2,9 +2,9 @@
 // Mixins de tipografía editorial
 // ============================================================
 // Las fuentes vienen de next/font/google (capa CSS):
-//   --font-display    Fraunces (variable: opsz, wght, SOFT, WONK)
-//   --font-editorial  Newsreader (regular + italic)
-//   --font-sans       IBM Plex Sans
+//   --font-display    Hanken Grotesk (sistema "Corporate Precision")
+//   --font-editorial  Hanken Grotesk (alias — una sola voz tipográfica)
+//   --font-sans       Hanken Grotesk
 //   --font-mono       JetBrains Mono
 
 @use './tokens' as t;
@@ -33,7 +33,7 @@
   line-height: 1;
 }
 
-// Masthead: ahora un H1 sans razonable (Space Grotesk), no un titular de revista.
+// Masthead: ahora un H1 sans razonable (Hanken Grotesk), no un titular de revista.
 @mixin masthead($size: 2.25rem) {
   font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 700;

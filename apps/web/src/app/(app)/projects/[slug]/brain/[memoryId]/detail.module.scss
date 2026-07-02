@@ -172,7 +172,7 @@
     background: var(--ink-wash-8);
     padding: 0.08em 0.4em;
     font-size: 0.88em;
-    border-radius: 2px;
+    border-radius: t.$radius-sm;
     color: var(--ink);
   }
 
@@ -180,7 +180,7 @@
     background: var(--paper-deep);
     border: 1px solid var(--rule);
     padding: t.$space-md t.$space-lg;
-    border-radius: 2px;
+    border-radius: t.$radius-sm;
     overflow-x: auto;
     margin: t.$space-lg 0;
     line-height: 1.55;
@@ -340,7 +340,7 @@
     color: var(--ink);
     font: inherit;
     font-size: 0.85rem;
-    border-radius: 0;
+    border-radius: t.$radius-sm;
 
     &:focus {
       outline: none;

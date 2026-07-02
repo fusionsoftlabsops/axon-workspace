@@ -22,11 +22,11 @@ $space-5xl: 8rem;     // 128px
 $baseline: 0.5rem;
 
 // ---------- Border radius ----------
-// Cuaderno = cantos rectos. Casi todo es 0 o 2px.
+// Corporate Precision: cantos redondeados, look SaaS moderno.
 $radius-none: 0;
-$radius-sm: 2px;
-$radius-md: 4px;
-$radius-lg: 8px;
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 16px;
 $radius-full: 9999px;
 
 // ---------- Reglas (separadores tipográficos) ----------
