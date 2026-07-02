@@ -313,6 +313,12 @@ PER STORY (repeat)
               )}{' '}
               → <strong>Coding Tools</strong> → {t('«Crear token» (copiá la URL del modelo y el token que aparecen ahí).', '"Create token" (copy the model URL and token shown there).')}
             </p>
+            <p style={{ ...lead, margin: '0.5rem 0 0.2rem', fontSize: '0.8rem' }}>
+              {t(
+                '¿"No hay ningún modelo expuesto" en Coding Tools? Ese botón lista los modelos del proyecto de fusion-soft-lab al que tenés acceso — pedile a quien lo administra que te agregue como colaborador (rol Editor) desde «Colaboradores» en ese proyecto. Una vez agregado, el modelo y el botón «Crear token» aparecen ahí solos.',
+                '"No model exposed" on Coding Tools? That page lists models from the fusion-soft-lab project you have access to — ask whoever manages it to add you as a collaborator (Editor role) via that project\'s "Collaborators". Once added, the model and the "Create token" button show up there automatically.',
+              )}
+            </p>
             <p style={{ ...lead, margin: '0.5rem 0 0.2rem' }}>{t('Al terminar, verificá:', 'When done, verify:')}</p>
             <CopyRow value={'qwen'} label={t('Copiar', 'Copy')} />
             <Sample>
