@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { getServerT } from '@/lib/i18n/server';
 import { PageHeader, Eyebrow } from '@/components/ui';
 import { env } from '@/lib/env';
+import { isFusionConfigured } from '@/lib/deploy/fusion-coding-tools';
 import { DevelopClient, type DevelopHU } from './DevelopClient';
 
 export default async function DevelopPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -61,6 +62,7 @@ export default async function DevelopPage({ params }: { params: Promise<{ slug: 
         slug={slug}
         canGenerate={role !== 'VIEWER'}
         fusionBase={fusionBase}
+        fusionConfigured={isFusionConfigured()}
         mcpUrl={mcpUrl}
         hus={hus}
       />

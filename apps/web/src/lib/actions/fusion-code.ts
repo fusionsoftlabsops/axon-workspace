@@ -6,6 +6,11 @@ import { audit } from '@/lib/audit';
 import { generateApiToken } from '@/lib/api-auth';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { env } from '@/lib/env';
+import {
+  createModelToken,
+  getExposedModels,
+  isFusionConfigured,
+} from '@/lib/deploy/fusion-coding-tools';
 import type { ActionResult } from './projects';
 
 export interface ProjectAgentSetup {
@@ -15,6 +20,13 @@ export interface ProjectAgentSetup {
   mcpUrl: string;
   /** The project slug for `.axon/config.json`. */
   projectSlug: string;
+}
+
+export interface ModelSetup {
+  /** Public OpenAI-compatible model base, /v1 included — what the installer expects. */
+  modelUrl: string;
+  /** Plain `fsn_` model token — shown ONCE, revocable from Coding Tools. */
+  token: string;
 }
 
 // Scopes a Fusion Code / Qwen agent needs to work a project's HUs end to end:
@@ -72,4 +84,59 @@ export async function createProjectAgentTokenAction(
     ok: true,
     data: { plainToken: plain, mcpUrl: env().AXON_MCP_URL, projectSlug: slug },
   };
+}
+
+/**
+ * Mint a personal `fsn_` model token on fusion-infra and return it with the
+ * public model URL, so the Develop page can render an installer one-liner that
+ * needs zero manual steps (the install scripts consume FUSION_MODEL_URL /
+ * FUSION_TOKEN and skip every prompt). Any project member can generate one —
+ * the token only grants model usage, not Axon writes. The plaintext is
+ * returned once; ops can revoke it from the Coding Tools page.
+ */
+export async function createModelSetupAction(slug: string): Promise<ActionResult<ModelSetup>> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: 'No autenticado' };
+
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+
+  if (!isFusionConfigured()) {
+    return {
+      ok: false,
+      error:
+        'La instalación asistida no está configurada (FUSION_INFRA_URL / FUSION_INFRA_TOKEN); usá el paso manual de abajo.',
+    };
+  }
+
+  try {
+    const models = await getExposedModels();
+    const model = models[0];
+    if (!model) {
+      return {
+        ok: false,
+        error: 'No hay ningún modelo expuesto en la plataforma todavía; avisale al administrador.',
+      };
+    }
+
+    const who = session.user?.name || session.user?.email || userId;
+    const minted = await createModelToken(model.appId, `Fusion Code – ${who} – axon/${slug}`);
+
+    await audit({
+      actorId: userId,
+      action: 'model_token.create',
+      resourceType: 'model_token',
+      resourceId: minted.id,
+      projectId: ctx.projectId,
+      payload: { name: minted.name, appId: model.appId, via: 'develop-page' },
+    });
+
+    return { ok: true, data: { modelUrl: `${model.url}/v1`, token: minted.token } };
+  } catch (e) {
+    return {
+      ok: false,
+      error: `No se pudo generar el token del modelo: ${e instanceof Error ? e.message : 'error desconocido'}`,
+    };
+  }
 }
