@@ -45,6 +45,8 @@ const { prismaMock, auditMock, assertMock, fusionMock, startPollingMock, revalid
         dbCatalog: vi.fn(),
         createDatabase: vi.fn(),
         getDbCredentials: vi.fn(),
+        getEnvironmentPolicy: vi.fn(),
+        getProjectGovernance: vi.fn(),
       },
       startPollingMock: vi.fn(),
       revalidateMock: vi.fn(),
@@ -793,5 +795,36 @@ describe('refreshDeploymentsAction', () => {
       where: { id: 'dep1' },
       data: { status: 'LIVE', hostname: 'new1', error: null },
     });
+  });
+});
+
+describe('getGovernanceAction', () => {
+  it('returns an empty list when the project has no deploy target', async () => {
+    prismaMock.deployTarget.findUnique.mockResolvedValue(null);
+    const res = await deploy.getGovernanceAction('slug');
+    expect(res).toEqual({ ok: true, data: [] });
+    expect(fusionMock.getProjectGovernance).not.toHaveBeenCalled();
+  });
+
+  it('fetches the fusion project governance for the connected target', async () => {
+    const summaries = [
+      { environmentId: 'e1', environmentName: 'production', policy: null },
+    ];
+    fusionMock.getProjectGovernance.mockResolvedValue(summaries);
+    const res = await deploy.getGovernanceAction('slug');
+    expect(fusionMock.getProjectGovernance).toHaveBeenCalledWith('fp1', 't1');
+    expect(res).toEqual({ ok: true, data: summaries });
+  });
+
+  it('surfaces fusion-infra errors', async () => {
+    fusionMock.getProjectGovernance.mockRejectedValue(new Error('fusion-infra 500: boom'));
+    const res = await deploy.getGovernanceAction('slug');
+    expect(res).toEqual({ ok: false, error: 'fusion-infra 500: boom' });
+  });
+
+  it('propagates the membership guard failure', async () => {
+    assertMock.mockResolvedValue({ ok: false, error: 'Proyecto no encontrado' });
+    const res = await deploy.getGovernanceAction('slug');
+    expect(res).toEqual({ ok: false, error: 'Proyecto no encontrado' });
   });
 });

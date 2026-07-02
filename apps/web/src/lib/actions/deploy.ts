@@ -750,6 +750,21 @@ export async function refreshDeploymentsAction(slug: string): Promise<ActionResu
   return { ok: true, data: await loadView(g.ctx.projectId, progressMap) };
 }
 
+// ---- governance ----
+
+export async function getGovernanceAction(slug: string): Promise<ActionResult<fusion.FusionEnvPolicySummary[]>> {
+  const g = await guard(slug);
+  if (!g.ok) return g;
+  const target = await prisma.deployTarget.findUnique({ where: { projectId: g.ctx.projectId } });
+  if (!target) return { ok: true, data: [] };
+  try {
+    const data = await fusion.getProjectGovernance(target.fusionProjectId, target.fusionTeamId);
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 // ---- shared resolver ----
 
 async function resolveDeployment(projectId: string, deploymentId: string) {
