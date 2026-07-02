@@ -20,12 +20,13 @@ import {
   linkExistingAppAction,
   deleteDeploymentAction,
   refreshDeploymentsAction,
+  getGovernanceAction,
   type DeployView,
   type DeploymentView,
   type DeployRepoView,
   type ConnectOption,
 } from '@/lib/actions/deploy';
-import type { DbEngine, FusionDbCatalogEntry, FusionDbCredentials } from '@/lib/deploy/fusion-client';
+import type { DbEngine, FusionDbCatalogEntry, FusionDbCredentials, FusionPolicy } from '@/lib/deploy/fusion-client';
 import { SignalLine, type SignalState } from '@/components/SignalLine';
 import styles from './deploy.module.scss';
 
@@ -261,7 +262,107 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
 
       {/* ---- Databases ---- */}
       <DatabaseSection slug={slug} busy={busy} apply={apply} setError={setError} t={t} />
+
+      {/* ---- Governance ---- */}
+      <GovernancePanel slug={slug} t={t} />
     </div>
+  );
+}
+
+// ---- governance info panel ----
+function GovernancePanel({ slug, t }: { slug: string; t: Tr }) {
+  const [policies, setPolicies] = useState<FusionPolicy[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function load() {
+    if (loading) return;
+    setLoading(true);
+    void getGovernanceAction(slug).then((r) => {
+      setLoading(false);
+      if (!r.ok) { setErr(r.error); return; }
+      setPolicies((r.data ?? []).map((s) => s.policy).filter((p): p is FusionPolicy => !!p));
+    });
+  }
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && policies === null) load();
+  }
+
+  const active = policies?.filter((p) =>
+    p.requireApproval || p.qualityChecks.length > 0 || p.deployerRole !== 'MEMBER' || p.maxMemoryMb || p.maxCpuPercent,
+  ) ?? [];
+
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionHead}>
+        <h3 className={styles.sectionTitle}>{t('Gobernanza', 'Governance')}</h3>
+        <button
+          type="button"
+          className={styles.miniBtn}
+          onClick={toggle}
+        >
+          {open ? t('Ocultar', 'Hide') : t('Ver políticas', 'View policies')}
+        </button>
+      </div>
+
+      {open && (
+        loading ? (
+          <p className={styles.reason}>{t('Cargando…', 'Loading…')}</p>
+        ) : err ? (
+          <p className={styles.error}>{err}</p>
+        ) : !policies?.length ? (
+          <p className={styles.reason}>
+            {t(
+              'Sin políticas configuradas — todos los deploys siguen el flujo estándar.',
+              'No policies configured — all deploys follow the standard flow.',
+            )}
+          </p>
+        ) : (
+          <div className={styles.grid}>
+            {policies.map((p) => (
+              <div key={p.environmentId} className={styles.card}>
+                <div className={styles.cardTop}>
+                  <span className={styles.name}>
+                    {t('Environment', 'Environment')}: {p.environmentId.slice(-8)}
+                  </span>
+                  {active.some((a) => a.environmentId === p.environmentId) && (
+                    <Badge tone="warn">{t('política activa', 'policy active')}</Badge>
+                  )}
+                </div>
+
+                <div className={styles.reason} style={{ fontSize: '0.78rem', lineHeight: 1.7 }}>
+                  {p.requireApproval && (
+                    <div>⏸ {t('Requiere aprobación antes de deploy', 'Requires approval before deploy')}</div>
+                  )}
+                  <div>👤 {t('Rol mínimo para deploy', 'Min role to deploy')}: <strong>{p.deployerRole}</strong></div>
+                  <div>🗄 {t('Retención de builds', 'Build retention')}: <strong>{p.retentionBuilds}</strong></div>
+                  {p.maxMemoryMb && (
+                    <div>💾 {t('Memoria máx', 'Max memory')}: <strong>{p.maxMemoryMb} MB</strong> ({t('advisory', 'advisory')})</div>
+                  )}
+                  {p.maxCpuPercent && (
+                    <div>⚙ {t('CPU máx', 'Max CPU')}: <strong>{p.maxCpuPercent}%</strong> ({t('advisory', 'advisory')})</div>
+                  )}
+                  {p.qualityChecks.length > 0 && (
+                    <div>
+                      🧪 {t('Checks de calidad', 'Quality checks')}:
+                      {p.qualityChecks.map((c) => (
+                        <span key={c.name} style={{ marginLeft: 6, opacity: 0.8 }}>
+                          {c.name} ({c.image})
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </section>
   );
 }
 

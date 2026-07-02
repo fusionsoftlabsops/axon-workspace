@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   linkExistingAppAction: vi.fn(),
   deleteDeploymentAction: vi.fn(),
   refreshDeploymentsAction: vi.fn(),
+  getGovernanceAction: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/deploy', () => ({ ...h }));
@@ -571,5 +572,54 @@ describe('DeployClient — polling', () => {
     });
     expect(h.refreshDeploymentsAction).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+});
+
+describe('GovernancePanel', () => {
+  const policy = (over: Obj = {}) => ({
+    id: 'pol1',
+    environmentId: 'env12345678',
+    requireApproval: true,
+    approverRole: 'ADMIN',
+    deployerRole: 'ADMIN',
+    retentionBuilds: 5,
+    maxMemoryMb: 512,
+    maxCpuPercent: null,
+    qualityChecks: [{ name: 'tests', command: 'npm test', image: 'node:20' }],
+    updatedAt: null,
+    createdAt: null,
+    ...over,
+  });
+
+  it('loads policies lazily on toggle and renders their rules', async () => {
+    const user = userEvent.setup();
+    h.getGovernanceAction.mockResolvedValue({
+      ok: true,
+      data: [{ environmentId: 'env12345678', environmentName: 'production', policy: policy() }],
+    });
+    render(<DeployClient slug="p" initial={view()} />);
+    expect(h.getGovernanceAction).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: /View policies/i }));
+    expect(h.getGovernanceAction).toHaveBeenCalledWith('p');
+    expect(await screen.findByText(/Requires approval before deploy/i)).toBeInTheDocument();
+    expect(screen.getByText(/Min role to deploy/i)).toBeInTheDocument();
+    expect(screen.getByText(/tests/)).toBeInTheDocument();
+    expect(screen.getByText(/policy active/i)).toBeInTheDocument();
+  });
+
+  it('shows the empty message when no policies are configured', async () => {
+    const user = userEvent.setup();
+    h.getGovernanceAction.mockResolvedValue({ ok: true, data: [] });
+    render(<DeployClient slug="p" initial={view()} />);
+    await user.click(screen.getByRole('button', { name: /View policies/i }));
+    expect(await screen.findByText(/No policies configured/i)).toBeInTheDocument();
+  });
+
+  it('surfaces a governance load error', async () => {
+    const user = userEvent.setup();
+    h.getGovernanceAction.mockResolvedValue({ ok: false, error: 'fusion-infra 401' });
+    render(<DeployClient slug="p" initial={view()} />);
+    await user.click(screen.getByRole('button', { name: /View policies/i }));
+    expect(await screen.findByText('fusion-infra 401')).toBeInTheDocument();
   });
 });

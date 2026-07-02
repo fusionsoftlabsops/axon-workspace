@@ -27,6 +27,8 @@ import {
   getAppEnvKeys,
   getDeployment,
   appDeployments,
+  getEnvironmentPolicy,
+  getProjectGovernance,
   dbCatalog,
   createDatabase,
   getDbCredentials,
@@ -258,6 +260,22 @@ describe('api headers / wiring (via thin methods)', () => {
     fetchMock.mockResolvedValue(ok({ local: {} }));
     await getDbCredentials('a1', 't1');
     expect(callArgs().url).toBe(`${BASE}/applications/a1/credentials`);
+  });
+
+  it('getEnvironmentPolicy: GET /environments/:id/policy', async () => {
+    fetchMock.mockResolvedValue(ok({ environmentId: 'e1', requireApproval: false }));
+    await getEnvironmentPolicy('e1', 't1');
+    const c = callArgs();
+    expect(c.url).toBe(`${BASE}/environments/e1/policy`);
+    expect(c.headers['x-team-id']).toBe('t1');
+  });
+
+  it('getProjectGovernance: GET /projects/:id/governance', async () => {
+    fetchMock.mockResolvedValue(ok([]));
+    await getProjectGovernance('p1', 't1');
+    const c = callArgs();
+    expect(c.url).toBe(`${BASE}/projects/p1/governance`);
+    expect(c.headers['x-team-id']).toBe('t1');
   });
 });
 

@@ -300,6 +300,38 @@ export function appDeployments(id: string, teamId: string): Promise<FusionLatest
   return api<FusionLatestDeployment[]>('GET', `/applications/${id}/deployments`, { teamId });
 }
 
+// ---- governance ----
+export interface FusionQualityCheck {
+  name: string;
+  command: string;
+  image: string;
+}
+export interface FusionPolicy {
+  id: string | null;
+  environmentId: string;
+  requireApproval: boolean;
+  approverRole: 'OWNER' | 'ADMIN' | 'MEMBER';
+  deployerRole: 'OWNER' | 'ADMIN' | 'MEMBER';
+  retentionBuilds: number;
+  maxMemoryMb: number | null;
+  maxCpuPercent: number | null;
+  qualityChecks: FusionQualityCheck[];
+  updatedAt: string | null;
+  createdAt: string | null;
+}
+export interface FusionEnvPolicySummary {
+  environmentId: string;
+  environmentName: string;
+  policy: FusionPolicy | null;
+}
+
+export function getEnvironmentPolicy(environmentId: string, teamId: string): Promise<FusionPolicy> {
+  return api<FusionPolicy>('GET', `/environments/${environmentId}/policy`, { teamId });
+}
+export function getProjectGovernance(projectId: string, teamId: string): Promise<FusionEnvPolicySummary[]> {
+  return api<FusionEnvPolicySummary[]>('GET', `/projects/${projectId}/governance`, { teamId });
+}
+
 // ---- databases ----
 export function dbCatalog(): Promise<FusionDbCatalogEntry[]> {
   return api<FusionDbCatalogEntry[]>('GET', '/databases/catalog');
