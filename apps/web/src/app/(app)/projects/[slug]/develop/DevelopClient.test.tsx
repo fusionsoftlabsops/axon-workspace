@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const h = vi.hoisted(() => ({ createToken: vi.fn() }));
+const h = vi.hoisted(() => ({ createToken: vi.fn(), createModelSetup: vi.fn() }));
 vi.mock('next/link', () => ({ default: ({ children, href }: any) => <a href={href}>{children}</a> }));
-vi.mock('@/lib/actions/fusion-code', () => ({ createProjectAgentTokenAction: h.createToken }));
+vi.mock('@/lib/actions/fusion-code', () => ({
+  createProjectAgentTokenAction: h.createToken,
+  createModelSetupAction: h.createModelSetup,
+}));
 
 import { DevelopClient, type DevelopHU } from './DevelopClient';
 
@@ -108,5 +111,52 @@ describe('DevelopClient', () => {
   it('prompts to publish a plan when there are no HUs', () => {
     renderClient({ hus: [] });
     expect(screen.getByText(/No stories yet/i)).toBeInTheDocument();
+  });
+});
+
+describe('DevelopClient — assisted install (pre-configured installer)', () => {
+  it('hides the assisted button when fusion-infra is not configured', () => {
+    renderClient();
+    expect(screen.queryByRole('button', { name: /Generate my configured installer/i })).not.toBeInTheDocument();
+    // the generic one-liner stays as the primary flow
+    expect(screen.getByText(/curl -fsSL https:\/\/infra.test\/api\/coding-tools\/install.sh \| sh/)).toBeInTheDocument();
+  });
+
+  it('shows the assisted button and tucks the manual flow behind a fallback', () => {
+    renderClient({ fusionConfigured: true });
+    expect(screen.getByRole('button', { name: /Generate my configured installer/i })).toBeInTheDocument();
+    expect(screen.getByText(/Manual install \(alternative\)/i)).toBeInTheDocument();
+  });
+
+  it('mints the token and renders the pre-configured one-liner per OS', async () => {
+    const user = userEvent.setup();
+    h.createModelSetup.mockResolvedValue({
+      ok: true,
+      data: { modelUrl: 'https://vllm-api.test/v1', token: 'fsn_SECRET' },
+    });
+    renderClient({ fusionConfigured: true });
+    await user.click(screen.getByRole('button', { name: /Generate my configured installer/i }));
+    expect(h.createModelSetup).toHaveBeenCalledWith('my-proj');
+    expect(
+      await screen.findByText(
+        /curl -fsSL https:\/\/infra.test\/api\/coding-tools\/install.sh \| FUSION_MODEL_URL="https:\/\/vllm-api.test\/v1" FUSION_TOKEN="fsn_SECRET" sh/,
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Windows' }));
+    expect(
+      screen.getByText(
+        /\$env:FUSION_MODEL_URL="https:\/\/vllm-api.test\/v1"; \$env:FUSION_TOKEN="fsn_SECRET"; irm https:\/\/infra.test\/api\/coding-tools\/install.ps1 \| iex/,
+      ),
+    ).toBeInTheDocument();
+    // one-time warning shown
+    expect(screen.getByText(/shown only once/i)).toBeInTheDocument();
+  });
+
+  it('surfaces an assisted-install error', async () => {
+    const user = userEvent.setup();
+    h.createModelSetup.mockResolvedValue({ ok: false, error: 'sin modelo expuesto' });
+    renderClient({ fusionConfigured: true });
+    await user.click(screen.getByRole('button', { name: /Generate my configured installer/i }));
+    expect(await screen.findByText('sin modelo expuesto')).toBeInTheDocument();
   });
 });

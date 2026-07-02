@@ -6,6 +6,7 @@ const m = vi.hoisted(() => ({
   projectFindUnique: vi.fn(),
   taskFindMany: vi.fn(),
   env: vi.fn(() => ({ FUSION_CODE_BASE_URL: 'https://infra.test', AXON_MCP_URL: 'https://mcp-axon.test/mcp' })),
+  isFusionConfigured: vi.fn(() => false),
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND');
   }),
@@ -22,9 +23,23 @@ vi.mock('@/components/ui', () => ({
   PageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
   Eyebrow: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
+vi.mock('@/lib/deploy/fusion-coding-tools', () => ({ isFusionConfigured: m.isFusionConfigured }));
 vi.mock('./DevelopClient', () => ({
-  DevelopClient: ({ hus, fusionBase }: { hus: unknown[]; fusionBase: string | null }) => (
-    <div data-testid="client" data-count={hus.length} data-base={fusionBase ?? ''} />
+  DevelopClient: ({
+    hus,
+    fusionBase,
+    fusionConfigured,
+  }: {
+    hus: unknown[];
+    fusionBase: string | null;
+    fusionConfigured?: boolean;
+  }) => (
+    <div
+      data-testid="client"
+      data-count={hus.length}
+      data-base={fusionBase ?? ''}
+      data-fusion-configured={String(fusionConfigured ?? false)}
+    />
   ),
 }));
 
@@ -54,5 +69,13 @@ describe('DevelopPage', () => {
     const client = screen.getByTestId('client');
     expect(client).toHaveAttribute('data-count', '1');
     expect(client).toHaveAttribute('data-base', 'https://infra.test');
+    expect(client).toHaveAttribute('data-fusion-configured', 'false');
+  });
+
+  it('flags assisted install when fusion-infra is configured', async () => {
+    m.isFusionConfigured.mockReturnValue(true);
+    m.projectFindUnique.mockResolvedValue({ id: 'pr', members: [{ role: 'ADMIN' }] });
+    render(await Page({ params: params() }));
+    expect(screen.getByTestId('client')).toHaveAttribute('data-fusion-configured', 'true');
   });
 });

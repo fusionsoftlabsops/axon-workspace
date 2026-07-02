@@ -39,6 +39,7 @@ export type AuditAction =
   | 'invitation.revoke'
   | 'api_token.create'
   | 'api_token.revoke'
+  | 'model_token.create'
   | 'ai.invoke'
   | 'brain.capture'
   | 'brain.publish'

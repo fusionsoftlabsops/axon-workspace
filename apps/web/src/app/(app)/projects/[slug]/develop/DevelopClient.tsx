@@ -3,7 +3,12 @@
 import Link from 'next/link';
 import { useState, useTransition, type ReactNode } from 'react';
 import { useI18n } from '@/lib/i18n/i18n';
-import { createProjectAgentTokenAction, type ProjectAgentSetup } from '@/lib/actions/fusion-code';
+import {
+  createModelSetupAction,
+  createProjectAgentTokenAction,
+  type ModelSetup,
+  type ProjectAgentSetup,
+} from '@/lib/actions/fusion-code';
 
 export interface DevelopHU {
   number: number;
@@ -89,6 +94,43 @@ function CopyRow({ value, label }: { value: string; label?: string }) {
   );
 }
 
+/** Manual model-URL/token instructions — only needed when assisted install is off. */
+function ManualTokenHelp({ base }: { base: string | null }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <p style={{ ...lead, margin: '0.5rem 0 0.2rem' }}>
+        {t('El instalador te va a pedir dos cosas:', 'The installer will ask you for two things:')}
+      </p>
+      <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--color-fg-muted)', fontSize: '0.88rem', lineHeight: 1.7 }}>
+        <li>
+          <strong>{t('URL del modelo', 'Model URL')}</strong> —{' '}
+          {t('algo como', 'something like')} <code style={mono}>https://…fusion-soft-lab.com/v1</code>.
+        </li>
+        <li>
+          <strong>{t('Token del modelo', 'Model token')}</strong> (<code style={mono}>fsn_…</code>) —{' '}
+          {t('tu llave personal para usar el modelo (revocable y medida).', 'your personal key to use the model (revocable and metered).')}
+        </li>
+      </ul>
+      <p style={{ ...lead, margin: '0.5rem 0 0.2rem' }}>
+        {t('Ambos se generan en la plataforma:', 'Both are generated on the platform:')}{' '}
+        {base ? (
+          <a href={base} target="_blank" rel="noreferrer">{t('abrí la plataforma', 'open the platform')}</a>
+        ) : (
+          <em>fusion-soft-lab</em>
+        )}{' '}
+        → <strong>Coding Tools</strong> → {t('«Crear token» (copiá la URL del modelo y el token que aparecen ahí).', '"Create token" (copy the model URL and token shown there).')}
+      </p>
+      <p style={{ ...lead, margin: '0.5rem 0 0.2rem', fontSize: '0.8rem' }}>
+        {t(
+          '¿"No hay ningún modelo expuesto" en Coding Tools? Ese botón lista los modelos del proyecto de fusion-soft-lab al que tenés acceso — pedile a quien lo administra que te agregue como colaborador (rol Editor) desde «Colaboradores» en ese proyecto. Una vez agregado, el modelo y el botón «Crear token» aparecen ahí solos.',
+          '"No model exposed" on Coding Tools? That page lists models from the fusion-soft-lab project you have access to — ask whoever manages it to add you as a collaborator (Editor role) via that project\'s "Collaborators". Once added, the model and the "Create token" button show up there automatically.',
+        )}
+      </p>
+    </>
+  );
+}
+
 /** A non-copyable, read-only example / expected-output block. */
 function Sample({ children }: { children: ReactNode }) {
   return (
@@ -116,12 +158,15 @@ export function DevelopClient({
   slug,
   canGenerate,
   fusionBase,
+  fusionConfigured = false,
   mcpUrl,
   hus,
 }: {
   slug: string;
   canGenerate: boolean;
   fusionBase: string | null;
+  /** True when axon-web can mint model tokens on fusion-infra (assisted install). */
+  fusionConfigured?: boolean;
   mcpUrl: string;
   hus: DevelopHU[];
 }) {
@@ -130,6 +175,9 @@ export function DevelopClient({
   const [error, setError] = useState<string | null>(null);
   const [setup, setSetup] = useState<ProjectAgentSetup | null>(null);
   const [os, setOs] = useState<'sh' | 'ps1'>('sh');
+  const [modelPending, modelStart] = useTransition();
+  const [modelError, setModelError] = useState<string | null>(null);
+  const [modelSetup, setModelSetup] = useState<ModelSetup | null>(null);
 
   const base = fusionBase ? fusionBase.replace(/\/$/, '') : null;
   const installOneLiner = base
@@ -137,6 +185,14 @@ export function DevelopClient({
       ? `curl -fsSL ${base}/api/coding-tools/install.sh | sh`
       : `irm ${base}/api/coding-tools/install.ps1 | iex`
     : null;
+  // Pre-configured install: the scripts consume FUSION_MODEL_URL / FUSION_TOKEN
+  // and skip every prompt, so this one line is the whole setup.
+  const assistedOneLiner =
+    base && modelSetup
+      ? os === 'sh'
+        ? `curl -fsSL ${base}/api/coding-tools/install.sh | FUSION_MODEL_URL="${modelSetup.modelUrl}" FUSION_TOKEN="${modelSetup.token}" sh`
+        : `$env:FUSION_MODEL_URL="${modelSetup.modelUrl}"; $env:FUSION_TOKEN="${modelSetup.token}"; irm ${base}/api/coding-tools/install.ps1 | iex`
+      : null;
 
   const envLine = setup ? `AXON_API_TOKEN=${setup.plainToken}` : '';
   const axonConfig = `{ "projectSlug": "${slug}" }`;
@@ -192,6 +248,18 @@ export function DevelopClient({
         return;
       }
       if (r.data) setSetup(r.data);
+    });
+  }
+
+  function generateModelSetup() {
+    setModelError(null);
+    modelStart(async () => {
+      const r = await createModelSetupAction(slug);
+      if (!r.ok) {
+        setModelError(r.error);
+        return;
+      }
+      if (r.data) setModelSetup(r.data);
     });
   }
 
@@ -253,7 +321,9 @@ PER STORY (repeat)
           </li>
           <li>{t('Una terminal (macOS/Linux: Terminal; Windows: PowerShell).', 'A terminal (macOS/Linux: Terminal; Windows: PowerShell).')}</li>
           <li>{t('El repositorio del proyecto clonado localmente (donde vas a escribir el código).', "The project's repository cloned locally (where you'll write the code).")}</li>
-          <li>{t('Una cuenta en la plataforma (fusion-soft-lab) para generar el token del modelo.', 'An account on the platform (fusion-soft-lab) to generate the model token.')}</li>
+          {!fusionConfigured && (
+            <li>{t('Una cuenta en la plataforma (fusion-soft-lab) para generar el token del modelo.', 'An account on the platform (fusion-soft-lab) to generate the model token.')}</li>
+          )}
         </ul>
       </section>
 
@@ -290,35 +360,73 @@ PER STORY (repeat)
                 </button>
               ))}
             </div>
-            <CopyRow value={installOneLiner} />
-            <p style={{ ...lead, margin: '0.5rem 0 0.2rem' }}>
-              {t('El instalador te va a pedir dos cosas:', 'The installer will ask you for two things:')}
-            </p>
-            <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--color-fg-muted)', fontSize: '0.88rem', lineHeight: 1.7 }}>
-              <li>
-                <strong>{t('URL del modelo', 'Model URL')}</strong> —{' '}
-                {t('algo como', 'something like')} <code style={mono}>https://…fusion-soft-lab.com/v1</code>.
-              </li>
-              <li>
-                <strong>{t('Token del modelo', 'Model token')}</strong> (<code style={mono}>fsn_…</code>) —{' '}
-                {t('tu llave personal para usar el modelo (revocable y medida).', 'your personal key to use the model (revocable and metered).')}
-              </li>
-            </ul>
-            <p style={{ ...lead, margin: '0.5rem 0 0.2rem' }}>
-              {t('Ambos se generan en la plataforma:', 'Both are generated on the platform:')}{' '}
-              {base ? (
-                <a href={base} target="_blank" rel="noreferrer">{t('abrí la plataforma', 'open the platform')}</a>
-              ) : (
-                <em>fusion-soft-lab</em>
-              )}{' '}
-              → <strong>Coding Tools</strong> → {t('«Crear token» (copiá la URL del modelo y el token que aparecen ahí).', '"Create token" (copy the model URL and token shown there).')}
-            </p>
-            <p style={{ ...lead, margin: '0.5rem 0 0.2rem', fontSize: '0.8rem' }}>
-              {t(
-                '¿"No hay ningún modelo expuesto" en Coding Tools? Ese botón lista los modelos del proyecto de fusion-soft-lab al que tenés acceso — pedile a quien lo administra que te agregue como colaborador (rol Editor) desde «Colaboradores» en ese proyecto. Una vez agregado, el modelo y el botón «Crear token» aparecen ahí solos.',
-                '"No model exposed" on Coding Tools? That page lists models from the fusion-soft-lab project you have access to — ask whoever manages it to add you as a collaborator (Editor role) via that project\'s "Collaborators". Once added, the model and the "Create token" button show up there automatically.',
-              )}
-            </p>
+
+            {/* Assisted install: mint the model token here and hand out a
+                pre-configured one-liner — zero prompts, zero visits to the platform. */}
+            {fusionConfigured && !modelSetup && (
+              <div style={{ margin: '0 0 0.6rem' }}>
+                <p style={{ ...lead, margin: '0 0 0.4rem' }}>
+                  {t(
+                    'Generá tu token del modelo acá mismo y te damos el comando con todo ya configurado (no te pide nada):',
+                    'Generate your model token right here and we hand you the command with everything pre-configured (no prompts):',
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={generateModelSetup}
+                  disabled={modelPending}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: 'none',
+                    borderRadius: 6,
+                    background: 'var(--color-accent)',
+                    color: 'var(--color-accent-fg)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {modelPending
+                    ? t('Generando…', 'Generating…')
+                    : t('🔑 Generar mi instalador configurado', '🔑 Generate my configured installer')}
+                </button>
+                {modelError && (
+                  <p style={{ color: 'var(--color-danger)', fontSize: '0.82rem', margin: '0.4rem 0 0' }}>
+                    {modelError}
+                  </p>
+                )}
+              </div>
+            )}
+            {modelSetup && assistedOneLiner ? (
+              <>
+                <CopyRow value={assistedOneLiner} />
+                <p style={{ ...lead, margin: '0.4rem 0 0.2rem', fontSize: '0.8rem' }}>
+                  {t(
+                    'Este comando incluye tu token personal del modelo (fsn_…) y se muestra una sola vez — pegalo en tu terminal y listo. Es revocable desde Coding Tools si hace falta.',
+                    'This command includes your personal model token (fsn_…) and is shown only once — paste it in your terminal and you are done. It can be revoked from Coding Tools if needed.',
+                  )}
+                </p>
+              </>
+            ) : (
+              !fusionConfigured && <CopyRow value={installOneLiner} />
+            )}
+
+            {/* Manual path: the primary flow when assisted install is unavailable,
+                a collapsed fallback otherwise. */}
+            {fusionConfigured ? (
+              !modelSetup && (
+                <details style={{ marginTop: '0.4rem' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
+                    {t('Instalación manual (alternativa)', 'Manual install (alternative)')}
+                  </summary>
+                  <div style={{ marginTop: '0.4rem' }}>
+                    <CopyRow value={installOneLiner} />
+                    <ManualTokenHelp base={base} />
+                  </div>
+                </details>
+              )
+            ) : (
+              <ManualTokenHelp base={base} />
+            )}
+
             <p style={{ ...lead, margin: '0.5rem 0 0.2rem' }}>{t('Al terminar, verificá:', 'When done, verify:')}</p>
             <CopyRow value={'qwen'} label={t('Copiar', 'Copy')} />
             <Sample>
