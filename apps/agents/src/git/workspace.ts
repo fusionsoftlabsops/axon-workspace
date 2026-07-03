@@ -15,15 +15,38 @@ export interface CommandRunner {
   (cmd: string, args: string[], cwd?: string): Promise<{ code: number; stdout: string; stderr: string }>;
 }
 
+// Post-dogfooding hardening: un git clone/push colgado (red caída, stall del
+// remoto) nunca resolvía la promesa — el handler del rol quedaba bloqueado
+// para siempre (eventsDispatched jamás incrementaba para ese evento, aunque
+// el resto del worker seguía vivo). Todo comando tiene un tope duro.
+const GIT_COMMAND_TIMEOUT_MS = 120_000;
+
 export const spawnRunner: CommandRunner = (cmd, args, cwd) =>
   new Promise((resolve) => {
     const child = spawn(cmd, args, { cwd, shell: false });
     let stdout = '';
     let stderr = '';
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill('SIGKILL');
+      resolve({ code: 124, stdout, stderr: `comando colgado: sin salida tras ${GIT_COMMAND_TIMEOUT_MS}ms` });
+    }, GIT_COMMAND_TIMEOUT_MS);
     child.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
     child.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
-    child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
-    child.on('error', (err) => resolve({ code: 127, stdout, stderr: String(err) }));
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ code: code ?? 1, stdout, stderr });
+    });
+    child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ code: 127, stdout, stderr: String(err) });
+    });
   });
 
 export interface WorkspaceOptions {
@@ -108,6 +131,7 @@ export class GitWorkspace {
         'content-type': 'application/json',
       },
       body: JSON.stringify(input),
+      signal: AbortSignal.timeout(30_000),
     });
     const data = (await res.json().catch(() => ({}))) as { html_url?: string; message?: string };
     if (!res.ok || !data.html_url) {
