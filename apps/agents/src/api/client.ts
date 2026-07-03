@@ -146,4 +146,19 @@ export class AxonApi {
   codeContext(slug: string): Promise<Record<string, unknown>> {
     return this.request('GET', `/projects/${slug}/context/code`);
   }
+
+  /** Publica una memoria en el cerebro (scope PROJECT = visible al equipo). */
+  captureMemory(
+    slug: string,
+    input: {
+      type: 'DECISION' | 'GOTCHA' | 'PATTERN' | 'ANTIPATTERN' | 'RUNBOOK' | 'GLOSSARY' | 'NOTE';
+      title: string;
+      body: string;
+      tags?: string[];
+      scope?: 'LOCAL' | 'PROJECT';
+      sourceTaskNumber?: number;
+    },
+  ): Promise<{ id: string }> {
+    return this.request('POST', `/projects/${slug}/brain/memories`, input);
+  }
 }
