@@ -165,6 +165,32 @@ describe('runAgentLoop', () => {
     expect(provider.complete).toHaveBeenCalledTimes(1);
   });
 
+  it('backstop: una llamada al modelo que NUNCA resuelve se corta y cierra como timeout (no cuelga el handler)', async () => {
+    // Reproduce el cuelgue vivo de HU#24: vLLM aceptaba la conexión pero la
+    // petición de inferencia nunca resolvía y el AbortSignal del provider no la
+    // abortaba → el handler quedaba bloqueado para siempre. El backstop de
+    // Promise.race garantiza que la corrida SIEMPRE termina.
+    vi.useFakeTimers();
+    try {
+      const provider: LlmProvider = { complete: vi.fn(() => new Promise<never>(() => {})) }; // jamás settlea
+      const p = runAgentLoop('meta', { provider, system: 's', tools: [tool()], providerTimeoutMs: 1000 });
+      await vi.advanceTimersByTimeAsync(1000);
+      const res = await p;
+      expect(res.stopped).toBe('timeout');
+      expect(res.iterations).toBe(1);
+      expect(provider.complete).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('un error real del proveedor también cierra la corrida como timeout (no la cuelga ni la propaga)', async () => {
+    const provider: LlmProvider = { complete: vi.fn().mockRejectedValue(new Error('vllm 503')) };
+    const res = await runAgentLoop('meta', { provider, system: 's', tools: [tool()] });
+    expect(res.stopped).toBe('timeout');
+    expect(res.iterations).toBe(1);
+  });
+
   it('una tool colgada se corta por su propio timeout y vuelve como ERROR (no bloquea el loop)', async () => {
     const hungTool = tool({ execute: vi.fn(() => new Promise<string>(() => {})) });
     const res = await runAgentLoop('meta', {
