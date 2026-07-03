@@ -259,6 +259,51 @@ export function buildOpenApiDocument(baseUrl = '/'): OpenApiDocument {
           required: ['body'],
           properties: { body: { type: 'string', minLength: 1, maxLength: 20000 } },
         },
+        QaReviewSubmit: {
+          type: 'object',
+          properties: {
+            criteria: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['text', 'met'],
+                properties: { text: { type: 'string' }, met: { type: 'boolean' } },
+              },
+            },
+            suggestedTests: {
+              type: 'array',
+              items: {
+                oneOf: [
+                  { type: 'string' },
+                  {
+                    type: 'object',
+                    required: ['title'],
+                    properties: {
+                      title: { type: 'string' },
+                      steps: { type: 'string' },
+                      expected: { type: 'string' },
+                    },
+                  },
+                ],
+              },
+            },
+            executedTasks: { type: 'array', items: { type: 'string' } },
+            notes: { type: 'string' },
+            moveToVerification: { type: 'boolean', default: true },
+          },
+        },
+        QaDecision: {
+          type: 'object',
+          required: ['decision'],
+          properties: {
+            decision: { type: 'string', enum: ['approve', 'reject'] },
+            comment: {
+              type: 'string',
+              maxLength: 20000,
+              description: 'Obligatorio en reject: feedback accionable para el dev.',
+            },
+          },
+        },
         MemoryCreate: {
           type: 'object',
           required: ['type', 'title', 'body'],
@@ -541,6 +586,38 @@ export function buildOpenApiDocument(baseUrl = '/'): OpenApiDocument {
           parameters: [slugParam, taskNumberParam],
           requestBody: jsonBody('#/components/schemas/CommentCreate'),
           responses: { '201': ok('The created comment id and timestamp.') },
+        }),
+      },
+      '/api/v1/projects/{slug}/tasks/{taskNumber}/qa-review': {
+        post: op({
+          summary: 'Submit a QA review (dev handoff)',
+          description:
+            'Registra el checklist de criterios, pruebas sugeridas y tareas ejecutadas; ' +
+            'publica el resumen como comentario y (por defecto) mueve la HU a Verificación. ' +
+            'Es el cierre de desarrollo que usan humanos y el agente Dev.',
+          tags: ['tasks'],
+          operationId: 'submitQaReview',
+          security: 'token',
+          scopes: ['tasks:write', 'comments:write'],
+          parameters: [slugParam, taskNumberParam],
+          requestBody: jsonBody('#/components/schemas/QaReviewSubmit'),
+          responses: { '200': ok('`{ ok: true, movedToVerification }`.') },
+        }),
+      },
+      '/api/v1/projects/{slug}/tasks/{taskNumber}/qa-decision': {
+        post: op({
+          summary: 'Submit a QA verdict (approve / reject)',
+          description:
+            'approve → mueve la HU al estado DONE; reject → la devuelve a IN_PROGRESS ' +
+            'con comentario accionable obligatorio. Guardarraíl: un agente no puede ' +
+            'aprobar una HU que él mismo desarrolló (403).',
+          tags: ['tasks'],
+          operationId: 'submitQaDecision',
+          security: 'token',
+          scopes: ['tasks:write', 'comments:write'],
+          parameters: [slugParam, taskNumberParam],
+          requestBody: jsonBody('#/components/schemas/QaDecision'),
+          responses: { '200': ok('`{ ok: true, decision, movedTo }`.') },
         }),
       },
       '/api/v1/projects/{slug}/tasks/{taskNumber}/ai/commit-message': {

@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { getServerLang } from '@/lib/i18n/server';
 import { generateQaTests } from '@/lib/ai/planner';
 import { audit } from '@/lib/audit';
+import { publishDomainEvent } from '@/lib/agents/events';
 import {
   asHandoff,
   asQaTests,
@@ -185,6 +186,18 @@ export async function qaDecisionAction(
       data: { taskId, actorId: ctx.userId, type: 'COMMENTED', payload: { via: 'qa' } },
     });
   });
+
+  if (task.stateId !== target.id) {
+    publishDomainEvent({
+      type: 'story.state_changed',
+      projectId: ctx.projectId,
+      storyId: taskId,
+      fromState: { id: task.stateId },
+      toState: { id: target.id, category: targetCategory },
+      actorId: ctx.userId,
+      payload: { via: 'qa', decision },
+    });
+  }
 
   if (decision === 'approve') {
     const { extractMemoriesFromTaskAction } = await import('./brain');
