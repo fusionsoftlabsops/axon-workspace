@@ -45,4 +45,15 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ DEV_MAX_ITERATIONS: '3' })).toThrow(/DEV_MAX_ITERATIONS/);
     expect(() => loadConfig({ DEV_MAX_ITERATIONS: '500' })).toThrow(/DEV_MAX_ITERATIONS/);
   });
+
+  it('AGENT_MAX_DURATION_MS por defecto 20min, configurable dentro de [60_000, 3_600_000]', () => {
+    expect(loadConfig({}).AGENT_MAX_DURATION_MS).toBe(1_200_000);
+    expect(loadConfig({ AGENT_MAX_DURATION_MS: '600000' }).AGENT_MAX_DURATION_MS).toBe(600_000);
+    expect(loadConfig({ AGENT_MAX_DURATION_MS: '' }).AGENT_MAX_DURATION_MS).toBe(1_200_000);
+  });
+
+  it('rechaza AGENT_MAX_DURATION_MS fuera de rango', () => {
+    expect(() => loadConfig({ AGENT_MAX_DURATION_MS: '1000' })).toThrow(/AGENT_MAX_DURATION_MS/);
+    expect(() => loadConfig({ AGENT_MAX_DURATION_MS: '99999999' })).toThrow(/AGENT_MAX_DURATION_MS/);
+  });
 });

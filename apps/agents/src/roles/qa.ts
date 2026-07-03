@@ -28,6 +28,8 @@ export interface QaOptions {
   run?: CommandRunner;
   meCacheMs?: number;
   maxIterations?: number;
+  /** Tope de reloj del run completo (defensa contra hangs sin timeout propio). */
+  maxDurationMs?: number;
 }
 
 const QA_SYSTEM = `Sos el QA adversarial del equipo. Tu trabajo NO es confirmar que la HU está bien:
@@ -129,6 +131,7 @@ export function createQaHandler(opts: QaOptions): RoleHandler {
           system: QA_SYSTEM,
           tools: [...(ws ? readOnlyRepoTools(ws.dir) : []), ...contextTools(opts.api, opts.projectSlug)],
           maxIterations: opts.maxIterations ?? 16,
+          maxDurationMs: opts.maxDurationMs,
         });
 
         if (result.status !== 'SUCCEEDED') {
