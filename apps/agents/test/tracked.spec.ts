@@ -72,12 +72,15 @@ describe('runTrackedLoop', () => {
     );
   });
 
-  it('cierra FAILED y re-lanza cuando el proveedor revienta', async () => {
+  it('un proveedor que revienta cierra FAILED (sin colgar ni propagar) preservando el mensaje real', async () => {
+    // Antes esto re-lanzaba y el handler del rol no llegaba a comentar en la HU;
+    // ahora runAgentLoop atrapa el fallo del modelo y devuelve un resultado
+    // FAILED (stopped=timeout) para que el rol SIEMPRE cierre con comentario, y
+    // el mensaje real queda en la bitácora vía finishRun.
     const a = api();
     const provider: LlmProvider = { complete: vi.fn().mockRejectedValue(new Error('modelo caido')) };
-    await expect(
-      runTrackedLoop('meta', { api: a, projectSlug: 'axon', provider, system: 's', tools: [] }),
-    ).rejects.toThrow('modelo caido');
+    const res = await runTrackedLoop('meta', { api: a, projectSlug: 'axon', provider, system: 's', tools: [] });
+    expect(res).toMatchObject({ runId: 'run1', status: 'FAILED', stopped: 'timeout' });
     expect(a.finishRun).toHaveBeenCalledWith(
       'axon',
       'run1',

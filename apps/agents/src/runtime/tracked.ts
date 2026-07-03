@@ -69,7 +69,9 @@ export async function runTrackedLoop(goal: string, opts: TrackedRunOptions): Pro
       promptTokens: result.usage.promptTokens,
       completionTokens: result.usage.completionTokens,
       costUsd,
-      ...(status !== 'SUCCEEDED' ? { error: `stopped=${result.stopped} tras ${result.iterations} iteraciones` } : {}),
+      ...(status !== 'SUCCEEDED'
+        ? { error: result.error ?? `stopped=${result.stopped} tras ${result.iterations} iteraciones` }
+        : {}),
     })
     .catch((e) => console.error('[agents] no se pudo cerrar el run:', e));
 

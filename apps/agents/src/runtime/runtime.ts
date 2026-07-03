@@ -15,7 +15,7 @@
  *   defensa en profundidad, no alternativas entre sí.
  * - El transcript completo queda disponible para la bitácora (AgentRun).
  */
-import type { ChatMessage, LlmProvider, ToolCall, ToolDef, Usage } from './types.js';
+import type { ChatMessage, CompletionResult, LlmProvider, ToolCall, ToolDef, Usage } from './types.js';
 
 export interface AgentLoopOptions {
   provider: LlmProvider;
@@ -30,6 +30,8 @@ export interface AgentLoopOptions {
   maxDurationMs?: number;
   /** Tope por llamada a una tool individual en ms (default 60s). */
   toolTimeoutMs?: number;
+  /** Backstop de reloj por llamada al modelo en ms (default 5min). */
+  providerTimeoutMs?: number;
   /** Callback por iteración (telemetría / heartbeat). */
   onIteration?(info: { iteration: number; usage: Usage; toolCalls: ToolCall[] }): void;
 }
@@ -40,10 +42,44 @@ export interface AgentLoopResult {
   iterations: number;
   usage: Usage & { totalTokens: number };
   transcript: ChatMessage[];
+  /** Detalle del fallo cuando el proveedor colgó/reventó (para la bitácora). */
+  error?: string;
 }
 
 const DEFAULT_MAX_DURATION_MS = 20 * 60_000;
 const DEFAULT_TOOL_TIMEOUT_MS = 60_000;
+const DEFAULT_PROVIDER_TIMEOUT_MS = 5 * 60_000;
+
+/** Backstop de reloj para la llamada al modelo (distinguible de un error real
+ *  del proveedor para no confundir un fallo de API con un cuelgue). */
+class ProviderTimeoutError extends Error {}
+
+/**
+ * Envuelve provider.complete en un Promise.race con tope de reloj explícito.
+ * NO confiar solo en el AbortSignal.timeout del provider: se observó en vivo
+ * (HU#24, 3 corridas seguidas) que una petición colgada a vLLM/Qwen NO era
+ * abortada por AbortSignal y dejaba el handler del rol bloqueado
+ * indefinidamente (ni resolvía ni rechazaba → eventsDispatched jamás
+ * incrementaba, solo un restart del worker lo recuperaba). Este race garantiza
+ * que la llamada SIEMPRE se resuelve.
+ */
+async function completeWithBackstop(
+  provider: LlmProvider,
+  input: Parameters<LlmProvider['complete']>[0],
+  timeoutMs: number,
+): ReturnType<LlmProvider['complete']> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      provider.complete(input),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new ProviderTimeoutError(`modelo sin respuesta (>${timeoutMs}ms)`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 function parseArgs(raw: string): unknown {
   try {
@@ -74,6 +110,7 @@ export async function runAgentLoop(goal: string, opts: AgentLoopOptions): Promis
   const maxIterations = opts.maxIterations ?? 12;
   const maxDurationMs = opts.maxDurationMs ?? DEFAULT_MAX_DURATION_MS;
   const toolTimeoutMs = opts.toolTimeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
+  const providerTimeoutMs = opts.providerTimeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS;
   const deadline = Date.now() + maxDurationMs;
   const transcript: ChatMessage[] = [{ role: 'user', content: goal }];
   const usage: Usage = { promptTokens: 0, completionTokens: 0 };
@@ -86,12 +123,23 @@ export async function runAgentLoop(goal: string, opts: AgentLoopOptions): Promis
       return { finalText: lastContent, stopped: 'timeout', iterations, usage: { ...usage, totalTokens: total }, transcript };
     }
     iterations += 1;
-    const res = await opts.provider.complete({
-      system: opts.system,
-      messages: transcript,
-      tools: opts.tools,
-      maxOutputTokens: opts.maxOutputTokens,
-    });
+    let res: CompletionResult;
+    try {
+      res = await completeWithBackstop(
+        opts.provider,
+        { system: opts.system, messages: transcript, tools: opts.tools, maxOutputTokens: opts.maxOutputTokens },
+        providerTimeoutMs,
+      );
+    } catch (err) {
+      // El modelo colgó o falló: cerrar el run LIMPIO (bitácora + comentario del
+      // rol) en vez de dejar el handler bloqueado. Cualquier fallo del proveedor
+      // termina la corrida como timeout — jamás cuelga. El mensaje real se
+      // preserva en `error` para la bitácora.
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[agents] llamada al modelo falló/colgó:', message);
+      const total = usage.promptTokens + usage.completionTokens;
+      return { finalText: lastContent, stopped: 'timeout', iterations, usage: { ...usage, totalTokens: total }, transcript, error: message };
+    }
     usage.promptTokens += res.usage.promptTokens;
     usage.completionTokens += res.usage.completionTokens;
     lastContent = res.content || lastContent;
