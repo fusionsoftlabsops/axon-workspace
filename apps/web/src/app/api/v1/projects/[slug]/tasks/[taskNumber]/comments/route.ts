@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
+import { publishDomainEvent } from '@/lib/agents/events';
 
 const body = z.object({ body: z.string().min(1).max(20_000) });
 
@@ -49,6 +50,15 @@ export async function POST(
 
   const created = await prisma.taskComment.create({
     data: { taskId: task.id, authorId: authd.userId, body: parsed.data.body.trim() },
+  });
+
+  publishDomainEvent({
+    type: 'story.commented',
+    projectId: project.id,
+    storyId: task.id,
+    storyNumber: num,
+    actorId: authd.userId,
+    payload: { body: parsed.data.body.trim().slice(0, 2000) },
   });
 
   return NextResponse.json({ id: created.id, createdAt: created.createdAt.toISOString() }, { status: 201 });

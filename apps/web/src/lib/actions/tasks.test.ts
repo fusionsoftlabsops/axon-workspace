@@ -4,7 +4,7 @@ const CUID = 'cjld2cjxh0000qzrmn831i7rn';
 const CUID2 = 'cjld2cyuq0000t3rmniod1foy';
 const CUID3 = 'cjld2cjxh0000qzrmn831i999';
 
-const { prismaMock, txMock, authMock, revalidateMock, extractMock } = vi.hoisted(() => {
+const { prismaMock, txMock, authMock, revalidateMock, extractMock, publishEventMock } = vi.hoisted(() => {
   const txMock = {
     projectTaskCounter: { update: vi.fn() },
     task: { aggregate: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -22,6 +22,7 @@ const { prismaMock, txMock, authMock, revalidateMock, extractMock } = vi.hoisted
     authMock: vi.fn(),
     revalidateMock: vi.fn(),
     extractMock: vi.fn(),
+    publishEventMock: vi.fn(),
   };
 });
 
@@ -29,6 +30,7 @@ vi.mock('next/cache', () => ({ revalidatePath: revalidateMock }));
 vi.mock('@/auth', () => ({ auth: authMock }));
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
 vi.mock('./brain', () => ({ extractMemoriesFromTaskAction: extractMock }));
+vi.mock('@/lib/agents/events', () => ({ publishDomainEvent: publishEventMock }));
 
 import {
   createTaskAction,
@@ -85,6 +87,13 @@ describe('createTaskAction', () => {
     await createTaskAction('slug', { stateId: CUID, title: 'T' });
     expect(txMock.task.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ positionInState: 0 }) }),
+    );
+  });
+
+  it('emits story.created after the transaction commits', async () => {
+    await createTaskAction('slug', { stateId: CUID, title: 'T' });
+    expect(publishEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'story.created', projectId: 'p1', storyId: 't1', storyNumber: 4 }),
     );
   });
 });
@@ -170,6 +179,28 @@ describe('moveTaskAction', () => {
     await moveTaskAction('slug', 't1', 's2', ['t1']);
     expect(extractMock).not.toHaveBeenCalled();
   });
+
+  it('emits story.state_changed with the enriched target state', async () => {
+    prismaMock.task.findUnique.mockResolvedValue({ id: 't1', projectId: 'p1', stateId: 's1', taskNumber: 9, assigneeId: 'dev1' });
+    prismaMock.workflowState.findUnique.mockResolvedValue({ name: 'Desarrollo', category: 'IN_PROGRESS' });
+    await moveTaskAction('slug', 't1', 's2', ['t1']);
+    expect(publishEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'story.state_changed',
+        storyNumber: 9,
+        fromState: { id: 's1' },
+        toState: { id: 's2', name: 'Desarrollo', category: 'IN_PROGRESS' },
+        assigneeId: 'dev1',
+      }),
+    );
+  });
+
+  it('does not emit when the state did not change', async () => {
+    prismaMock.task.findUnique.mockResolvedValue({ id: 't1', projectId: 'p1', stateId: 's2' });
+    prismaMock.workflowState.findUnique.mockResolvedValue({ name: 'X', category: 'IN_PROGRESS' });
+    await moveTaskAction('slug', 't1', 's2', ['t1']);
+    expect(publishEventMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('addCommentAction', () => {
@@ -188,6 +219,13 @@ describe('addCommentAction', () => {
       data: { taskId: 't1', authorId: 'u1', body: 'hello' },
     });
     expect(res).toEqual({ ok: true });
+  });
+
+  it('emits story.commented with the trimmed body excerpt', async () => {
+    await addCommentAction('slug', 't1', '  hola equipo  ');
+    expect(publishEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'story.commented', storyId: 't1', payload: { body: 'hola equipo' } }),
+    );
   });
 });
 

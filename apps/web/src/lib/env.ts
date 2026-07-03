@@ -99,6 +99,11 @@ const schema = z.object({
     (v) => (v === '' ? undefined : v),
     z.string().url().default('https://mcp-axon.fusion-soft-lab.com/mcp'),
   ),
+  // Plataforma agéntica: cuando está activo ('1'|'true'|'on'), axon-web publica
+  // eventos de dominio de HUs (creación / cambio de estado / comentario) en el
+  // canal Redis que consume el worker axon-agents. Opt-in: apagado por defecto,
+  // la feature se despliega oscura. See lib/agents/events.ts.
+  AGENT_EVENTS_ENABLED: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });

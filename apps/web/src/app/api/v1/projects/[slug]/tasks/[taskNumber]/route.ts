@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
+import { publishDomainEvent } from '@/lib/agents/events';
 
 async function loadTaskByNumber(slug: string, taskNumber: number, userId: string) {
   const project = await prisma.project.findUnique({
@@ -123,6 +124,7 @@ export async function PATCH(
   const body = parsed.data;
 
   let newStateId: string | undefined;
+  let newState: { id: string; name: string; category: string } | undefined;
   let enteringDone = false;
   if (body.toState) {
     const stateMatch = project.workflows[0]?.states.find(
@@ -132,6 +134,7 @@ export async function PATCH(
       return NextResponse.json({ error: `state "${body.toState}" not found` }, { status: 400 });
     }
     newStateId = stateMatch.id;
+    newState = { id: stateMatch.id, name: stateMatch.name, category: stateMatch.category };
     enteringDone = stateMatch.category === 'DONE' && stateMatch.id !== task.state.id;
   }
 
@@ -156,6 +159,19 @@ export async function PATCH(
       });
     }
   });
+
+  if (newState && newState.id !== task.state.id) {
+    publishDomainEvent({
+      type: 'story.state_changed',
+      projectId: project.id,
+      storyId: task.id,
+      storyNumber: task.taskNumber,
+      fromState: { id: task.state.id, name: task.state.name, category: task.state.category },
+      toState: newState,
+      actorId: authd.userId,
+      assigneeId: task.assignee?.id ?? null,
+    });
+  }
 
   // Same hook as moveTaskAction: when a task enters a DONE category, fire the
   // brain extractor for the actor's local brain.

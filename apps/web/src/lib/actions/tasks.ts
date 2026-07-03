@@ -10,6 +10,7 @@ import {
   type CreateTaskInput,
   type UpdateTaskInput,
 } from '@admin/shared/schemas';
+import { publishDomainEvent } from '@/lib/agents/events';
 import type { ActionResult } from './projects';
 
 type ActivityCreate = Prisma.TaskActivityCreateManyInput;
@@ -97,6 +98,17 @@ export async function createTaskAction(
     return task;
   });
 
+  // Evento de dominio tras el commit (nunca dentro de la transacción).
+  publishDomainEvent({
+    type: 'story.created',
+    projectId: ctx.projectId,
+    storyId: created.id,
+    storyNumber: created.taskNumber,
+    toState: { id: created.stateId },
+    actorId: ctx.userId,
+    assigneeId: created.assigneeId,
+  });
+
   revalidatePath(`/projects/${projectSlug}/board`);
   return { ok: true, data: { taskNumber: created.taskNumber } };
 }
@@ -161,6 +173,19 @@ export async function updateTaskAction(
     }
   });
 
+  if (rest.stateId && rest.stateId !== existing.stateId) {
+    publishDomainEvent({
+      type: 'story.state_changed',
+      projectId: ctx.projectId,
+      storyId: id,
+      storyNumber: existing.taskNumber,
+      fromState: { id: existing.stateId },
+      toState: { id: rest.stateId },
+      actorId: ctx.userId,
+      assigneeId: rest.assigneeId !== undefined ? rest.assigneeId : existing.assigneeId,
+    });
+  }
+
   revalidatePath(`/projects/${projectSlug}/board`);
   return { ok: true };
 }
@@ -184,10 +209,11 @@ export async function moveTaskAction(
     return { ok: false, error: 'Tarea no encontrada' };
   }
 
-  // Resolve target state category to decide whether to fire the brain extractor.
+  // Resolve target state name/category: decides the brain-extractor hook and
+  // enriquece el evento de dominio (el worker no tiene que resolver el estado).
   const toState = await prisma.workflowState.findUnique({
     where: { id: toStateId },
-    select: { category: true },
+    select: { name: true, category: true },
   });
   const stateChanged = task.stateId !== toStateId;
   const enteringDone = stateChanged && toState?.category === 'DONE';
@@ -214,6 +240,19 @@ export async function moveTaskAction(
       });
     }
   });
+
+  if (stateChanged) {
+    publishDomainEvent({
+      type: 'story.state_changed',
+      projectId: ctx.projectId,
+      storyId: taskId,
+      storyNumber: task.taskNumber,
+      fromState: { id: task.stateId },
+      toState: { id: toStateId, name: toState?.name, category: toState?.category },
+      actorId: ctx.userId,
+      assigneeId: task.assigneeId,
+    });
+  }
 
   // Fire-and-forget: when a task enters a DONE column, extract memories into
   // the actor's local brain. Failures (no API key, etc.) are swallowed by the
@@ -248,6 +287,14 @@ export async function addCommentAction(
     await tx.taskActivity.create({
       data: { taskId, actorId: ctx.userId, type: 'COMMENTED' },
     });
+  });
+
+  publishDomainEvent({
+    type: 'story.commented',
+    projectId: ctx.projectId,
+    storyId: taskId,
+    actorId: ctx.userId,
+    payload: { body: trimmed.slice(0, 2000) },
   });
 
   revalidatePath(`/projects/${projectSlug}/board`);

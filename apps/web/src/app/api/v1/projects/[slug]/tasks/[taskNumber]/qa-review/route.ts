@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
+import { publishDomainEvent } from '@/lib/agents/events';
 import { formatQaHandoffComment, type QaHandoff, type QaTestCase } from '@/lib/qa-types';
 import type { Prisma } from '@prisma/client';
 
@@ -119,6 +120,19 @@ export async function POST(
     projectId: project.id,
     payload: { via: 'api', moved: !!willMove },
   });
+
+  if (willMove) {
+    publishDomainEvent({
+      type: 'story.state_changed',
+      projectId: project.id,
+      storyId: task.id,
+      storyNumber: num,
+      fromState: { id: task.stateId },
+      toState: { id: reviewState!.id, name: reviewState!.name, category: reviewState!.category },
+      actorId: authd.userId,
+      payload: { via: 'qa-review' },
+    });
+  }
 
   return NextResponse.json({ ok: true, movedToVerification: !!willMove });
 }
