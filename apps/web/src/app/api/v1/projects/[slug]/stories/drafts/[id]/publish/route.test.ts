@@ -44,6 +44,6 @@ describe('POST publish draft', () => {
     const res = await POST(req(valid), ctx);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, taskId: 't1', taskNumber: 5 });
-    expect(h.publish).toHaveBeenCalledWith('d1', expect.objectContaining({ stateId: valid.stateId }));
+    expect(h.publish).toHaveBeenCalledWith('d1', expect.objectContaining({ stateId: valid.stateId }), 'u1');
   });
 });
