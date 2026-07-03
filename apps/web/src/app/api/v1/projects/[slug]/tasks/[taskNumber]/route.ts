@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { publishDomainEvent } from '@/lib/agents/events';
+import { selfApprovalBlockReason } from '@/lib/agents/provision';
 
 async function loadTaskByNumber(slug: string, taskNumber: number, userId: string) {
   const project = await prisma.project.findUnique({
@@ -136,6 +137,27 @@ export async function PATCH(
     newStateId = stateMatch.id;
     newState = { id: stateMatch.id, name: stateMatch.name, category: stateMatch.category };
     enteringDone = stateMatch.category === 'DONE' && stateMatch.id !== task.state.id;
+
+    // Guardarraíl de plataforma: un agente no aprueba su propio trabajo.
+    if (enteringDone) {
+      const blocked = await selfApprovalBlockReason({
+        projectId: project.id,
+        actorUserId: authd.userId,
+        qaHandoff: task.qaHandoff,
+        assigneeId: task.assignee?.id ?? null,
+      });
+      if (blocked) {
+        await audit({
+          actorId: authd.userId,
+          action: 'task.self_approval_blocked',
+          resourceType: 'task',
+          resourceId: task.id,
+          projectId: project.id,
+          payload: { via: 'api', reason: blocked },
+        });
+        return NextResponse.json({ error: blocked }, { status: 403 });
+      }
+    }
   }
 
   await prisma.$transaction(async (tx) => {
