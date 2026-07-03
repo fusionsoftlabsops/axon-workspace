@@ -56,6 +56,9 @@ export interface DeployView {
 export interface ConnectOption {
   servers: Array<{ id: string; name: string; agentStatus: fusion.AgentStatus }>;
   defaultTeamId: string | null;
+  /** Proyectos fusion-infra ya existentes en el team — permiten enlazar la
+   * infraestructura actual en vez de crear un proyecto nuevo (brownfield). */
+  projects: Array<{ id: string; name: string; environments: Array<{ id: string; name: string }> }>;
 }
 
 const NOT_CONFIGURED = 'El despliegue no está configurado en esta instancia (FUSION_INFRA_URL / FUSION_INFRA_TOKEN)';
@@ -188,7 +191,14 @@ export async function getConnectOptionsAction(slug: string): Promise<ActionResul
     const servers = ctx.servers
       .filter((s) => !teamId || s.teamId === teamId)
       .map((s) => ({ id: s.id, name: s.name, agentStatus: s.agentStatus }));
-    return { ok: true, data: { servers, defaultTeamId: ctx.defaultTeamId } };
+    const projects = (ctx.projects ?? [])
+      .filter((p) => !teamId || p.teamId === teamId)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        environments: (p.environments ?? []).map((e) => ({ id: e.id, name: e.name })),
+      }));
+    return { ok: true, data: { servers, defaultTeamId: ctx.defaultTeamId, projects } };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'No se pudo consultar fusion-infra' };
   }
@@ -226,11 +236,18 @@ export async function setEnvironmentClassAction(
   }
 }
 
-// ---- connect (auto-create the fusion-infra project/environment) ----
+// ---- connect (auto-create the fusion-infra project/environment, o enlazar uno existente) ----
 
 export async function connectDeployTargetAction(
   slug: string,
-  input: { serverId?: string; envClass?: fusion.FusionEnvClass } = {},
+  input: {
+    serverId?: string;
+    envClass?: fusion.FusionEnvClass;
+    /** Enlaza un proyecto fusion-infra EXISTENTE en vez de crear uno nuevo. */
+    fusionProjectId?: string;
+    /** Entorno del proyecto existente (default: "production" o el primero). */
+    environmentId?: string;
+  } = {},
 ): Promise<ActionResult<DeployView>> {
   const g = await guard(slug, { mutate: true });
   if (!g.ok) return g;
@@ -257,21 +274,40 @@ export async function connectDeployTargetAction(
       };
     }
 
-    // Auto-create the fusion-infra project (it ships with a "production" env).
-    const project = await fusion.createProject(g.ctx.name, teamId);
-    const envs = project.environments?.length
-      ? project.environments
-      : await fusion.listEnvironments(project.id, teamId);
-    const environment = envs.find((e) => e.name.toLowerCase() === 'production') ?? envs[0];
-    if (!environment) return { ok: false, error: 'fusion-infra creó el proyecto sin entornos' };
+    let project: { id: string };
+    let environment: fusion.FusionEnvironment | undefined;
 
-    // Clase del ambiente (dev/qa/prod): gobierna los backups automáticos de
-    // fusion-infra. Best-effort si el control-plane aún no soporta el PATCH.
-    if (input.envClass) {
-      try {
-        await fusion.updateEnvironmentClass(project.id, environment.id, input.envClass, teamId);
-      } catch (err) {
-        console.warn('[deploy.connect] no se pudo fijar envClass:', err);
+    if (input.fusionProjectId) {
+      // Enlazar un proyecto fusion-infra EXISTENTE (brownfield / auto-administración):
+      // no se crea nada y no se toca la clasificación del entorno actual.
+      const found = (ctx.projects ?? []).find((p) => p.id === input.fusionProjectId && p.teamId === teamId);
+      if (!found) return { ok: false, error: 'Proyecto fusion-infra no encontrado en el team' };
+      const envs = found.environments?.length
+        ? found.environments
+        : await fusion.listEnvironments(found.id, teamId);
+      environment = input.environmentId
+        ? envs.find((e) => e.id === input.environmentId)
+        : (envs.find((e) => e.name.toLowerCase() === 'production') ?? envs[0]);
+      if (!environment) return { ok: false, error: 'El proyecto fusion-infra no tiene ese entorno' };
+      project = { id: found.id };
+    } else {
+      // Auto-create the fusion-infra project (it ships with a "production" env).
+      const created = await fusion.createProject(g.ctx.name, teamId);
+      const envs = created.environments?.length
+        ? created.environments
+        : await fusion.listEnvironments(created.id, teamId);
+      environment = envs.find((e) => e.name.toLowerCase() === 'production') ?? envs[0];
+      if (!environment) return { ok: false, error: 'fusion-infra creó el proyecto sin entornos' };
+      project = created;
+
+      // Clase del ambiente (dev/qa/prod): gobierna los backups automáticos de
+      // fusion-infra. Best-effort si el control-plane aún no soporta el PATCH.
+      if (input.envClass) {
+        try {
+          await fusion.updateEnvironmentClass(created.id, environment.id, input.envClass, teamId);
+        } catch (err) {
+          console.warn('[deploy.connect] no se pudo fijar envClass:', err);
+        }
       }
     }
 
@@ -290,7 +326,13 @@ export async function connectDeployTargetAction(
       resourceType: 'deploy_target',
       resourceId: g.ctx.projectId,
       projectId: g.ctx.projectId,
-      payload: { fusionProjectId: project.id, environmentId: environment.id, serverId, envClass: input.envClass ?? null },
+      payload: {
+        fusionProjectId: project.id,
+        environmentId: environment.id,
+        serverId,
+        envClass: input.envClass ?? null,
+        linkedExisting: Boolean(input.fusionProjectId),
+      },
     });
 
     revalidatePath(`/projects/${slug}/deploy`);
