@@ -19,11 +19,23 @@ const schema = z.object({
   AGENT_SM_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_DEV_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_QA_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Proyecto que este worker atiende (v1: un proyecto por instancia).
+  AGENT_PROJECT_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  AGENT_PROJECT_SLUG: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // Modelo Qwen propio (vLLM OpenAI-compatible) para el rol Dev.
   FUSION_MODEL_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   FUSION_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  QWEN_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('qwen3-coder-next')),
   // Claude (credencial server de la instancia) para los roles SM/QA.
   ANTHROPIC_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  ANTHROPIC_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('claude-sonnet-4-6')),
+  // Token de GitHub para clone/push/PR del Dev y clone de QA (repos privados).
+  GITHUB_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Intervalo del sweep de estancadas del SM (minutos; 0 = apagado).
+  STALE_SWEEP_MINUTES: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(0).default(30),
+  ),
   // Health endpoint del worker (fusion-infra healthCheckPath=/health).
   PORT: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().positive().default(3060)),
 });
