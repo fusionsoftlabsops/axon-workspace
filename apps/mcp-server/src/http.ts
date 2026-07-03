@@ -19,11 +19,9 @@
  * Like the stdio server, this NEVER touches the vault: credentials never flow
  * through LLM context.
  */
-import { randomUUID } from 'node:crypto';
 import express from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ApiClient } from './api-client.js';
 import { ToolRegistry } from './tool-registry.js';
 import { registerTaskTools } from './tools/tasks.js';
@@ -60,8 +58,13 @@ function buildServer(token: string): Server {
   return server;
 }
 
-// ---- Streamable HTTP transport (stateful sessions, token per session) ----
-const transports: Record<string, StreamableHTTPServerTransport> = {};
+// ---- Streamable HTTP transport (STATELESS) ----
+// Antes las sesiones vivían en memoria (Record<sid, transport>): cada redeploy
+// del contenedor las borraba y el cliente quedaba con "No valid session" hasta
+// reconectar a mano. Este server es de tools puras (sin notificaciones push),
+// así que el modo stateless del SDK es el correcto: el Bearer token viaja en
+// CADA request, se construye un server efímero por petición y no hay nada que
+// perder en un reinicio (además habilita múltiples réplicas).
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
@@ -70,57 +73,36 @@ app.get('/health', (_req, res) => {
 });
 
 app.post('/mcp', async (req, res) => {
-  const sid = req.headers['mcp-session-id'] as string | undefined;
-  let transport: StreamableHTTPServerTransport | undefined = sid ? transports[sid] : undefined;
-
-  if (!transport) {
-    if (sid || !isInitializeRequest(req.body)) {
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: { code: -32000, message: 'No valid session; send initialize first' },
-        id: null,
-      });
-      return;
-    }
-    const auth = req.headers.authorization;
-    if (!auth) {
-      res.status(401).json({
-        jsonrpc: '2.0',
-        error: { code: -32001, message: 'Missing Authorization (admin API token)' },
-        id: null,
-      });
-      return;
-    }
-    // The web API expects `Bearer ad_pk_...`; ApiClient adds the prefix itself,
-    // so strip a leading scheme if the caller already sent one.
-    const token = auth.replace(/^Bearer\s+/i, '');
-    const t = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (id) => {
-        transports[id] = t;
-      },
+  const auth = req.headers.authorization;
+  if (!auth) {
+    res.status(401).json({
+      jsonrpc: '2.0',
+      error: { code: -32001, message: 'Missing Authorization (admin API token)' },
+      id: null,
     });
-    t.onclose = () => {
-      if (t.sessionId) delete transports[t.sessionId];
-    };
-    await buildServer(token).connect(t);
-    transport = t;
+    return;
   }
+  // The web API expects `Bearer ad_pk_...`; ApiClient adds the prefix itself,
+  // so strip a leading scheme if the caller already sent one.
+  const token = auth.replace(/^Bearer\s+/i, '');
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless: sin session id, sin estado
+    enableJsonResponse: true,
+  });
+  res.on('close', () => {
+    void transport.close();
+  });
+  await buildServer(token).connect(transport);
   await transport.handleRequest(req, res, req.body);
 });
 
-// GET (SSE stream) / DELETE (end session) reuse the session transport.
-const bySession = async (req: express.Request, res: express.Response) => {
-  const sid = req.headers['mcp-session-id'] as string | undefined;
-  const transport = sid ? transports[sid] : undefined;
-  if (!transport) {
-    res.status(400).send('Invalid or missing session id');
-    return;
-  }
-  await transport.handleRequest(req, res);
-};
-app.get('/mcp', bySession);
-app.delete('/mcp', bySession);
+// Stateless: no hay stream SSE por sesión ni sesiones que cerrar.
+app.get('/mcp', (_req, res) => {
+  res.status(405).set('Allow', 'POST').send('Stateless server: use POST');
+});
+app.delete('/mcp', (_req, res) => {
+  res.status(405).set('Allow', 'POST').send('Stateless server: use POST');
+});
 
 app.listen(PORT, () => {
   console.log(`admin-data MCP (HTTP) on :${PORT} → ${BASE_URL}`);
