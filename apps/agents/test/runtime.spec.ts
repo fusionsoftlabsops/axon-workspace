@@ -142,6 +142,44 @@ describe('runAgentLoop', () => {
     expect(res.finalText).toBe('a medias');
   });
 
+  it('corta por tope de reloj total ante iteraciones lentas sin tocar el límite de iteraciones', async () => {
+    // Cada llamada al provider tarda 20ms; con maxDurationMs=10 el deadline
+    // ya pasó antes de arrancar la 2ª iteración, aunque maxIterations no se
+    // haya agotado (post-dogfooding: defensa contra runs que se alargan sin
+    // que ningún timeout individual los corte).
+    const provider: LlmProvider = {
+      complete: vi.fn(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+        return completion({ content: 'sigo', toolCalls: [CALL], stopReason: 'tool_calls' });
+      }),
+    };
+    const res = await runAgentLoop('meta', {
+      provider,
+      system: 's',
+      tools: [tool()],
+      maxIterations: 10,
+      maxDurationMs: 10,
+    });
+    expect(res.stopped).toBe('timeout');
+    expect(res.iterations).toBe(1);
+    expect(provider.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('una tool colgada se corta por su propio timeout y vuelve como ERROR (no bloquea el loop)', async () => {
+    const hungTool = tool({ execute: vi.fn(() => new Promise<string>(() => {})) });
+    const res = await runAgentLoop('meta', {
+      provider: scripted(
+        completion({ toolCalls: [CALL], stopReason: 'tool_calls' }),
+        completion({ content: 'me recupero' }),
+      ),
+      system: 's',
+      tools: [hungTool],
+      toolTimeoutMs: 10,
+    });
+    expect(res.stopped).toBe('completed');
+    expect(res.transcript[2]!.content).toContain('colgada');
+  });
+
   it('argumentos vacíos se tratan como {}', async () => {
     const t = tool();
     await runAgentLoop('meta', {

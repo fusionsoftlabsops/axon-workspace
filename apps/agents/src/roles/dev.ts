@@ -32,6 +32,8 @@ export interface DevOptions {
   run?: CommandRunner;
   meCacheMs?: number;
   maxIterations?: number;
+  /** Tope de reloj del run completo (defensa contra hangs sin timeout propio). */
+  maxDurationMs?: number;
 }
 
 // Tuning post-dogfooding (primer ciclo vivo: 24 iteraciones agotadas explorando):
@@ -132,6 +134,7 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           system: DEV_SYSTEM,
           tools: [...repoTools(ws.dir), ...contextTools(opts.api, opts.projectSlug)],
           maxIterations: opts.maxIterations ?? 40,
+          maxDurationMs: opts.maxDurationMs,
         });
 
         if (result.status !== 'SUCCEEDED') {

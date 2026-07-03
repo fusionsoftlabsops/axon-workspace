@@ -78,6 +78,7 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
         provider: qwen,
         gitToken: config.GITHUB_TOKEN,
         maxIterations: config.DEV_MAX_ITERATIONS,
+        maxDurationMs: config.AGENT_MAX_DURATION_MS,
       }),
     );
     registered.push('DEV');
@@ -91,7 +92,14 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
   } else {
     const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.QA);
     router.register(
-      createQaHandler({ api, projectId, projectSlug, provider: anthropic, gitToken: config.GITHUB_TOKEN }),
+      createQaHandler({
+        api,
+        projectId,
+        projectSlug,
+        provider: anthropic,
+        gitToken: config.GITHUB_TOKEN,
+        maxDurationMs: config.AGENT_MAX_DURATION_MS,
+      }),
     );
     registered.push('QA');
   }

@@ -41,6 +41,13 @@ const schema = z.object({
     (v) => (v === '' ? undefined : v),
     z.coerce.number().int().min(4).max(200).default(40),
   ),
+  // Tope de reloj (ms) del run completo de Dev/QA — defensa contra hangs sin
+  // timeout propio (post-dogfooding: un run se quedó sin resolver ~20 min
+  // pese a que cada llamada individual tenía su propio timeout). Default 20min.
+  AGENT_MAX_DURATION_MS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(60_000).max(3_600_000).default(1_200_000),
+  ),
   // Health endpoint del worker (fusion-infra healthCheckPath=/health).
   PORT: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().positive().default(3060)),
 });

@@ -23,6 +23,7 @@ const STATUS_BY_STOP: Record<AgentLoopResult['stopped'], 'SUCCEEDED' | 'FAILED' 
   budget_exceeded: 'BUDGET_EXCEEDED',
   max_iterations: 'FAILED',
   truncated: 'FAILED',
+  timeout: 'FAILED',
 };
 
 export interface TrackedRunResult extends AgentLoopResult {
