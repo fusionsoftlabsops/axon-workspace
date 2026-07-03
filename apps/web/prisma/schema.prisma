@@ -167,6 +167,7 @@ model User {
   authoredPlans    ProjectPlan[]    @relation("PlanAuthor")
   invitesSent      Invitation[]     @relation("InvitedBy")
   passwordResets   PasswordResetToken[]
+  agentIdentities  Agent[]
 
   @@index([email])
 }
@@ -260,6 +261,7 @@ model Project {
   repos          ProjectRepo[]
   analysis       CodeAnalysis?
   deployTarget   DeployTarget?
+  agents         Agent[]
 
   @@index([ownerId])
 }
@@ -513,6 +515,7 @@ model Task {
   dependsOn   TaskDependency[] @relation("DependsOnSource")
   dependents  TaskDependency[] @relation("DependsOnTarget")
   sourceForMemories BrainMemory[]    @relation("MemorySourceTask")
+  agentRuns   AgentRun[]       @relation("AgentRunStory")
   memoryCitations   MemoryCitation[] @relation("MemoryCitedInTask")
   publishedFromDraft StoryDraft?     @relation("PublishedFrom")
 
@@ -704,9 +707,75 @@ model ApiToken {
   revokedAt     DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent Agent?
 
   @@index([userId])
   @@index([tokenHash])
+}
+
+// ============================================================
+// Agentic platform (Fase 1): identidad y bitácora de agentes
+// ============================================================
+
+enum AgentRole {
+  SM
+  DEV
+  QA
+}
+
+enum AgentRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  BUDGET_EXCEEDED
+  CANCELLED
+}
+
+// Un agente ES un usuario-miembro del proyecto y opera con su propio ApiToken:
+// la auditoría y el guardarraíl anti auto-aprobación se aplican por identidad
+// de token (plataforma), no por prompt.
+model Agent {
+  id            String   @id @default(cuid())
+  projectId     String
+  role          AgentRole
+  userId        String
+  apiTokenId    String?  @unique
+  llmModel      String   // p.ej. "qwen3-coder-next" | "claude-sonnet-4-6"
+  credentialRef String?  // 'server' | id de LlmCredential | null (Qwen vía env del worker)
+  tokenBudget   Int      @default(200000) // presupuesto de tokens por corrida (corte duro)
+  enabled       Boolean  @default(false)  // opt-in por proyecto: nace apagado
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiToken ApiToken? @relation(fields: [apiTokenId], references: [id], onDelete: SetNull)
+  runs     AgentRun[]
+
+  @@unique([projectId, role])
+  @@index([userId])
+}
+
+// Bitácora de corridas: una fila por reacción de un agente a un evento.
+// Persiste tokens/costo para atribución por rol y para el corte de presupuesto.
+model AgentRun {
+  id               String         @id @default(cuid())
+  agentId          String
+  storyId          String?        // Task.id que originó la corrida (null = housekeeping)
+  status           AgentRunStatus @default(RUNNING)
+  startedAt        DateTime       @default(now())
+  finishedAt       DateTime?
+  promptTokens     Int            @default(0)
+  completionTokens Int            @default(0)
+  costUsd          Decimal        @default(0) @db.Decimal(10, 6)
+  error            String?
+  payload          Json?          // evento disparador / resumen de la corrida
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  story Task? @relation("AgentRunStory", fields: [storyId], references: [id], onDelete: SetNull)
+
+  @@index([agentId, startedAt])
+  @@index([storyId])
 }
 
 // ============================================================
