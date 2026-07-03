@@ -98,6 +98,88 @@ export async function provisionAgentAction(
   }
 }
 
+export interface AgentRunView {
+  id: string;
+  role: AgentRole;
+  storyNumber: number | null;
+  storyTitle: string | null;
+  status: string;
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: string;
+  error: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+/** Bitácora reciente de corridas de agentes (tokens/costo/estado). */
+export async function listAgentRunsAction(
+  slug: string,
+  limit = 30,
+): Promise<ActionResult<AgentRunView[]>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+  const runs = await prisma.agentRun.findMany({
+    where: { agent: { projectId: ctx.projectId } },
+    include: {
+      agent: { select: { role: true } },
+      story: { select: { taskNumber: true, title: true } },
+    },
+    orderBy: { startedAt: 'desc' },
+    take: Math.min(Math.max(limit, 1), 100),
+  });
+  return {
+    ok: true,
+    data: runs.map((r) => ({
+      id: r.id,
+      role: r.agent.role,
+      storyNumber: r.story?.taskNumber ?? null,
+      storyTitle: r.story?.title ?? null,
+      status: r.status,
+      promptTokens: r.promptTokens,
+      completionTokens: r.completionTokens,
+      costUsd: r.costUsd.toString(),
+      error: r.error,
+      startedAt: r.startedAt.toISOString(),
+      finishedAt: r.finishedAt?.toISOString() ?? null,
+    })),
+  };
+}
+
+/** Actualiza la config de un agente (modelo LLM / presupuesto por corrida). */
+export async function updateAgentAction(
+  slug: string,
+  agentId: string,
+  input: { llmModel?: string; tokenBudget?: number },
+): Promise<ActionResult<AgentView[]>> {
+  const ctx = await guard(slug);
+  if (!ctx.ok) return ctx;
+  const agent = await prisma.agent.findFirst({ where: { id: agentId, projectId: ctx.projectId } });
+  if (!agent) return { ok: false, error: 'Agente no encontrado' };
+  const llmModel = input.llmModel?.trim();
+  if (input.llmModel !== undefined && !llmModel) return { ok: false, error: 'llmModel inválido' };
+  if (input.tokenBudget !== undefined && (!Number.isInteger(input.tokenBudget) || input.tokenBudget < 1000)) {
+    return { ok: false, error: 'tokenBudget inválido (mínimo 1000 tokens)' };
+  }
+  await prisma.agent.update({
+    where: { id: agentId },
+    data: {
+      ...(llmModel ? { llmModel } : {}),
+      ...(input.tokenBudget !== undefined ? { tokenBudget: input.tokenBudget } : {}),
+    },
+  });
+  await audit({
+    actorId: ctx.userId,
+    action: 'agent.update',
+    resourceType: 'agent',
+    resourceId: agentId,
+    projectId: ctx.projectId,
+    payload: { llmModel: llmModel ?? null, tokenBudget: input.tokenBudget ?? null },
+  });
+  revalidatePath(`/projects/${slug}/agents`);
+  return { ok: true, data: await loadAgents(ctx.projectId) };
+}
+
 /** Enciende/apaga un agente (kill-switch por proyecto). */
 export async function setAgentEnabledAction(
   slug: string,

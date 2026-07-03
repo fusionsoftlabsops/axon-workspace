@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { prismaMock, assertMock, auditMock, provisionMock, revalidateMock } = vi.hoisted(() => ({
   prismaMock: {
     agent: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    agentRun: { findMany: vi.fn() },
   },
   assertMock: vi.fn(),
   auditMock: vi.fn(),
@@ -19,7 +20,13 @@ vi.mock('@/lib/agents/provision', () => ({
   AGENT_DISPLAY_NAMES: { SM: 'Agente Scrum Master', DEV: 'Agente Dev', QA: 'Agente QA' },
 }));
 
-import { listAgentsAction, provisionAgentAction, setAgentEnabledAction } from './agents';
+import {
+  listAgentsAction,
+  provisionAgentAction,
+  setAgentEnabledAction,
+  updateAgentAction,
+  listAgentRunsAction,
+} from './agents';
 
 const OWNER = { ok: true as const, userId: 'u1', projectId: 'p1', role: 'OWNER' as const };
 const AGENT_ROW = {
@@ -85,6 +92,56 @@ describe('provisionAgentAction', () => {
     expect(await provisionAgentAction('axon', { role: 'DEV', llmModel: 'm' })).toEqual({
       ok: false,
       error: 'ya tiene un agente DEV',
+    });
+  });
+});
+
+describe('updateAgentAction', () => {
+  it('valida modelo/presupuesto y actualiza con auditoría', async () => {
+    prismaMock.agent.findFirst.mockResolvedValue({ id: 'ag1' });
+    prismaMock.agent.update.mockResolvedValue({});
+    expect(await updateAgentAction('axon', 'ag1', { llmModel: '  ' })).toMatchObject({ ok: false });
+    expect(await updateAgentAction('axon', 'ag1', { tokenBudget: 10 })).toMatchObject({ ok: false });
+    const res = await updateAgentAction('axon', 'ag1', { llmModel: ' m2 ', tokenBudget: 5000 });
+    expect(prismaMock.agent.update).toHaveBeenCalledWith({
+      where: { id: 'ag1' },
+      data: { llmModel: 'm2', tokenBudget: 5000 },
+    });
+    expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.update' }));
+    expect(res.ok).toBe(true);
+  });
+
+  it('rechaza agentes de otro proyecto', async () => {
+    prismaMock.agent.findFirst.mockResolvedValue(null);
+    expect(await updateAgentAction('axon', 'agX', { tokenBudget: 5000 })).toEqual({
+      ok: false,
+      error: 'Agente no encontrado',
+    });
+  });
+});
+
+describe('listAgentRunsAction', () => {
+  it('mapea la bitácora con rol, HU y costo como string', async () => {
+    prismaMock.agentRun.findMany.mockResolvedValue([
+      {
+        id: 'r1',
+        status: 'SUCCEEDED',
+        promptTokens: 100,
+        completionTokens: 50,
+        costUsd: { toString: () => '0.012' },
+        error: null,
+        startedAt: new Date('2026-07-03T10:00:00Z'),
+        finishedAt: new Date('2026-07-03T10:01:00Z'),
+        agent: { role: 'DEV' },
+        story: { taskNumber: 13, title: 'HU 13' },
+      },
+    ]);
+    const res = await listAgentRunsAction('axon');
+    expect(res.ok && res.data[0]).toMatchObject({
+      role: 'DEV',
+      storyNumber: 13,
+      costUsd: '0.012',
+      startedAt: '2026-07-03T10:00:00.000Z',
     });
   });
 });
