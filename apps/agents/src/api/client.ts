@@ -114,4 +114,17 @@ export class AxonApi {
   ): Promise<{ ok: boolean; decision: string; movedTo: string }> {
     return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/qa-decision`, input);
   }
+
+  // ---- Contexto (solo lectura) ----
+
+  /** Memorias del cerebro del proyecto (recall por query). */
+  recallBrain(slug: string, query?: string, limit = 10): Promise<Record<string, unknown>> {
+    const q = query ? `?q=${encodeURIComponent(query)}&limit=${limit}` : `?limit=${limit}`;
+    return this.request('GET', `/projects/${slug}/brain/recall${q}`);
+  }
+
+  /** Resumen del grafo de código (CodeAnalysis de graphify). */
+  codeContext(slug: string): Promise<Record<string, unknown>> {
+    return this.request('GET', `/projects/${slug}/context/code`);
+  }
 }

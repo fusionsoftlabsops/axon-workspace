@@ -51,6 +51,26 @@ describe('AxonApi', () => {
     expect(urls[2]).toContain('/tasks/7/qa-decision');
   });
 
+  it('getTask/submitQaReview apuntan a las rutas correctas', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+    await api.getTask('axon', 9);
+    await api.submitQaReview('axon', 9, { criteria: [] });
+    const urls = fetchMock.mock.calls.map((c) => c[0] as string);
+    expect(urls[0]).toContain('/tasks/9');
+    expect(urls[1]).toContain('/tasks/9/qa-review');
+    expect(fetchMock.mock.calls[0]![1].method).toBe('GET');
+  });
+
+  it('recallBrain codifica la query y codeContext lee el resumen', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ memories: [] }));
+    await api.recallBrain('axon', 'redis pub/sub', 5);
+    expect(fetchMock.mock.calls[0]![0]).toContain('/brain/recall?q=redis%20pub%2Fsub&limit=5');
+    await api.recallBrain('axon');
+    expect(fetchMock.mock.calls[1]![0]).toContain('/brain/recall?limit=10');
+    await api.codeContext('axon');
+    expect(fetchMock.mock.calls[2]![0]).toContain('/context/code');
+  });
+
   it('errores non-2xx suben como AxonApiError con el mensaje del server', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ error: 'agent is disabled for this project' }, 403));
     await expect(api.openRun('axon')).rejects.toThrowError(AxonApiError);
