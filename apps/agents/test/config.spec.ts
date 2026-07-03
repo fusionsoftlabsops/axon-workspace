@@ -1,0 +1,37 @@
+import { describe, it, expect } from 'vitest';
+import { loadConfig } from '../src/config.js';
+
+describe('loadConfig', () => {
+  it('arranca deshabilitado por defecto con los defaults sanos', () => {
+    const c = loadConfig({});
+    expect(c.enabled).toBe(false);
+    expect(c.PORT).toBe(3060);
+    expect(c.AXON_API_BASE_URL).toBe('http://axon-web:3000/api/v1');
+    expect(c.tokens).toEqual({ SM: undefined, DEV: undefined, QA: undefined });
+  });
+
+  it.each(['1', 'true', 'on', 'TRUE'])('AGENTS_ENABLED=%s enciende el worker', (v) => {
+    expect(loadConfig({ AGENTS_ENABLED: v }).enabled).toBe(true);
+  });
+
+  it('valores no reconocidos quedan apagados', () => {
+    expect(loadConfig({ AGENTS_ENABLED: 'yes' }).enabled).toBe(false);
+  });
+
+  it('normaliza strings vacíos a undefined y mapea tokens por rol', () => {
+    const c = loadConfig({
+      REDIS_URL: '',
+      AGENT_SM_TOKEN: 'ad_pk_sm',
+      AGENT_DEV_TOKEN: '',
+      AGENT_QA_TOKEN: 'ad_pk_qa',
+      PORT: '4000',
+    });
+    expect(c.REDIS_URL).toBeUndefined();
+    expect(c.tokens).toEqual({ SM: 'ad_pk_sm', DEV: undefined, QA: 'ad_pk_qa' });
+    expect(c.PORT).toBe(4000);
+  });
+
+  it('rechaza configuración inválida con mensaje accionable', () => {
+    expect(() => loadConfig({ REDIS_URL: 'no-es-url' })).toThrow(/REDIS_URL/);
+  });
+});
