@@ -26,6 +26,7 @@ export async function GET(
     select: {
       id: true,
       role: true,
+      userId: true,
       llmModel: true,
       credentialRef: true,
       tokenBudget: true,

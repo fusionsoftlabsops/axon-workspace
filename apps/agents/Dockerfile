@@ -33,6 +33,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3060
 
+# git: el agente Dev clona el repo del proyecto en un workspace efímero.
+RUN apk add --no-cache git
+
 COPY --from=builder /deploy ./
 
 RUN addgroup -S agents && adduser -S agents -G agents \

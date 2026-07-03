@@ -7,6 +7,7 @@
 export interface AgentMe {
   id: string;
   role: 'SM' | 'DEV' | 'QA';
+  userId: string;
   llmModel: string;
   credentialRef: string | null;
   tokenBudget: number;
@@ -145,6 +146,13 @@ export class AxonApi {
   /** Resumen del grafo de código (CodeAnalysis de graphify). */
   codeContext(slug: string): Promise<Record<string, unknown>> {
     return this.request('GET', `/projects/${slug}/context/code`);
+  }
+
+  /** Repos vinculados al proyecto (para el workspace del Dev). */
+  listRepos(slug: string): Promise<{
+    repos: Array<{ name: string; kind: string; url: string | null; githubFullName: string | null; defaultBranch: string }>;
+  }> {
+    return this.request('GET', `/projects/${slug}/repos`);
   }
 
   /** Publica una memoria en el cerebro (scope PROJECT = visible al equipo). */
