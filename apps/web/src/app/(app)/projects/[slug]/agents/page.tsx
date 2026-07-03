@@ -3,7 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { getServerT } from '@/lib/i18n/server';
 import { PageHeader, Eyebrow } from '@/components/ui';
-import { listAgentsAction, listAgentRunsAction } from '@/lib/actions/agents';
+import { listAgentsAction, listAgentRunsAction, getAgentStatsAction } from '@/lib/actions/agents';
 import { AgentsClient } from './AgentsClient';
 import styles from './agents.module.scss';
 
@@ -21,7 +21,11 @@ export default async function AgentsPage({ params }: { params: Promise<{ slug: s
   const role = project.members[0]!.role;
   const canManage = role === 'OWNER' || role === 'ADMIN';
 
-  const [agents, runs] = await Promise.all([listAgentsAction(slug), listAgentRunsAction(slug)]);
+  const [agents, runs, stats] = await Promise.all([
+    listAgentsAction(slug),
+    listAgentRunsAction(slug),
+    getAgentStatsAction(slug),
+  ]);
 
   return (
     <main className={styles.page}>
@@ -38,6 +42,7 @@ export default async function AgentsPage({ params }: { params: Promise<{ slug: s
         canManage={canManage}
         initialAgents={agents.ok ? (agents.data ?? []) : []}
         initialRuns={runs.ok ? (runs.data ?? []) : []}
+        initialStats={stats.ok ? (stats.data ?? null) : null}
       />
     </main>
   );

@@ -8,6 +8,7 @@ import {
   setAgentEnabledAction,
   updateAgentAction,
   type AgentRunView,
+  type AgentStatsView,
   type AgentView,
 } from '@/lib/actions/agents';
 import styles from './agents.module.scss';
@@ -26,11 +27,13 @@ export function AgentsClient({
   canManage,
   initialAgents,
   initialRuns,
+  initialStats = null,
 }: {
   slug: string;
   canManage: boolean;
   initialAgents: AgentView[];
   initialRuns: AgentRunView[];
+  initialStats?: AgentStatsView | null;
 }) {
   const { t } = useI18n();
   const [agents, setAgents] = useState<AgentView[]>(initialAgents);
@@ -129,6 +132,43 @@ export function AgentsClient({
             ))}
         </div>
       </section>
+
+      {initialStats && initialStats.byRole.length > 0 && (
+        <section data-testid="agent-stats">
+          <h3 className={styles.sectionTitle}>{t('Salud y costo', 'Health & cost')}</h3>
+          <div className={styles.cards}>
+            {initialStats.byRole.map((s) => (
+              <div key={s.role} className={styles.card}>
+                <div className={styles.cardTop}>
+                  <span className={styles.name}>{s.role}</span>
+                  <Badge tone={s.total > 0 && s.succeeded / s.total >= 0.8 ? 'ok' : 'warn'}>
+                    {s.total > 0 ? `${Math.round((s.succeeded / s.total) * 100)}%` : '—'}
+                  </Badge>
+                </div>
+                <p className={styles.hint}>
+                  {s.succeeded}/{s.total} {t('exitosas', 'succeeded')}
+                  {s.budgetExceeded > 0 && ` · ${s.budgetExceeded} ${t('cortes de presupuesto', 'budget cuts')}`}
+                  {s.failed > 0 && ` · ${s.failed} ${t('fallidas', 'failed')}`}
+                </p>
+                <p className={styles.hint}>
+                  {(s.promptTokens + s.completionTokens).toLocaleString()} tokens · ${s.costUsd} USD
+                </p>
+              </div>
+            ))}
+            <div className={styles.card}>
+              <div className={styles.cardTop}>
+                <span className={styles.name}>{t('Proyecto', 'Project')}</span>
+              </div>
+              <p className={styles.hint}>
+                {t('Costo total:', 'Total cost:')} ${initialStats.totalCostUsd} USD
+              </p>
+              <p className={styles.hint}>
+                {t('HUs devueltas por QA:', 'Stories rejected by QA:')} {initialStats.qaRejections}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section>
         <h3 className={styles.sectionTitle}>{t('Corridas recientes', 'Recent runs')}</h3>

@@ -4,6 +4,7 @@ const { prismaMock, assertMock, auditMock, provisionMock, revalidateMock } = vi.
   prismaMock: {
     agent: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     agentRun: { findMany: vi.fn() },
+    auditLog: { count: vi.fn() },
   },
   assertMock: vi.fn(),
   auditMock: vi.fn(),
@@ -26,6 +27,7 @@ import {
   setAgentEnabledAction,
   updateAgentAction,
   listAgentRunsAction,
+  getAgentStatsAction,
 } from './agents';
 
 const OWNER = { ok: true as const, userId: 'u1', projectId: 'p1', role: 'OWNER' as const };
@@ -143,6 +145,42 @@ describe('listAgentRunsAction', () => {
       costUsd: '0.012',
       startedAt: '2026-07-03T10:00:00.000Z',
     });
+  });
+});
+
+describe('getAgentStatsAction', () => {
+  it('agrega por rol (éxitos, cortes, tokens, costo) y cuenta rechazos de QA', async () => {
+    const run = (role: string, status: string, cost: string) => ({
+      status,
+      promptTokens: 100,
+      completionTokens: 50,
+      costUsd: { toString: () => cost },
+      agent: { role },
+    });
+    prismaMock.agentRun.findMany.mockResolvedValue([
+      run('DEV', 'SUCCEEDED', '0'),
+      run('DEV', 'BUDGET_EXCEEDED', '0'),
+      run('QA', 'SUCCEEDED', '0.02'),
+      run('QA', 'FAILED', '0.01'),
+      run('SM', 'RUNNING', '0'),
+    ]);
+    prismaMock.auditLog.count.mockResolvedValue(3);
+    const res = await getAgentStatsAction('axon');
+    expect(res.ok).toBe(true);
+    if (!res.ok || !res.data) return;
+    const dev = res.data.byRole.find((r) => r.role === 'DEV')!;
+    expect(dev).toMatchObject({ total: 2, succeeded: 1, budgetExceeded: 1, promptTokens: 200 });
+    const qa = res.data.byRole.find((r) => r.role === 'QA')!;
+    expect(qa).toMatchObject({ total: 2, succeeded: 1, failed: 1, costUsd: '0.030000' });
+    const sm = res.data.byRole.find((r) => r.role === 'SM')!;
+    expect(sm).toMatchObject({ running: 1 });
+    expect(res.data.qaRejections).toBe(3);
+    expect(res.data.totalCostUsd).toBe('0.030000');
+    expect(prismaMock.auditLog.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ action: 'task.qa_decision', payload: { path: ['decision'], equals: 'reject' } }),
+      }),
+    );
   });
 });
 

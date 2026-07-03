@@ -146,6 +146,90 @@ export async function listAgentRunsAction(
   };
 }
 
+export interface AgentRoleStats {
+  role: AgentRole;
+  total: number;
+  succeeded: number;
+  failed: number;
+  budgetExceeded: number;
+  running: number;
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: string;
+}
+
+export interface AgentStatsView {
+  byRole: AgentRoleStats[];
+  qaRejections: number;
+  totalCostUsd: string;
+}
+
+/** Métricas de las corridas: tasa de éxito por rol, tokens/costo, cortes de
+ * presupuesto y HUs devueltas por QA (vía auditoría task.qa_decision). */
+export async function getAgentStatsAction(slug: string): Promise<ActionResult<AgentStatsView>> {
+  const ctx = await assertProjectMember(slug);
+  if (!ctx.ok) return ctx;
+
+  const [runs, qaRejections] = await Promise.all([
+    prisma.agentRun.findMany({
+      where: { agent: { projectId: ctx.projectId } },
+      select: {
+        status: true,
+        promptTokens: true,
+        completionTokens: true,
+        costUsd: true,
+        agent: { select: { role: true } },
+      },
+    }),
+    prisma.auditLog.count({
+      where: {
+        projectId: ctx.projectId,
+        action: 'task.qa_decision',
+        payload: { path: ['decision'], equals: 'reject' },
+      },
+    }),
+  ]);
+
+  const byRole = new Map<AgentRole, AgentRoleStats>();
+  let totalCost = 0;
+  for (const r of runs) {
+    const role = r.agent.role;
+    const s =
+      byRole.get(role) ??
+      ({
+        role,
+        total: 0,
+        succeeded: 0,
+        failed: 0,
+        budgetExceeded: 0,
+        running: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        costUsd: '0',
+      } satisfies AgentRoleStats);
+    s.total += 1;
+    if (r.status === 'SUCCEEDED') s.succeeded += 1;
+    else if (r.status === 'BUDGET_EXCEEDED') s.budgetExceeded += 1;
+    else if (r.status === 'RUNNING') s.running += 1;
+    else s.failed += 1;
+    s.promptTokens += r.promptTokens;
+    s.completionTokens += r.completionTokens;
+    const cost = Number(r.costUsd);
+    s.costUsd = (Number(s.costUsd) + cost).toFixed(6);
+    totalCost += cost;
+    byRole.set(role, s);
+  }
+
+  return {
+    ok: true,
+    data: {
+      byRole: [...byRole.values()].sort((a, b) => a.role.localeCompare(b.role)),
+      qaRejections,
+      totalCostUsd: totalCost.toFixed(6),
+    },
+  };
+}
+
 /** Actualiza la config de un agente (modelo LLM / presupuesto por corrida). */
 export async function updateAgentAction(
   slug: string,
