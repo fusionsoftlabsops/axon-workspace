@@ -94,7 +94,13 @@ export class AxonApi {
   patchTask(
     slug: string,
     taskNumber: number,
-    input: { toState?: string; title?: string; description?: string; priority?: string },
+    input: {
+      toState?: string;
+      title?: string;
+      description?: string;
+      priority?: string;
+      assignToAgentRole?: 'SM' | 'DEV' | 'QA';
+    },
   ): Promise<{ ok: boolean }> {
     return this.request('PATCH', `/projects/${slug}/tasks/${taskNumber}`, input);
   }

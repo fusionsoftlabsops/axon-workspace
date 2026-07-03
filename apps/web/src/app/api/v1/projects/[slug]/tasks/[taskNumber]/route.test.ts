@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   extract: vi.fn(),
   publishEvent: vi.fn(),
   blockReason: vi.fn(),
+  agentFindUnique: vi.fn(),
 }));
 vi.mock('@/lib/api-auth', () => ({
   requireApiToken: h.requireApiToken,
@@ -27,6 +28,7 @@ vi.mock('@/lib/db', () => ({
     project: { findUnique: h.projectFindUnique },
     task: { findUnique: h.taskFindUnique, update: h.taskUpdate },
     taskActivity: { create: h.activityCreate },
+    agent: { findUnique: h.agentFindUnique },
     $transaction: h.transaction,
   },
 }));
@@ -200,6 +202,32 @@ describe('PATCH task', () => {
     h.taskFindUnique.mockResolvedValue(task());
     await PATCH(req({ title: 'solo titulo' }), ctx());
     expect(h.blockReason).not.toHaveBeenCalled();
+  });
+
+  it('asigna al agente del rol pedido (resuelto server-side) y registra ASSIGNED', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task());
+    h.agentFindUnique.mockResolvedValue({ userId: 'u-dev-agent', enabled: true });
+    const res = await PATCH(req({ assignToAgentRole: 'DEV' }), ctx());
+    expect(res.status).toBe(200);
+    expect(h.agentFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { projectId_role: { projectId: 'p1', role: 'DEV' } } }),
+    );
+    expect(h.taskUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ assigneeId: 'u-dev-agent' }) }),
+    );
+    expect(h.activityCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ type: 'ASSIGNED' }) }),
+    );
+  });
+
+  it('400 si el proyecto no tiene agente de ese rol; 409 si está disabled', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task());
+    h.agentFindUnique.mockResolvedValue(null);
+    expect((await PATCH(req({ assignToAgentRole: 'QA' }), ctx())).status).toBe(400);
+    h.agentFindUnique.mockResolvedValue({ userId: 'x', enabled: false });
+    expect((await PATCH(req({ assignToAgentRole: 'QA' }), ctx())).status).toBe(409);
   });
 
   it('emits story.state_changed on a state transition', async () => {

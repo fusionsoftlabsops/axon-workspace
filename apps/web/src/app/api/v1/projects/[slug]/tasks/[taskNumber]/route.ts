@@ -88,6 +88,9 @@ const patchBody = z
     title: z.string().min(1).max(200).optional(),
     description: z.string().max(20_000).optional(),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+    // Asignar la HU al AGENTE de un rol del proyecto (el server resuelve su
+    // userId — el llamador no necesita conocer identidades internas).
+    assignToAgentRole: z.enum(['SM', 'DEV', 'QA']).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'at least one field is required',
@@ -160,6 +163,28 @@ export async function PATCH(
     }
   }
 
+  // Resolver el agente destino cuando se pide asignación por rol.
+  let assigneeId: string | undefined;
+  if (body.assignToAgentRole) {
+    const targetAgent = await prisma.agent.findUnique({
+      where: { projectId_role: { projectId: project.id, role: body.assignToAgentRole } },
+      select: { userId: true, enabled: true },
+    });
+    if (!targetAgent) {
+      return NextResponse.json(
+        { error: `project has no ${body.assignToAgentRole} agent` },
+        { status: 400 },
+      );
+    }
+    if (!targetAgent.enabled) {
+      return NextResponse.json(
+        { error: `${body.assignToAgentRole} agent is disabled` },
+        { status: 409 },
+      );
+    }
+    assigneeId = targetAgent.userId;
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.task.update({
       where: { id: task.id },
@@ -168,6 +193,7 @@ export async function PATCH(
         ...(body.title ? { title: body.title } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.priority ? { priority: body.priority } : {}),
+        ...(assigneeId ? { assigneeId } : {}),
       },
     });
     if (newStateId && newStateId !== task.state.id) {
@@ -177,6 +203,16 @@ export async function PATCH(
           actorId: authd.userId,
           type: 'STATE_CHANGED',
           payload: { from: task.state.id, to: newStateId, via: 'api' },
+        },
+      });
+    }
+    if (assigneeId && assigneeId !== task.assignee?.id) {
+      await tx.taskActivity.create({
+        data: {
+          taskId: task.id,
+          actorId: authd.userId,
+          type: 'ASSIGNED',
+          payload: { to: assigneeId, agentRole: body.assignToAgentRole, via: 'api' },
         },
       });
     }
@@ -191,7 +227,7 @@ export async function PATCH(
       fromState: { id: task.state.id, name: task.state.name, category: task.state.category },
       toState: newState,
       actorId: authd.userId,
-      assigneeId: task.assignee?.id ?? null,
+      assigneeId: assigneeId ?? task.assignee?.id ?? null,
     });
   }
 
