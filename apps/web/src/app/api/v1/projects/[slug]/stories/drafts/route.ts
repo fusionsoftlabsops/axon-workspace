@@ -54,7 +54,9 @@ export async function POST(
     credentialId: parsed.data.credentialId,
     selectedPaths: parsed.data.selectedPaths ?? [],
     citedMemoryIds: parsed.data.citedMemoryIds ?? [],
-  });
+    // Con auth por token no hay sesión de navegador: el userId autenticado
+    // viaja explícito para la verificación de membresía.
+  }, authd.userId);
   if (!start.ok || !start.draftId) {
     return NextResponse.json(
       { error: start.error ?? 'no se pudo crear el borrador' },

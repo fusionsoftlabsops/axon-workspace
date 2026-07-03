@@ -67,8 +67,9 @@ export interface DraftCreatedResult {
 export async function startStoryDraftAction(
   projectSlug: string,
   input: StartStoryInput,
+  asUserId?: string,
 ): Promise<DraftCreatedResult> {
-  const ctx = await assertProjectMember(projectSlug);
+  const ctx = await assertProjectMember(projectSlug, asUserId);
   if (!ctx.ok) return { ok: false, error: ctx.error };
   if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos para crear HUs' };
 
@@ -461,12 +462,17 @@ export async function* runDraftGeneration(
 export async function publishStoryDraftAsTaskAction(
   draftId: string,
   input: PublishStoryInput,
+  asUserId?: string,
 ): Promise<
   | { ok: true; taskId: string; taskNumber: number }
   | { ok: false; error: string }
 > {
-  const session = await auth();
-  const userId = session?.user?.id;
+  // `asUserId` llega de rutas API autenticadas por token (sin sesión).
+  let userId = asUserId;
+  if (!userId) {
+    const session = await auth();
+    userId = session?.user?.id;
+  }
   if (!userId) return { ok: false, error: 'No autenticado' };
 
   const parsed = publishSchema.safeParse(input);

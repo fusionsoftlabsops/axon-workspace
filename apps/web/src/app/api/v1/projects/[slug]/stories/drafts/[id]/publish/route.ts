@@ -36,7 +36,7 @@ export async function POST(
     includeSubtasks: parsed.data.includeSubtasks,
     finalTitle: parsed.data.finalTitle,
     finalDescription: parsed.data.finalDescription,
-  });
+  }, authd.userId);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
 
   return NextResponse.json({

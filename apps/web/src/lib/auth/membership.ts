@@ -13,9 +13,17 @@ export type ProjectMemberCtx =
   | { ok: true; projectId: string; userId: string; role: MemberRole }
   | { ok: false; error: string };
 
-export async function assertProjectMember(projectSlug: string): Promise<ProjectMemberCtx> {
-  const session = await auth();
-  const userId = session?.user?.id;
+export async function assertProjectMember(
+  projectSlug: string,
+  asUserId?: string,
+): Promise<ProjectMemberCtx> {
+  // `asUserId` llega de rutas API que YA autenticaron por token
+  // (requireSessionOrToken); sin él, se resuelve la sesión del navegador.
+  let userId = asUserId;
+  if (!userId) {
+    const session = await auth();
+    userId = session?.user?.id;
+  }
   if (!userId) return { ok: false, error: 'No autenticado' };
 
   const project = await prisma.project.findUnique({
