@@ -10,6 +10,9 @@ const h = vi.hoisted(() => ({
   transaction: vi.fn(),
   audit: vi.fn(),
   extract: vi.fn(),
+  publishEvent: vi.fn(),
+  blockReason: vi.fn(),
+  agentFindUnique: vi.fn(),
 }));
 vi.mock('@/lib/api-auth', () => ({
   requireApiToken: h.requireApiToken,
@@ -18,11 +21,14 @@ vi.mock('@/lib/api-auth', () => ({
 }));
 vi.mock('@/lib/audit', () => ({ audit: h.audit }));
 vi.mock('@/lib/actions/brain', () => ({ extractMemoriesFromTaskAction: h.extract }));
+vi.mock('@/lib/agents/events', () => ({ publishDomainEvent: h.publishEvent }));
+vi.mock('@/lib/agents/provision', () => ({ selfApprovalBlockReason: h.blockReason }));
 vi.mock('@/lib/db', () => ({
   prisma: {
     project: { findUnique: h.projectFindUnique },
     task: { findUnique: h.taskFindUnique, update: h.taskUpdate },
     taskActivity: { create: h.activityCreate },
+    agent: { findUnique: h.agentFindUnique },
     $transaction: h.transaction,
   },
 }));
@@ -57,6 +63,7 @@ function task(over: Record<string, unknown> = {}) {
 beforeEach(() => {
   Object.values(h).forEach((fn) => fn.mockReset());
   h.requireApiToken.mockResolvedValue({ ...authd });
+  h.blockReason.mockResolvedValue(null);
   h.transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
     fn({ task: { update: h.taskUpdate }, taskActivity: { create: h.activityCreate } }),
   );
@@ -173,5 +180,67 @@ describe('PATCH task', () => {
     const res = await PATCH(req({ toState: 'Done' }), ctx());
     expect(res.status).toBe(200);
     await new Promise((r) => setTimeout(r, 0));
+  });
+
+  it('403 guardrail: an agent cannot approve its own work (audited, no mutation)', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task({ qaHandoff: { submittedById: 'u1' } }));
+    h.blockReason.mockResolvedValue('guardrail: el agente DEV no puede aprobar su propio trabajo (desarrolló esta HU)');
+    const res = await PATCH(req({ toState: 'Done' }), ctx());
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toContain('guardrail');
+    expect(h.blockReason).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p1', actorUserId: 'u1', qaHandoff: { submittedById: 'u1' } }),
+    );
+    expect(h.transaction).not.toHaveBeenCalled();
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'task.self_approval_blocked' }));
+    expect(h.publishEvent).not.toHaveBeenCalled();
+  });
+
+  it('guardrail only consults on transitions INTO done', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task());
+    await PATCH(req({ title: 'solo titulo' }), ctx());
+    expect(h.blockReason).not.toHaveBeenCalled();
+  });
+
+  it('asigna al agente del rol pedido (resuelto server-side) y registra ASSIGNED', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task());
+    h.agentFindUnique.mockResolvedValue({ userId: 'u-dev-agent', enabled: true });
+    const res = await PATCH(req({ assignToAgentRole: 'DEV' }), ctx());
+    expect(res.status).toBe(200);
+    expect(h.agentFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { projectId_role: { projectId: 'p1', role: 'DEV' } } }),
+    );
+    expect(h.taskUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ assigneeId: 'u-dev-agent' }) }),
+    );
+    expect(h.activityCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ type: 'ASSIGNED' }) }),
+    );
+  });
+
+  it('400 si el proyecto no tiene agente de ese rol; 409 si está disabled', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task());
+    h.agentFindUnique.mockResolvedValue(null);
+    expect((await PATCH(req({ assignToAgentRole: 'QA' }), ctx())).status).toBe(400);
+    h.agentFindUnique.mockResolvedValue({ userId: 'x', enabled: false });
+    expect((await PATCH(req({ assignToAgentRole: 'QA' }), ctx())).status).toBe(409);
+  });
+
+  it('emits story.state_changed on a state transition', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task());
+    h.extract.mockResolvedValue({ ok: true });
+    await PATCH(req({ toState: 'Done' }), ctx());
+    expect(h.publishEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'story.state_changed',
+        fromState: expect.objectContaining({ id: 's1' }),
+        toState: expect.objectContaining({ id: 's2', category: 'DONE' }),
+      }),
+    );
   });
 });

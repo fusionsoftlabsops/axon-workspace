@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
+import { publishDomainEvent } from '@/lib/agents/events';
+import { selfApprovalBlockReason } from '@/lib/agents/provision';
 
 async function loadTaskByNumber(slug: string, taskNumber: number, userId: string) {
   const project = await prisma.project.findUnique({
@@ -86,6 +88,9 @@ const patchBody = z
     title: z.string().min(1).max(200).optional(),
     description: z.string().max(20_000).optional(),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+    // Asignar la HU al AGENTE de un rol del proyecto (el server resuelve su
+    // userId — el llamador no necesita conocer identidades internas).
+    assignToAgentRole: z.enum(['SM', 'DEV', 'QA']).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'at least one field is required',
@@ -123,6 +128,7 @@ export async function PATCH(
   const body = parsed.data;
 
   let newStateId: string | undefined;
+  let newState: { id: string; name: string; category: string } | undefined;
   let enteringDone = false;
   if (body.toState) {
     const stateMatch = project.workflows[0]?.states.find(
@@ -132,7 +138,51 @@ export async function PATCH(
       return NextResponse.json({ error: `state "${body.toState}" not found` }, { status: 400 });
     }
     newStateId = stateMatch.id;
+    newState = { id: stateMatch.id, name: stateMatch.name, category: stateMatch.category };
     enteringDone = stateMatch.category === 'DONE' && stateMatch.id !== task.state.id;
+
+    // Guardarraíl de plataforma: un agente no aprueba su propio trabajo.
+    if (enteringDone) {
+      const blocked = await selfApprovalBlockReason({
+        projectId: project.id,
+        actorUserId: authd.userId,
+        qaHandoff: task.qaHandoff,
+        assigneeId: task.assignee?.id ?? null,
+      });
+      if (blocked) {
+        await audit({
+          actorId: authd.userId,
+          action: 'task.self_approval_blocked',
+          resourceType: 'task',
+          resourceId: task.id,
+          projectId: project.id,
+          payload: { via: 'api', reason: blocked },
+        });
+        return NextResponse.json({ error: blocked }, { status: 403 });
+      }
+    }
+  }
+
+  // Resolver el agente destino cuando se pide asignación por rol.
+  let assigneeId: string | undefined;
+  if (body.assignToAgentRole) {
+    const targetAgent = await prisma.agent.findUnique({
+      where: { projectId_role: { projectId: project.id, role: body.assignToAgentRole } },
+      select: { userId: true, enabled: true },
+    });
+    if (!targetAgent) {
+      return NextResponse.json(
+        { error: `project has no ${body.assignToAgentRole} agent` },
+        { status: 400 },
+      );
+    }
+    if (!targetAgent.enabled) {
+      return NextResponse.json(
+        { error: `${body.assignToAgentRole} agent is disabled` },
+        { status: 409 },
+      );
+    }
+    assigneeId = targetAgent.userId;
   }
 
   await prisma.$transaction(async (tx) => {
@@ -143,6 +193,7 @@ export async function PATCH(
         ...(body.title ? { title: body.title } : {}),
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.priority ? { priority: body.priority } : {}),
+        ...(assigneeId ? { assigneeId } : {}),
       },
     });
     if (newStateId && newStateId !== task.state.id) {
@@ -155,7 +206,30 @@ export async function PATCH(
         },
       });
     }
+    if (assigneeId && assigneeId !== task.assignee?.id) {
+      await tx.taskActivity.create({
+        data: {
+          taskId: task.id,
+          actorId: authd.userId,
+          type: 'ASSIGNED',
+          payload: { to: assigneeId, agentRole: body.assignToAgentRole, via: 'api' },
+        },
+      });
+    }
   });
+
+  if (newState && newState.id !== task.state.id) {
+    publishDomainEvent({
+      type: 'story.state_changed',
+      projectId: project.id,
+      storyId: task.id,
+      storyNumber: task.taskNumber,
+      fromState: { id: task.state.id, name: task.state.name, category: task.state.category },
+      toState: newState,
+      actorId: authd.userId,
+      assigneeId: assigneeId ?? task.assignee?.id ?? null,
+    });
+  }
 
   // Same hook as moveTaskAction: when a task enters a DONE category, fire the
   // brain extractor for the actor's local brain.

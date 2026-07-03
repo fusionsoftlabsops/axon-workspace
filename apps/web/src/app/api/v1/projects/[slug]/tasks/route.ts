@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
+import { publishDomainEvent } from '@/lib/agents/events';
 
 async function loadProject(slug: string, userId: string) {
   return prisma.project.findUnique({
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       priority: t.priority,
       assignee: t.assignee ? { id: t.assignee.id, name: t.assignee.name } : null,
       dueDate: t.dueDate?.toISOString() ?? null,
+      updatedAt: t.updatedAt.toISOString(),
     })),
   });
 }
@@ -149,6 +151,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     resourceId: created.id,
     projectId: project.id,
     payload: { via: 'api', tokenId: authd.tokenId },
+  });
+
+  publishDomainEvent({
+    type: 'story.created',
+    projectId: project.id,
+    storyId: created.id,
+    storyNumber: created.taskNumber,
+    toState: { id: stateMatch.id, name: stateMatch.name, category: stateMatch.category },
+    actorId: authd.userId,
+    assigneeId: created.assigneeId,
   });
 
   return NextResponse.json({

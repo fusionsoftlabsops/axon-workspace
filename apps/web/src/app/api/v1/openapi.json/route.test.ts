@@ -10,6 +10,8 @@ const EXPECTED_PATHS = [
   '/api/v1/projects/{slug}/tasks',
   '/api/v1/projects/{slug}/tasks/{taskNumber}',
   '/api/v1/projects/{slug}/tasks/{taskNumber}/comments',
+  '/api/v1/projects/{slug}/tasks/{taskNumber}/qa-review',
+  '/api/v1/projects/{slug}/tasks/{taskNumber}/qa-decision',
   '/api/v1/projects/{slug}/tasks/{taskNumber}/ai/commit-message',
   '/api/v1/projects/{slug}/tasks/{taskNumber}/ai/pr-description',
   '/api/v1/projects/{slug}/brain/memories',

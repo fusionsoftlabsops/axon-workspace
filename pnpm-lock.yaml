@@ -18,6 +18,31 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
+  apps/agents:
+    dependencies:
+      ioredis:
+        specifier: ^5.4.1
+        version: 5.11.1
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.19
+      '@vitest/coverage-v8':
+        specifier: 2.1.9
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.19)(jsdom@29.1.1(@noble/hashes@1.8.0))(sass@1.99.0))
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.0
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.19.19)(jsdom@29.1.1(@noble/hashes@1.8.0))(sass@1.99.0)
+
   apps/mcp-server:
     dependencies:
       '@admin/shared':

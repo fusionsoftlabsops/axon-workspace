@@ -74,18 +74,24 @@ describe('GET /api/v1/projects/[slug]/tasks', () => {
     expect(res.status).toBe(404);
   });
 
-  it('lists tasks', async () => {
+  it('lists tasks (incluye updatedAt para el sweep del SM)', async () => {
     h.projectFindUnique.mockResolvedValue(project());
     h.taskFindMany.mockResolvedValue([
       {
         id: 't1', taskNumber: 1, title: 'A', priority: 'LOW',
         dueDate: null, state: { name: 'Todo', category: 'TODO' }, assignee: null,
+        updatedAt: new Date('2026-07-03T10:00:00Z'),
       },
     ]);
     const res = await GET(new NextRequest('http://localhost/x'), ctx);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.tasks[0]).toMatchObject({ number: 1, assignee: null, dueDate: null });
+    expect(body.tasks[0]).toMatchObject({
+      number: 1,
+      assignee: null,
+      dueDate: null,
+      updatedAt: '2026-07-03T10:00:00.000Z',
+    });
   });
 });
 
