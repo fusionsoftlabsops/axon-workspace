@@ -62,6 +62,10 @@ vi.mock('@/lib/llm-credentials/store', () => ({
 vi.mock('@/lib/ai/providers/registry', () => ({ getProvider: getProviderMock }));
 vi.mock('@/lib/brain/search', () => ({ searchBrain: searchMock }));
 vi.mock('@/lib/repo/reader', () => ({ repoReaderFor: repoReaderMock }));
+const envMock = vi.hoisted(() =>
+  vi.fn((): { ANTHROPIC_API_KEY: string | undefined } => ({ ANTHROPIC_API_KEY: 'sk-ant-test' })),
+);
+vi.mock('@/lib/env', () => ({ env: envMock }));
 vi.mock('@/lib/ai/story-prompt', () => ({
   buildStoryPrompt: buildPromptMock,
   storyOutputSchema: storyOutputSchemaMock,
@@ -165,6 +169,34 @@ describe('startStoryDraftAction', () => {
     expect(res).toEqual({ ok: false, error: 'Datos inválidos' });
   });
 
+  it('accepts the synthetic server credential when the env key exists', async () => {
+    assertMock.mockResolvedValue(okCtx);
+    envMock.mockReturnValue({ ANTHROPIC_API_KEY: 'sk-ant-test' });
+    prismaMock.storyDraft.create.mockResolvedValue({ id: 'draft-1' });
+    const res = await startStoryDraftAction('slug', { ...input, credentialId: 'server' });
+    expect(res).toEqual({ ok: true, draftId: 'draft-1' });
+    // No toca la tabla de credenciales personales.
+    expect(prismaMock.llmCredential.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('rejects the server credential when the env key is missing', async () => {
+    assertMock.mockResolvedValue(okCtx);
+    envMock.mockReturnValue({ ANTHROPIC_API_KEY: undefined });
+    const res = await startStoryDraftAction('slug', { ...input, credentialId: 'server' });
+    expect(res).toEqual({ ok: false, error: 'Credencial del servidor no disponible' });
+  });
+
+  it('rejects the server credential for non-Anthropic providers', async () => {
+    assertMock.mockResolvedValue(okCtx);
+    envMock.mockReturnValue({ ANTHROPIC_API_KEY: 'sk-ant-test' });
+    const res = await startStoryDraftAction('slug', {
+      ...input,
+      provider: 'OPENAI' as const,
+      credentialId: 'server',
+    });
+    expect(res).toEqual({ ok: false, error: 'Credencial del servidor no disponible' });
+  });
+
   it('rejects an invalid credential', async () => {
     prismaMock.llmCredential.findUnique.mockResolvedValue(null);
     expect(await startStoryDraftAction('slug', input)).toEqual({ ok: false, error: 'Credencial no válida' });
@@ -205,6 +237,7 @@ describe('runDraftGeneration', () => {
   });
 
   it('errors when no LLM credential is available', async () => {
+    envMock.mockReturnValue({ ANTHROPIC_API_KEY: undefined });
     prismaMock.storyDraft.findUnique.mockResolvedValue(baseDraft);
     prismaMock.llmCredential.findFirst.mockResolvedValue(null);
     const evs = await collect(runDraftGeneration('d1', 'u1'));

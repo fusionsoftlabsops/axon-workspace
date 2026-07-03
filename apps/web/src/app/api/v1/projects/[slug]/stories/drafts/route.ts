@@ -21,7 +21,7 @@ const bodySchema = z.object({
   rawInput: z.string().min(10).max(4000),
   provider: z.enum(['ANTHROPIC', 'OPENAI', 'GOOGLE', 'MOONSHOT']),
   model: z.string().min(1).max(100),
-  credentialId: z.string().cuid(),
+  credentialId: z.union([z.string().cuid(), z.literal('server')]),
   selectedPaths: z.array(z.string()).max(50).optional(),
   citedMemoryIds: z.array(z.string()).max(20).optional(),
 });

@@ -23,6 +23,11 @@ import {
   type BrainMemoryForPrompt,
   type StoryOutput,
 } from '@/lib/ai/story-prompt';
+import { env } from '@/lib/env';
+import {
+  SERVER_CREDENTIAL_ID,
+  serverCredentialAvailable,
+} from '@/lib/llm-credentials/server-credential';
 
 // ---------- Schemas ----------
 
@@ -30,7 +35,7 @@ const startSchema = z.object({
   rawInput: z.string().min(10).max(4000),
   provider: z.enum(['ANTHROPIC', 'OPENAI', 'GOOGLE', 'MOONSHOT']),
   model: z.string().min(1).max(100),
-  credentialId: z.string().cuid(),
+  credentialId: z.union([z.string().cuid(), z.literal(SERVER_CREDENTIAL_ID)]),
   selectedPaths: z.array(z.string()).max(50).default([]),
   citedMemoryIds: z.array(z.string()).max(20).default([]),
 });
@@ -70,18 +75,26 @@ export async function startStoryDraftAction(
   const parsed = startSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: 'Datos inválidos' };
 
-  const cred = await prisma.llmCredential.findUnique({
-    where: { id: parsed.data.credentialId },
-    select: { userId: true, projectId: true, provider: true, revokedAt: true },
-  });
-  if (!cred || cred.userId !== ctx.userId || cred.revokedAt) {
-    return { ok: false, error: 'Credencial no válida' };
-  }
-  if (cred.projectId && cred.projectId !== ctx.projectId) {
-    return { ok: false, error: 'Credencial es de otro proyecto' };
-  }
-  if (cred.provider !== parsed.data.provider) {
-    return { ok: false, error: 'Provider no coincide con la credencial' };
+  if (parsed.data.credentialId === SERVER_CREDENTIAL_ID) {
+    // Fallback a la key del servidor (la del chat del Plan). Solo Anthropic:
+    // es el unico provider con key de entorno en este deploy.
+    if (parsed.data.provider !== 'ANTHROPIC' || !serverCredentialAvailable()) {
+      return { ok: false, error: 'Credencial del servidor no disponible' };
+    }
+  } else {
+    const cred = await prisma.llmCredential.findUnique({
+      where: { id: parsed.data.credentialId },
+      select: { userId: true, projectId: true, provider: true, revokedAt: true },
+    });
+    if (!cred || cred.userId !== ctx.userId || cred.revokedAt) {
+      return { ok: false, error: 'Credencial no válida' };
+    }
+    if (cred.projectId && cred.projectId !== ctx.projectId) {
+      return { ok: false, error: 'Credencial es de otro proyecto' };
+    }
+    if (cred.provider !== parsed.data.provider) {
+      return { ok: false, error: 'Provider no coincide con la credencial' };
+    }
   }
 
   const draft = await prisma.storyDraft.create({
@@ -183,8 +196,15 @@ export async function* runDraftGeneration(
       },
       orderBy: { lastUsedAt: 'desc' },
     });
-    if (!credRow) throw new Error('No hay credencial LLM válida para este provider');
-    const apiKey = decryptLlmCredentialKey(credRow);
+    let apiKey: string;
+    if (credRow) {
+      apiKey = decryptLlmCredentialKey(credRow);
+    } else if (draft.provider === 'ANTHROPIC' && serverCredentialAvailable()) {
+      // Sin credencial personal: cae a la key del servidor (la del planner).
+      apiKey = env().ANTHROPIC_API_KEY as string;
+    } else {
+      throw new Error('No hay credencial LLM válida para este provider');
+    }
 
     // ---- Memorias del cerebro ----
     let memories: BrainMemoryForPrompt[] = [];
@@ -385,7 +405,8 @@ export async function* runDraftGeneration(
       },
     });
 
-    touchLlmCredential(credRow.id);
+    // Con la credencial del servidor no hay fila que 'tocar'.
+    if (credRow) touchLlmCredential(credRow.id);
 
     if (memories.length > 0) {
       await prisma.brainMemory.updateMany({

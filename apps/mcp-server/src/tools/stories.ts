@@ -5,9 +5,11 @@ import type { ToolRegistry } from '../tool-registry.js';
 const draftSchema = z.object({
   projectSlug: z.string(),
   rawInput: z.string().min(10).max(4000),
-  provider: z.enum(['ANTHROPIC', 'OPENAI', 'GOOGLE', 'MOONSHOT']),
-  model: z.string().min(1).max(100),
-  credentialId: z.string(),
+  provider: z.enum(['ANTHROPIC', 'OPENAI', 'GOOGLE', 'MOONSHOT']).default('ANTHROPIC'),
+  model: z.string().min(1).max(100).default('claude-sonnet-4-6'),
+  // 'server' = credencial sintetica del servidor (misma key que el chat del
+  // Plan); permite generar HUs sin credencial personal configurada.
+  credentialId: z.string().default('server'),
   selectedPaths: z.array(z.string()).max(50).optional(),
   citedMemoryIds: z.array(z.string()).max(20).optional(),
   pollIntervalMs: z.number().int().min(500).max(10_000).optional(),
@@ -48,7 +50,7 @@ export function registerStoryTools(registry: ToolRegistry, api: ApiClient) {
     tool: {
       name: 'draft_user_story',
       description:
-        'Genera un borrador de Historia de Usuario (HU) partiendo de una necesidad expresada en lenguaje natural + archivos del repo + memorias del cerebro. El server crea el draft en background y este tool poll hasta que llega a READY/ERRORED. Requiere `repoPath` configurado en el proyecto y al menos una credencial LLM. Usa `list_repo_tree` antes para elegir paths relevantes.',
+        'Genera un borrador de Historia de Usuario (HU) partiendo de una necesidad expresada en lenguaje natural + archivos del repo + memorias del cerebro. El server crea el draft en background y este tool poll hasta que llega a READY/ERRORED. Requiere `repoPath` configurado en el proyecto. Sin credentialId usa la credencial del servidor (Anthropic, la misma del chat del Plan). Usa `list_repo_tree` antes para elegir paths relevantes.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -56,7 +58,7 @@ export function registerStoryTools(registry: ToolRegistry, api: ApiClient) {
           rawInput: { type: 'string', description: 'Necesidad del usuario en lenguaje natural (>=10 chars).' },
           provider: { type: 'string', enum: ['ANTHROPIC', 'OPENAI', 'GOOGLE', 'MOONSHOT'] },
           model: { type: 'string', description: 'ID del modelo. Debe ser uno soportado por el provider.' },
-          credentialId: { type: 'string', description: 'ID de la LlmCredential a usar (crear en /settings/llm-credentials).' },
+          credentialId: { type: 'string', description: "ID de la LlmCredential a usar, o 'server' (default) para la credencial del servidor." },
           selectedPaths: {
             type: 'array',
             items: { type: 'string' },
@@ -70,7 +72,7 @@ export function registerStoryTools(registry: ToolRegistry, api: ApiClient) {
           pollIntervalMs: { type: 'number', description: 'Intervalo de polling, default 2000.' },
           maxWaitMs: { type: 'number', description: 'Timeout total. Default 90s.' },
         },
-        required: ['projectSlug', 'rawInput', 'provider', 'model', 'credentialId'],
+        required: ['projectSlug', 'rawInput'],
       },
     },
     handler: async (args) => {
