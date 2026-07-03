@@ -45,19 +45,34 @@ if (!config.enabled) {
 } else if (!config.REDIS_URL) {
   console.error('[agents] AGENTS_ENABLED on pero sin REDIS_URL — modo pasivo');
 } else {
-  subscription = await subscribeToDomainEvents(config.REDIS_URL, async (event) => {
-    state.eventsReceived += 1;
-    const results = await router.dispatch(event);
-    state.eventsDispatched += results.length;
-    if (results.length > 0) {
-      console.log(
-        `[agents] ${event.type} #${event.storyNumber ?? '?'} → ${results
-          .map((r) => `${r.role}:${r.ok ? 'ok' : 'fail'}`)
-          .join(', ')}`,
+  // Hardening post-dogfooding: un Redis inaccesible (NOAUTH, caído, password
+  // rotado) NO puede tumbar el worker en crash-loop — modo pasivo + reintento.
+  const RETRY_MS = 60_000;
+  const trySubscribe = async (): Promise<void> => {
+    try {
+      subscription = await subscribeToDomainEvents(config.REDIS_URL!, async (event) => {
+        state.eventsReceived += 1;
+        const results = await router.dispatch(event);
+        state.eventsDispatched += results.length;
+        if (results.length > 0) {
+          console.log(
+            `[agents] ${event.type} #${event.storyNumber ?? '?'} → ${results
+              .map((r) => `${r.role}:${r.ok ? 'ok' : 'fail'}`)
+              .join(', ')}`,
+          );
+        }
+      });
+      state.subscribed = true;
+      console.log('[agents] suscripción activa');
+    } catch (err) {
+      state.subscribed = false;
+      console.error(
+        `[agents] suscripción falló (${err instanceof Error ? err.message : err}) — reintento en ${RETRY_MS / 1000}s`,
       );
+      setTimeout(() => void trySubscribe(), RETRY_MS);
     }
-  });
-  state.subscribed = true;
+  };
+  await trySubscribe();
 }
 
 async function shutdown(signal: string): Promise<void> {
@@ -68,3 +83,12 @@ async function shutdown(signal: string): Promise<void> {
 
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
+
+// Última línea de defensa: un error asíncrono huérfano (p.ej. del parser de
+// redis) no tumba el worker — se loguea y el proceso sigue sirviendo /health.
+process.on('unhandledRejection', (err) => {
+  console.error('[agents] unhandledRejection:', err instanceof Error ? err.message : err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[agents] uncaughtException:', err.message);
+});

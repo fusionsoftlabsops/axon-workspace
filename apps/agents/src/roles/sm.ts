@@ -10,6 +10,7 @@
 import type { AxonApi } from '../api/client.js';
 import type { DomainEventV1 } from '../events.js';
 import type { RoleHandler } from '../router.js';
+import { narrate } from './narrate.js';
 
 export interface SmAssignOptions {
   api: AxonApi;
@@ -91,6 +92,13 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
         opts.projectSlug,
         event.storyNumber!,
         `🤖 **SM**: HU asignada al Agente Dev y movida a ${opts.developmentState ?? 'Desarrollo'}.${contextNote}`,
+      );
+      await narrate(
+        opts.api,
+        opts.projectSlug,
+        `Tomé la HU #${event.storyNumber} «${story.title ?? ''}» del backlog y se la asigné al Dev. ` +
+          `Queda en ${opts.developmentState ?? 'Desarrollo'} — te toca.`,
+        { kind: 'HANDOFF', storyNumber: event.storyNumber! },
       );
     },
   };

@@ -262,6 +262,7 @@ model Project {
   analysis       CodeAnalysis?
   deployTarget   DeployTarget?
   agents         Agent[]
+  teamMessages   TeamChatMessage[]
 
   @@index([ownerId])
 }
@@ -516,6 +517,7 @@ model Task {
   dependents  TaskDependency[] @relation("DependsOnTarget")
   sourceForMemories BrainMemory[]    @relation("MemorySourceTask")
   agentRuns   AgentRun[]       @relation("AgentRunStory")
+  teamMessages TeamChatMessage[] @relation("TeamChatStory")
   memoryCitations   MemoryCitation[] @relation("MemoryCitedInTask")
   publishedFromDraft StoryDraft?     @relation("PublishedFrom")
 
@@ -740,6 +742,7 @@ model Agent {
   role          AgentRole
   userId        String
   apiTokenId    String?  @unique
+  displayName   String?  // nombre propio del agente en el equipo (ej. "Nova")
   llmModel      String   // p.ej. "qwen3-coder-next" | "claude-sonnet-4-6"
   credentialRef String?  // 'server' | id de LlmCredential | null (Qwen vía env del worker)
   tokenBudget   Int      @default(200000) // presupuesto de tokens por corrida (corte duro)
@@ -754,6 +757,32 @@ model Agent {
 
   @@unique([projectId, role])
   @@index([userId])
+}
+
+// Chat del equipo: el "standup" permanente del proyecto. Cada agente narra su
+// turno (tomó una HU, terminó, entrega al siguiente) y los humanos leen e
+// intervienen en el mismo hilo. En vivo por Redis (canal team:{projectId}).
+enum TeamMessageKind {
+  CHAT    // conversación libre (humanos o agentes)
+  STATUS  // avance/estado de un agente ("tomé la HU", "corrida FAILED")
+  HANDOFF // entrega de turno ("PR listo → te toca QA")
+}
+
+model TeamChatMessage {
+  id         String          @id @default(cuid())
+  projectId  String
+  authorId   String          // User (humano o cuenta de servicio del agente)
+  agentRole  AgentRole?      // null = humano
+  authorName String          // snapshot del nombre mostrado al momento de escribir
+  kind       TeamMessageKind @default(CHAT)
+  body       String
+  storyId    String?         // HU relacionada (opcional)
+  createdAt  DateTime        @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  story   Task?   @relation("TeamChatStory", fields: [storyId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
 }
 
 // Bitácora de corridas: una fila por reacción de un agente a un evento.

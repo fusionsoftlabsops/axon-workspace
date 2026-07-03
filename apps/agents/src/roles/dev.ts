@@ -19,6 +19,7 @@ import { runTrackedLoop } from '../runtime/tracked.js';
 import { contextTools } from '../tools/context.js';
 import { repoTools } from '../tools/repo.js';
 import { GitWorkspace, type CommandRunner } from '../git/workspace.js';
+import { narrate } from './narrate.js';
 
 export interface DevOptions {
   api: AxonApi;
@@ -33,11 +34,19 @@ export interface DevOptions {
   maxIterations?: number;
 }
 
+// Tuning post-dogfooding (primer ciclo vivo: 24 iteraciones agotadas explorando):
+// prompt DECISIVO — ir directo a los archivos nombrados, escribir temprano,
+// presupuesto de exploración explícito y cierre obligatorio con resumen.
 const DEV_SYSTEM = `Sos el desarrollador full-stack senior del equipo. Implementás UNA historia de usuario
-por corrida, con cambios mínimos y consistentes con el código existente.
-Reglas: (1) leé la HU y explorá el repo ANTES de escribir; (2) respetá los patrones del código vecino;
-(3) escribí tests cuando el repo los tenga; (4) NO toques archivos no relacionados; (5) al terminar,
-respondé con un resumen en markdown de qué cambiaste y por qué (será el handoff a QA).`;
+por corrida, con cambios mínimos y consistentes con el código existente. Tenés un número LIMITADO de
+turnos: sé decisivo.
+Método (seguilo en orden, sin vueltas):
+1. Si la HU nombra archivos concretos, leelos DIRECTO con read_file (no listes ni busques primero).
+2. Máximo 4 turnos de exploración en total (list_files/search_files/read_file). Después de eso, ESCRIBÍ.
+3. write_file reemplaza el archivo COMPLETO: incluí todo el contenido final, no fragmentos.
+4. Modificá SOLO lo que la HU pide + su test. Nada de refactors oportunistas.
+5. Cuando los archivos estén escritos, TERMINÁ: respondé sin tool calls con un resumen markdown de
+   qué cambiaste y por qué (es el handoff a QA). No re-verifiques leyendo lo que acabás de escribir.`;
 
 export function createDevHandler(opts: DevOptions): RoleHandler {
   let meCache: { enabled: boolean; userId: string | null; at: number } | null = null;
@@ -92,6 +101,12 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
       }
 
       const branch = `agent/hu-${n}`;
+      await narrate(
+        opts.api,
+        opts.projectSlug,
+        `Tomo la HU #${n} «${story.title ?? ''}». Clonando el repo y arrancando la implementación.`,
+        { kind: 'STATUS', storyNumber: n },
+      );
       const ws = await GitWorkspace.clone({
         repoUrl: repo.url,
         branch: repo.defaultBranch,
@@ -116,7 +131,7 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           provider: opts.provider,
           system: DEV_SYSTEM,
           tools: [...repoTools(ws.dir), ...contextTools(opts.api, opts.projectSlug)],
-          maxIterations: opts.maxIterations ?? 24,
+          maxIterations: opts.maxIterations ?? 40,
         });
 
         if (result.status !== 'SUCCEEDED') {
@@ -126,6 +141,13 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
             `🤖 **Dev**: la corrida terminó ${result.status} (${result.stopped}) tras ${result.iterations} ` +
               `iteraciones y ${result.usage.totalTokens} tokens. La HU sigue en Desarrollo.`,
           );
+          await narrate(
+            opts.api,
+            opts.projectSlug,
+            `No pude cerrar la HU #${n} en esta corrida (${result.stopped}, ${result.iterations} iteraciones). ` +
+              `Queda en Desarrollo — si alguien ve el bloqueo, comente en la HU.`,
+            { kind: 'STATUS', storyNumber: n },
+          );
           return;
         }
 
@@ -134,6 +156,12 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
             opts.projectSlug,
             n,
             `🤖 **Dev**: la corrida terminó sin cambios en el repo. Resumen del análisis:\n\n${result.finalText}`,
+          );
+          await narrate(
+            opts.api,
+            opts.projectSlug,
+            `Analicé la HU #${n} pero no produje cambios en el repo (detalle en la HU).`,
+            { kind: 'STATUS', storyNumber: n },
           );
           return;
         }
@@ -153,6 +181,13 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           suggestedTests: ['Revisar el PR y correr la suite del repo'],
           moveToVerification: true,
         });
+        await narrate(
+          opts.api,
+          opts.projectSlug,
+          `Terminé la HU #${n}: PR abierto en ${prUrl} (${result.usage.totalTokens} tokens, ` +
+            `${result.iterations} iteraciones). Pasa a Verificación — QA, te toca.`,
+          { kind: 'HANDOFF', storyNumber: n },
+        );
       } finally {
         await ws.cleanup();
       }

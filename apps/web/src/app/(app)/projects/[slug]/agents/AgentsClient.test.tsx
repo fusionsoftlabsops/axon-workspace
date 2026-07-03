@@ -15,7 +15,8 @@ import type { AgentRunView, AgentView } from '@/lib/actions/agents';
 const DEV: AgentView = {
   id: 'ag-dev',
   role: 'DEV',
-  displayName: 'Agente Dev',
+  name: 'Kai',
+  displayName: 'Kai · DEV',
   llmModel: 'qwen3-coder-next',
   credentialRef: null,
   tokenBudget: 200000,
@@ -45,7 +46,7 @@ beforeEach(() => {
 describe('AgentsClient', () => {
   it('lista agentes existentes, roles faltantes y corridas', () => {
     render(<AgentsClient slug="axon" canManage initialAgents={[DEV]} initialRuns={[RUN]} />);
-    expect(screen.getByText('Agente Dev')).toBeInTheDocument();
+    expect(screen.getByText('Kai · DEV')).toBeInTheDocument();
     expect(screen.getByTestId('provision-SM')).toBeInTheDocument();
     expect(screen.getByTestId('provision-QA')).toBeInTheDocument();
     expect(screen.queryByTestId('provision-DEV')).toBeNull();
@@ -83,6 +84,7 @@ describe('AgentsClient', () => {
     expect(h.updateAgentAction).toHaveBeenCalledWith('axon', 'ag-dev', {
       llmModel: 'qwen3-coder-next',
       tokenBudget: 50000,
+      displayName: 'Kai',
     });
   });
 

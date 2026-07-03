@@ -36,6 +36,11 @@ const schema = z.object({
     (v) => (v === '' ? undefined : v),
     z.coerce.number().int().min(0).default(30),
   ),
+  // Tope de iteraciones del loop del Dev (tuning post-dogfooding; default 40).
+  DEV_MAX_ITERATIONS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(4).max(200).default(40),
+  ),
   // Health endpoint del worker (fusion-infra healthCheckPath=/health).
   PORT: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().positive().default(3060)),
 });

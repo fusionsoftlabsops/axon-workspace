@@ -47,6 +47,7 @@ export default async function ProjectLayout({
     { href: `${base}/develop`, label: `⌘ ${t('Desarrollar', 'Develop')}` },
     { href: `${base}/deploy`, label: `⚡ ${t('Deploy', 'Deploy')}` },
     { href: `${base}/agents`, label: `🤖 ${t('Agentes', 'Agents')}` },
+    { href: `${base}/team`, label: `💬 ${t('Equipo', 'Team')}` },
     ...(canManage
       ? [
           { href: `${base}/settings`, label: `¶ ${t('Ajustes', 'Settings')}` },

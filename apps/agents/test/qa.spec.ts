@@ -43,6 +43,7 @@ function api(over: Partial<Record<string, unknown>> = {}): AxonApi {
     finishRun: vi.fn().mockResolvedValue({ ok: true }),
     comment: vi.fn().mockResolvedValue({ id: 'c' }),
     qaDecision: vi.fn().mockResolvedValue({ ok: true, decision: 'approve', movedTo: 'Terminada' }),
+    postTeamChat: vi.fn().mockResolvedValue({ message: { id: 'tc' } }),
     recallBrain: vi.fn().mockResolvedValue({ memories: [] }),
     codeContext: vi.fn().mockResolvedValue({ status: 'NONE' }),
     ...over,
@@ -80,6 +81,13 @@ describe('createQaHandler.handle', () => {
     const h = createQaHandler({ ...OPTS, api: a, provider: provider('{"decision":"approve","comment":"criterios cubiertos"}') });
     await h.handle(evt());
     expect(a.qaDecision).toHaveBeenCalledWith('axon', 16, { decision: 'approve', comment: 'criterios cubiertos' });
+    const narrated = (a.postTeamChat as ReturnType<typeof vi.fn>).mock.calls[0]![1] as {
+      kind: string;
+      storyNumber: number;
+      body: string;
+    };
+    expect(narrated).toMatchObject({ kind: 'HANDOFF', storyNumber: 16 });
+    expect(narrated.body).toContain('APROBADA');
   });
 
   it('rechaza con feedback accionable', async () => {
@@ -87,6 +95,9 @@ describe('createQaHandler.handle', () => {
     const h = createQaHandler({ ...OPTS, api: a, provider: provider('{"decision":"reject","comment":"falta el test de sandbox"}') });
     await h.handle(evt());
     expect(a.qaDecision).toHaveBeenCalledWith('axon', 16, { decision: 'reject', comment: 'falta el test de sandbox' });
+    const narrated = (a.postTeamChat as ReturnType<typeof vi.fn>).mock.calls[0]![1] as { body: string };
+    expect(narrated.body).toContain('RECHACÉ');
+    expect(narrated.body).toContain('falta el test de sandbox');
   });
 
   it('si el clone de la rama del dev falla, cae a la default y sigue', async () => {
