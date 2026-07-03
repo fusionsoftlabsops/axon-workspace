@@ -67,10 +67,10 @@ export function AgentsClient({
     else setAgents(res.data ?? []);
   }
 
-  async function saveConfig(agent: AgentView, llmModel: string, tokenBudget: number) {
+  async function saveConfig(agent: AgentView, llmModel: string, tokenBudget: number, name: string) {
     setBusy(`save:${agent.id}`);
     setError(null);
-    const res = await updateAgentAction(slug, agent.id, { llmModel, tokenBudget });
+    const res = await updateAgentAction(slug, agent.id, { llmModel, tokenBudget, displayName: name });
     setBusy(null);
     if (!res.ok) setError(res.error);
     else setAgents(res.data ?? []);
@@ -105,7 +105,7 @@ export function AgentsClient({
               canManage={canManage}
               busy={busy}
               onToggle={() => void toggle(a)}
-              onSave={(m, b) => void saveConfig(a, m, b)}
+              onSave={(m, b, n) => void saveConfig(a, m, b, n)}
               t={t}
             />
           ))}
@@ -221,11 +221,12 @@ function AgentCard({
   canManage: boolean;
   busy: string | null;
   onToggle: () => void;
-  onSave: (llmModel: string, tokenBudget: number) => void;
+  onSave: (llmModel: string, tokenBudget: number, name: string) => void;
   t: <T>(es: T, en: T) => T;
 }) {
   const [model, setModel] = useState(agent.llmModel);
   const [budget, setBudget] = useState(String(agent.tokenBudget));
+  const [name, setName] = useState(agent.name);
 
   return (
     <div className={styles.card}>
@@ -240,6 +241,15 @@ function AgentCard({
       </p>
       {canManage ? (
         <>
+          <label className={styles.field}>
+            <span>{t('Nombre propio', 'Given name')}</span>
+            <input
+              className={styles.input}
+              value={name}
+              aria-label={`name-${agent.role}`}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
           <label className={styles.field}>
             <span>{t('Modelo LLM', 'LLM model')}</span>
             <input
@@ -264,7 +274,7 @@ function AgentCard({
               size="sm"
               variant="secondary"
               disabled={busy === `save:${agent.id}`}
-              onClick={() => onSave(model, Number(budget))}
+              onClick={() => onSave(model, Number(budget), name)}
             >
               {t('Guardar', 'Save')}
             </Button>

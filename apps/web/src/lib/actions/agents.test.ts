@@ -18,7 +18,6 @@ vi.mock('@/lib/audit', () => ({ audit: auditMock }));
 vi.mock('@/lib/auth/membership', () => ({ assertProjectMember: assertMock }));
 vi.mock('@/lib/agents/provision', () => ({
   provisionAgent: provisionMock,
-  AGENT_DISPLAY_NAMES: { SM: 'Agente Scrum Master', DEV: 'Agente Dev', QA: 'Agente QA' },
 }));
 
 import {
@@ -34,6 +33,7 @@ const OWNER = { ok: true as const, userId: 'u1', projectId: 'p1', role: 'OWNER' 
 const AGENT_ROW = {
   id: 'ag1',
   role: 'DEV',
+  displayName: null,
   llmModel: 'qwen3-coder-next',
   credentialRef: null,
   tokenBudget: 200000,
@@ -55,7 +55,8 @@ describe('listAgentsAction', () => {
     expect(res.ok && res.data[0]).toMatchObject({
       id: 'ag1',
       role: 'DEV',
-      displayName: 'Agente Dev',
+      name: 'Kai',
+      displayName: 'Kai · DEV',
       tokenPrefix: 'ad_pk_abc123',
       enabled: false,
     });
@@ -119,6 +120,19 @@ describe('updateAgentAction', () => {
       ok: false,
       error: 'Agente no encontrado',
     });
+  });
+
+  it('actualiza el nombre propio y rechaza uno vacío o demasiado largo', async () => {
+    prismaMock.agent.findFirst.mockResolvedValue({ id: 'ag1' });
+    prismaMock.agent.update.mockResolvedValue({});
+    expect(await updateAgentAction('axon', 'ag1', { displayName: '   ' })).toMatchObject({ ok: false });
+    expect(await updateAgentAction('axon', 'ag1', { displayName: 'x'.repeat(41) })).toMatchObject({ ok: false });
+    const res = await updateAgentAction('axon', 'ag1', { displayName: ' Nova ' });
+    expect(prismaMock.agent.update).toHaveBeenCalledWith({
+      where: { id: 'ag1' },
+      data: { displayName: 'Nova' },
+    });
+    expect(res.ok).toBe(true);
   });
 });
 

@@ -27,6 +27,7 @@ export async function GET(
       id: true,
       role: true,
       userId: true,
+      displayName: true,
       llmModel: true,
       credentialRef: true,
       tokenBudget: true,

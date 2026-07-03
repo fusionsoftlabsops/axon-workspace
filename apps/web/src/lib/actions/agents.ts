@@ -5,12 +5,16 @@ import type { AgentRole } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { audit } from '@/lib/audit';
 import { assertProjectMember } from '@/lib/auth/membership';
-import { provisionAgent, AGENT_DISPLAY_NAMES } from '@/lib/agents/provision';
+import { provisionAgent } from '@/lib/agents/provision';
+import { agentDisplayName, DEFAULT_AGENT_NAMES } from '@/lib/agents/team-chat';
 import type { ActionResult } from './projects';
 
 export interface AgentView {
   id: string;
   role: AgentRole;
+  /** Nombre propio editable (ej. "Nova"), sin el sufijo de rol. */
+  name: string;
+  /** "{name} · {ROL}", listo para encabezados/chat. */
   displayName: string;
   llmModel: string;
   credentialRef: string | null;
@@ -40,7 +44,8 @@ async function loadAgents(projectId: string): Promise<AgentView[]> {
   return rows.map((a) => ({
     id: a.id,
     role: a.role,
-    displayName: AGENT_DISPLAY_NAMES[a.role],
+    name: a.displayName?.trim() || DEFAULT_AGENT_NAMES[a.role],
+    displayName: agentDisplayName(a.role, a.displayName),
     llmModel: a.llmModel,
     credentialRef: a.credentialRef,
     tokenBudget: a.tokenBudget,
@@ -234,7 +239,7 @@ export async function getAgentStatsAction(slug: string): Promise<ActionResult<Ag
 export async function updateAgentAction(
   slug: string,
   agentId: string,
-  input: { llmModel?: string; tokenBudget?: number },
+  input: { llmModel?: string; tokenBudget?: number; displayName?: string },
 ): Promise<ActionResult<AgentView[]>> {
   const ctx = await guard(slug);
   if (!ctx.ok) return ctx;
@@ -245,11 +250,15 @@ export async function updateAgentAction(
   if (input.tokenBudget !== undefined && (!Number.isInteger(input.tokenBudget) || input.tokenBudget < 1000)) {
     return { ok: false, error: 'tokenBudget inválido (mínimo 1000 tokens)' };
   }
+  const displayName = input.displayName?.trim();
+  if (input.displayName !== undefined && !displayName) return { ok: false, error: 'Nombre inválido' };
+  if (displayName && displayName.length > 40) return { ok: false, error: 'Nombre demasiado largo (máx. 40)' };
   await prisma.agent.update({
     where: { id: agentId },
     data: {
       ...(llmModel ? { llmModel } : {}),
       ...(input.tokenBudget !== undefined ? { tokenBudget: input.tokenBudget } : {}),
+      ...(displayName ? { displayName } : {}),
     },
   });
   await audit({
@@ -258,7 +267,7 @@ export async function updateAgentAction(
     resourceType: 'agent',
     resourceId: agentId,
     projectId: ctx.projectId,
-    payload: { llmModel: llmModel ?? null, tokenBudget: input.tokenBudget ?? null },
+    payload: { llmModel: llmModel ?? null, tokenBudget: input.tokenBudget ?? null, displayName: displayName ?? null },
   });
   revalidatePath(`/projects/${slug}/agents`);
   return { ok: true, data: await loadAgents(ctx.projectId) };

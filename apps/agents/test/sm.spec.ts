@@ -10,6 +10,7 @@ function api(over: Partial<Record<string, unknown>> = {}): AxonApi {
     recallBrain: vi.fn().mockResolvedValue({ memories: [{ title: 'gotcha', body: 'usar pnpm' }] }),
     patchTask: vi.fn().mockResolvedValue({ ok: true }),
     comment: vi.fn().mockResolvedValue({ id: 'c1' }),
+    postTeamChat: vi.fn().mockResolvedValue({ message: { id: 'tc1' } }),
     ...over,
   } as unknown as AxonApi;
 }
@@ -57,6 +58,12 @@ describe('createSmAssignHandler.handle', () => {
     expect(comment).toContain('Agente Dev');
     expect(comment).toContain('gotcha');
     expect(comment).toContain('usar pnpm');
+
+    const narrated = (a.postTeamChat as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(narrated[0]).toBe('axon');
+    expect(narrated[1]).toMatchObject({ kind: 'HANDOFF', storyNumber: 22 });
+    expect(narrated[1].body).toContain('HU X');
+    expect(narrated[1].body).toContain('Dev');
   });
 
   it('no hace nada si el SM está deshabilitado (kill-switch, cacheado)', async () => {

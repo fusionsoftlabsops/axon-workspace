@@ -44,6 +44,7 @@ function api(over: Partial<Record<string, unknown>> = {}): AxonApi {
     finishRun: vi.fn().mockResolvedValue({ ok: true }),
     comment: vi.fn().mockResolvedValue({ id: 'c' }),
     submitQaReview: vi.fn().mockResolvedValue({ ok: true }),
+    postTeamChat: vi.fn().mockResolvedValue({ message: { id: 'tc' } }),
     recallBrain: vi.fn().mockResolvedValue({ memories: [] }),
     codeContext: vi.fn().mockResolvedValue({ status: 'NONE' }),
     ...over,
@@ -87,6 +88,13 @@ describe('createDevHandler.handle', () => {
     expect(qa[1]).toBe(13);
     expect(JSON.stringify(qa[2])).toContain('https://github.com/pr/9');
     expect(a.comment).not.toHaveBeenCalled();
+
+    const narrated = (a.postTeamChat as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[1] as { kind: string; storyNumber: number; body: string },
+    );
+    expect(narrated[0]).toMatchObject({ kind: 'STATUS', storyNumber: 13 }); // "tomo la HU"
+    expect(narrated.at(-1)).toMatchObject({ kind: 'HANDOFF', storyNumber: 13 }); // "te toca QA"
+    expect(narrated.at(-1)!.body).toContain('https://github.com/pr/9');
   });
 
   it('ignora HUs asignadas a otra identidad', async () => {
@@ -112,6 +120,8 @@ describe('createDevHandler.handle', () => {
     expect(body).toContain('sin cambios');
     expect(body).toContain('solo análisis');
     expect(a.submitQaReview).not.toHaveBeenCalled();
+    const lastNarration = (a.postTeamChat as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1] as { kind: string };
+    expect(lastNarration.kind).toBe('STATUS');
   });
 
   it('corrida BUDGET_EXCEEDED → comenta el estado sin abrir PR', async () => {
@@ -121,6 +131,8 @@ describe('createDevHandler.handle', () => {
     const body = (a.comment as ReturnType<typeof vi.fn>).mock.calls[0]![2] as string;
     expect(body).toContain('BUDGET_EXCEEDED');
     expect(fetchMock).not.toHaveBeenCalled();
+    const lastNarration = (a.postTeamChat as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1] as { kind: string };
+    expect(lastNarration.kind).toBe('STATUS');
   });
 
   it('dev deshabilitado no actúa', async () => {

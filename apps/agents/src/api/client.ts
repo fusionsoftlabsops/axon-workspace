@@ -155,6 +155,14 @@ export class AxonApi {
     return this.request('GET', `/projects/${slug}/repos`);
   }
 
+  /** Mensaje al chat del equipo (el standup permanente del proyecto). */
+  postTeamChat(
+    slug: string,
+    input: { body: string; kind?: 'CHAT' | 'STATUS' | 'HANDOFF'; storyNumber?: number },
+  ): Promise<{ message: Record<string, unknown> }> {
+    return this.request('POST', `/projects/${slug}/team-chat`, input);
+  }
+
   /** Publica una memoria en el cerebro (scope PROJECT = visible al equipo). */
   captureMemory(
     slug: string,

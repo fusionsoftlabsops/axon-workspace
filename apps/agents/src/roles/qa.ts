@@ -17,6 +17,7 @@ import { runTrackedLoop } from '../runtime/tracked.js';
 import { contextTools } from '../tools/context.js';
 import { repoTools } from '../tools/repo.js';
 import { GitWorkspace, type CommandRunner } from '../git/workspace.js';
+import { narrate } from './narrate.js';
 
 export interface QaOptions {
   api: AxonApi;
@@ -160,6 +161,15 @@ export function createQaHandler(opts: QaOptions): RoleHandler {
           decision: verdict.decision,
           comment: verdict.comment?.trim() || (verdict.decision === 'reject' ? 'Revisión adversarial: criterios sin evidencia en el código.' : undefined),
         });
+        await narrate(
+          opts.api,
+          opts.projectSlug,
+          verdict.decision === 'approve'
+            ? `Revisé la HU #${n} contra el código real y no logré refutarla: APROBADA → Terminada. 🎉`
+            : `Revisé la HU #${n} y la RECHACÉ: ${verdict.comment?.trim() ?? 'criterios sin evidencia'}. ` +
+              `Vuelve a Desarrollo — Dev, te toca.`,
+          { kind: 'HANDOFF', storyNumber: n },
+        );
       } finally {
         if (ws) await ws.cleanup();
       }

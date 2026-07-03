@@ -71,7 +71,14 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
       model: config.QWEN_MODEL,
     });
     router.register(
-      createDevHandler({ api, projectId, projectSlug, provider: qwen, gitToken: config.GITHUB_TOKEN }),
+      createDevHandler({
+        api,
+        projectId,
+        projectSlug,
+        provider: qwen,
+        gitToken: config.GITHUB_TOKEN,
+        maxIterations: config.DEV_MAX_ITERATIONS,
+      }),
     );
     registered.push('DEV');
   }

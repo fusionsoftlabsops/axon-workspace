@@ -34,4 +34,15 @@ describe('loadConfig', () => {
   it('rechaza configuración inválida con mensaje accionable', () => {
     expect(() => loadConfig({ REDIS_URL: 'no-es-url' })).toThrow(/REDIS_URL/);
   });
+
+  it('DEV_MAX_ITERATIONS por defecto 40, configurable dentro de [4, 200]', () => {
+    expect(loadConfig({}).DEV_MAX_ITERATIONS).toBe(40);
+    expect(loadConfig({ DEV_MAX_ITERATIONS: '80' }).DEV_MAX_ITERATIONS).toBe(80);
+    expect(loadConfig({ DEV_MAX_ITERATIONS: '' }).DEV_MAX_ITERATIONS).toBe(40);
+  });
+
+  it('rechaza DEV_MAX_ITERATIONS fuera de rango', () => {
+    expect(() => loadConfig({ DEV_MAX_ITERATIONS: '3' })).toThrow(/DEV_MAX_ITERATIONS/);
+    expect(() => loadConfig({ DEV_MAX_ITERATIONS: '500' })).toThrow(/DEV_MAX_ITERATIONS/);
+  });
 });
