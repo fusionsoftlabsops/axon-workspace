@@ -52,6 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       priority: t.priority,
       assignee: t.assignee ? { id: t.assignee.id, name: t.assignee.name } : null,
       dueDate: t.dueDate?.toISOString() ?? null,
+      updatedAt: t.updatedAt.toISOString(),
     })),
   });
 }

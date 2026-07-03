@@ -91,6 +91,19 @@ export class AxonApi {
     return this.request('GET', `/projects/${slug}/tasks/${taskNumber}`);
   }
 
+  listTasks(slug: string): Promise<{
+    tasks: Array<{
+      number: number;
+      title: string;
+      state: string;
+      stateCategory: string;
+      assignee: { id: string; name: string } | null;
+      updatedAt: string;
+    }>;
+  }> {
+    return this.request('GET', `/projects/${slug}/tasks`);
+  }
+
   patchTask(
     slug: string,
     taskNumber: number,
