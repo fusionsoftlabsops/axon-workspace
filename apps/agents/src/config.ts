@@ -19,6 +19,11 @@ const schema = z.object({
   AGENT_SM_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_DEV_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_QA_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Modelo Qwen propio (vLLM OpenAI-compatible) para el rol Dev.
+  FUSION_MODEL_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  FUSION_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Claude (credencial server de la instancia) para los roles SM/QA.
+  ANTHROPIC_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // Health endpoint del worker (fusion-infra healthCheckPath=/health).
   PORT: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().positive().default(3060)),
 });
