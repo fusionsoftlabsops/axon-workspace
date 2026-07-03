@@ -194,11 +194,43 @@ export async function getConnectOptionsAction(slug: string): Promise<ActionResul
   }
 }
 
+/** Reclasifica el ambiente conectado (DEV/QA/PROD). En PROD, fusion-infra
+ * respalda las bases de datos automáticamente cada día. */
+export async function setEnvironmentClassAction(
+  slug: string,
+  envClass: fusion.FusionEnvClass,
+): Promise<ActionResult<DeployView>> {
+  const g = await guard(slug, { mutate: true });
+  if (!g.ok) return g;
+  const target = await loadTarget(g.ctx.projectId);
+  if (!target) return { ok: false, error: 'El proyecto no está conectado a fusion-infra' };
+  try {
+    await fusion.updateEnvironmentClass(
+      target.fusionProjectId,
+      target.environmentId,
+      envClass,
+      target.fusionTeamId,
+    );
+    await audit({
+      actorId: g.ctx.userId,
+      action: 'deploy.env_class',
+      resourceType: 'deploy_target',
+      resourceId: g.ctx.projectId,
+      projectId: g.ctx.projectId,
+      payload: { environmentId: target.environmentId, envClass },
+    });
+    revalidatePath(`/projects/${slug}/deploy`);
+    return { ok: true, data: await loadView(g.ctx.projectId) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'No se pudo reclasificar el ambiente' };
+  }
+}
+
 // ---- connect (auto-create the fusion-infra project/environment) ----
 
 export async function connectDeployTargetAction(
   slug: string,
-  input: { serverId?: string } = {},
+  input: { serverId?: string; envClass?: fusion.FusionEnvClass } = {},
 ): Promise<ActionResult<DeployView>> {
   const g = await guard(slug, { mutate: true });
   if (!g.ok) return g;
@@ -233,6 +265,16 @@ export async function connectDeployTargetAction(
     const environment = envs.find((e) => e.name.toLowerCase() === 'production') ?? envs[0];
     if (!environment) return { ok: false, error: 'fusion-infra creó el proyecto sin entornos' };
 
+    // Clase del ambiente (dev/qa/prod): gobierna los backups automáticos de
+    // fusion-infra. Best-effort si el control-plane aún no soporta el PATCH.
+    if (input.envClass) {
+      try {
+        await fusion.updateEnvironmentClass(project.id, environment.id, input.envClass, teamId);
+      } catch (err) {
+        console.warn('[deploy.connect] no se pudo fijar envClass:', err);
+      }
+    }
+
     await prisma.deployTarget.create({
       data: {
         projectId: g.ctx.projectId,
@@ -248,7 +290,7 @@ export async function connectDeployTargetAction(
       resourceType: 'deploy_target',
       resourceId: g.ctx.projectId,
       projectId: g.ctx.projectId,
-      payload: { fusionProjectId: project.id, environmentId: environment.id, serverId },
+      payload: { fusionProjectId: project.id, environmentId: environment.id, serverId, envClass: input.envClass ?? null },
     });
 
     revalidatePath(`/projects/${slug}/deploy`);

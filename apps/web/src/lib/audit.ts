@@ -55,6 +55,7 @@ export type AuditAction =
   | 'repo.read'
   | 'analysis.start'
   | 'deploy.connect'
+  | 'deploy.env_class'
   | 'deploy.create'
   | 'deploy.redeploy'
   | 'deploy.stop'
