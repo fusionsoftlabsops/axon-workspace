@@ -73,6 +73,19 @@ describe('DeployClient — gates', () => {
     expect(screen.queryByText('Repositories')).toBeNull();
   });
 
+  it('permite elegir la clase de ambiente y viaja en el connect (dev/qa/prod)', async () => {
+    const user = userEvent.setup();
+    h.getConnectOptionsAction.mockResolvedValue({
+      ok: true,
+      data: { servers: [{ id: 's1', name: 'srv', agentStatus: 'ONLINE' }], defaultTeamId: 't' },
+    });
+    h.connectDeployTargetAction.mockResolvedValue({ ok: true, data: view() });
+    render(<DeployClient slug="p" initial={view({ connected: false })} />);
+    await user.click(screen.getByTestId('env-class-DEV'));
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', { serverId: 's1', envClass: 'DEV' });
+  });
+
   it('auto-connects when there is a single server', async () => {
     const user = userEvent.setup();
     h.getConnectOptionsAction.mockResolvedValue({
@@ -83,7 +96,7 @@ describe('DeployClient — gates', () => {
     render(<DeployClient slug="p" initial={view({ connected: false })} />);
     await user.click(screen.getByRole('button', { name: 'Connect' }));
     expect(h.getConnectOptionsAction).toHaveBeenCalledWith('p');
-    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', { serverId: 's1' });
+    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', { serverId: 's1', envClass: 'PROD' });
     expect(await screen.findByText('Repositories')).toBeInTheDocument();
   });
 
@@ -93,7 +106,7 @@ describe('DeployClient — gates', () => {
     h.connectDeployTargetAction.mockResolvedValue({ ok: true, data: view() });
     render(<DeployClient slug="p" initial={view({ connected: false })} />);
     await user.click(screen.getByRole('button', { name: 'Connect' }));
-    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', {});
+    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', { envClass: 'PROD' });
   });
 
   it('shows a server picker when several are available, then connects', async () => {
@@ -115,7 +128,7 @@ describe('DeployClient — gates', () => {
     expect(screen.getByText('two')).toBeInTheDocument();
     const buttons = screen.getAllByRole('button', { name: 'Use this server' });
     await user.click(buttons[1]!);
-    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', { serverId: 's2' });
+    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', { serverId: 's2', envClass: 'PROD' });
   });
 
   it('surfaces a connect-options error', async () => {

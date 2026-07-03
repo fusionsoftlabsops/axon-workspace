@@ -35,6 +35,7 @@ export type BuildPack = 'DOCKER_IMAGE' | 'DOCKERFILE' | 'STATIC';
 export type DbEngine = 'POSTGRES' | 'MYSQL' | 'MARIADB' | 'REDIS' | 'MONGO' | 'KEYDB';
 
 export interface FusionEnvironment {
+  envClass?: FusionEnvClass;
   id: string;
   name: string;
 }
@@ -236,6 +237,22 @@ export function createEnvironment(
   return api<FusionEnvironment>('POST', `/projects/${projectId}/environments`, {
     teamId,
     body: { name },
+  });
+}
+
+export type FusionEnvClass = 'DEV' | 'QA' | 'PROD';
+
+/** Reclasifica el ambiente (DEV/QA/PROD) — en PROD fusion-infra activa backups
+ * diarios automáticos de las bases de datos. */
+export function updateEnvironmentClass(
+  projectId: string,
+  environmentId: string,
+  envClass: FusionEnvClass,
+  teamId: string,
+): Promise<FusionEnvironment> {
+  return api<FusionEnvironment>('PATCH', `/projects/${projectId}/environments/${environmentId}`, {
+    teamId,
+    body: { envClass },
   });
 }
 

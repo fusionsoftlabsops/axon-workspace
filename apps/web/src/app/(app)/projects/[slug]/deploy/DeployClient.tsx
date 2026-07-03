@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n/i18n';
 import {
   getConnectOptionsAction,
   connectDeployTargetAction,
+  setEnvironmentClassAction,
   deployRepoAction,
   lifecycleAction,
   getRollbackTargetsAction,
@@ -69,6 +70,9 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
   const [view, setView] = useState<DeployView>(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Clase del ambiente a conectar: en PROD fusion-infra activa backups diarios
+  // automáticos de las bases de datos del proyecto.
+  const [envClass, setEnvClass] = useState<'DEV' | 'QA' | 'PROD'>('PROD');
   const [connectOptions, setConnectOptions] = useState<ConnectOption | null>(null);
 
   // Run an action that resolves to a fresh DeployView, surfacing errors inline.
@@ -129,7 +133,7 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
     }
     void apply(
       'connect',
-      connectDeployTargetAction(slug, servers.length === 1 ? { serverId: servers[0]!.id } : {}),
+      connectDeployTargetAction(slug, servers.length === 1 ? { serverId: servers[0]!.id, envClass } : { envClass }),
     );
   }
 
@@ -145,6 +149,26 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
             )}
           </p>
 
+          <div className={styles.rowActions} data-testid="env-class-selector">
+            <span className={styles.reason}>{t('Clase de ambiente:', 'Environment class:')}</span>
+            {(['DEV', 'QA', 'PROD'] as const).map((cls) => (
+              <Button
+                key={cls}
+                size="sm"
+                variant={envClass === cls ? 'primary' : 'ghost'}
+                data-testid={`env-class-${cls}`}
+                onClick={() => setEnvClass(cls)}
+              >
+                {cls === 'DEV' ? t('Desarrollo', 'Dev') : cls === 'QA' ? 'QA' : t('Producción', 'Production')}
+              </Button>
+            ))}
+          </div>
+          <p className={styles.reason}>
+            {envClass === 'PROD'
+              ? t('Producción: las bases de datos se respaldan automáticamente cada día.', 'Production: databases are backed up automatically every day.')
+              : t('Dev/QA: sin backups automáticos (datos desechables).', 'Dev/QA: no automatic backups (disposable data).')}
+          </p>
+
           {connectOptions ? (
             <div className={styles.grid}>
               <p className={styles.reason}>{t('Elige un servidor de destino:', 'Choose a target server:')}</p>
@@ -156,7 +180,7 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
                     variant="primary"
                     size="sm"
                     disabled={busy === 'connect'}
-                    onClick={() => void apply('connect', connectDeployTargetAction(slug, { serverId: s.id }))}
+                    onClick={() => void apply('connect', connectDeployTargetAction(slug, { serverId: s.id, envClass }))}
                   >
                     {t('Usar este servidor', 'Use this server')}
                   </Button>
