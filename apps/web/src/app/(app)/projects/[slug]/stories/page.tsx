@@ -55,7 +55,10 @@ export default async function StoriesIndex({
     }),
   ]);
 
-  const noCredentials = credCount === 0;
+  // La credencial sintética del servidor también desbloquea el editor.
+  const { serverCredentialAvailable } = await import('@/lib/llm-credentials/server-credential');
+  const effectiveCredCount = credCount + (serverCredentialAvailable() ? 1 : 0);
+  const noCredentials = effectiveCredCount === 0;
   const noRepo = !project.repoPath;
 
   return (
@@ -69,7 +72,7 @@ export default async function StoriesIndex({
       <div className={styles.statsStrip}>
         <Stat label={t('Borradores', 'Drafts')} value={totalDrafts} />
         <Stat label={t('Publicados', 'Published')} value={totalPublished} />
-        <Stat label={t('Credenciales LLM', 'LLM credentials')} value={credCount} />
+        <Stat label={t('Credenciales LLM', 'LLM credentials')} value={effectiveCredCount} />
         <Stat label={t('Repo', 'Repo')} value={project.repoPath ? '✓' : '—'} />
       </div>
 

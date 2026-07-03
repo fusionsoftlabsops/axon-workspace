@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { repoReaderFor } from '@/lib/repo/reader';
 import { listProviders } from '@/lib/ai/providers/registry';
+import { serverCredentialAvailable } from '@/lib/llm-credentials/server-credential';
 import { PageHeader, Eyebrow } from '@/components/ui';
 import { getServerT } from '@/lib/i18n/server';
 import { Composer } from './Composer';
@@ -48,6 +49,18 @@ export default async function NewStoryPage({
       keyPrefix: true,
     },
   });
+
+  // Fallback del servidor (misma key que el chat del Plan): opción sintética
+  // al final — las credenciales personales siguen siendo el default.
+  if (serverCredentialAvailable()) {
+    credentials.push({
+      id: 'server',
+      provider: 'ANTHROPIC',
+      label: 'Credencial del servidor (Anthropic)',
+      modelDefault: 'claude-sonnet-4-6',
+      keyPrefix: 'server',
+    });
+  }
 
   // Snapshot del árbol del repo (depth 2) para el selector de archivos.
   let repoTree: Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof repoReaderFor>>>['tree']>> = [];
