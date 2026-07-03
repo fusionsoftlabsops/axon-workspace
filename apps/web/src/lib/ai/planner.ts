@@ -225,7 +225,10 @@ export async function generatePlan(
 
   const resp = await client().messages.create({
     model,
-    max_tokens: 8000,
+    // Un plan real (5+ sprints con HUs detalladas) supera con holgura los 8k
+    // tokens: con el techo corto el tool input llega truncado y el schema
+    // (sprints default []) lo tragaba como plan READY vacío.
+    max_tokens: 32000,
     system: genSystem(lang, codeContext),
     tools: [
       {
@@ -243,11 +246,21 @@ export async function generatePlan(
   });
   await record('plan.generate', model, resp.usage, userId, projectId);
 
+  if (resp.stop_reason === 'max_tokens') {
+    throw new Error(
+      'El plan quedó truncado por límite de tokens del modelo — reintenta (o simplifica el contexto)',
+    );
+  }
   const toolUse = resp.content.find(
     (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitPlan',
   );
   if (!toolUse) throw new Error('El modelo no devolvió un plan estructurado');
-  return generatedPlanSchema.parse(toolUse.input);
+  const plan = generatedPlanSchema.parse(toolUse.input);
+  if (plan.sprints.reduce((n, s) => n + s.tasks.length, 0) === 0) {
+    // Nunca guardar como READY un plan sin trabajo: es señal de output inválido.
+    throw new Error('El modelo devolvió un plan sin tareas — reintenta la generación');
+  }
+  return plan;
 }
 
 function refineSystem(lang: Lang): string {

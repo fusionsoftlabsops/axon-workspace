@@ -115,7 +115,7 @@ describe('planChatReply', () => {
 describe('generatePlan', () => {
   const PLAN_INPUT = {
     improvedIdea: 'idea',
-    sprints: [{ name: 'S1', goal: 'g', tasks: [] }],
+    sprints: [{ name: 'S1', goal: 'g', tasks: [SAMPLE_TASK] }],
     suggestedRepos: [{ name: 'api', kind: 'backend', stack: 'node', reason: 'r' }],
   };
 
@@ -153,6 +153,18 @@ describe('generatePlan', () => {
   it('throws when no EmitPlan tool block is returned', async () => {
     anthropicCreate.mockResolvedValue(textReply('just text'));
     await expect(generatePlan(PROJECT, [], 'es', [], [], 'u', 'p')).rejects.toThrow('no devolvió un plan');
+  });
+
+  it('throws when the response was truncated by max_tokens (instead of saving an empty plan)', async () => {
+    anthropicCreate.mockResolvedValue({ ...toolReply('EmitPlan', PLAN_INPUT), stop_reason: 'max_tokens' });
+    await expect(generatePlan(PROJECT, [], 'es', [], [], 'u', 'p')).rejects.toThrow('truncado');
+  });
+
+  it('throws when the emitted plan has zero tasks across all sprints', async () => {
+    anthropicCreate.mockResolvedValue(
+      toolReply('EmitPlan', { ...PLAN_INPUT, sprints: [{ name: 'S1', goal: 'g', tasks: [] }] }),
+    );
+    await expect(generatePlan(PROJECT, [], 'es', [], [], 'u', 'p')).rejects.toThrow('sin tareas');
   });
 });
 
