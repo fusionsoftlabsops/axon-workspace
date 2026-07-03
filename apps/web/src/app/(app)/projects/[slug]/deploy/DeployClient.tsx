@@ -74,6 +74,9 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
   // automáticos de las bases de datos del proyecto.
   const [envClass, setEnvClass] = useState<'DEV' | 'QA' | 'PROD'>('PROD');
   const [connectOptions, setConnectOptions] = useState<ConnectOption | null>(null);
+  // '' = crear proyecto fusion-infra nuevo; otro valor = enlazar uno existente.
+  const [fusionProjectId, setFusionProjectId] = useState('');
+  const [environmentId, setEnvironmentId] = useState('');
 
   // Run an action that resolves to a fresh DeployView, surfacing errors inline.
   function apply(key: string, p: Promise<Result<DeployView>>) {
@@ -127,14 +130,26 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
       return;
     }
     const servers = r.data?.servers ?? [];
-    if (servers.length > 1) {
-      setConnectOptions(r.data!);
+    const projects = r.data?.projects ?? [];
+    // Con proyectos existentes o varios servidores hay una decisión que tomar:
+    // mostrar el panel. Solo greenfield puro (sin proyectos) conecta directo.
+    if (servers.length > 1 || projects.length > 0) {
+      setConnectOptions({ ...r.data!, projects });
       return;
     }
     void apply(
       'connect',
       connectDeployTargetAction(slug, servers.length === 1 ? { serverId: servers[0]!.id, envClass } : { envClass }),
     );
+  }
+
+  function connectInput(serverId?: string) {
+    return {
+      ...(serverId ? { serverId } : {}),
+      ...(fusionProjectId
+        ? { fusionProjectId, ...(environmentId ? { environmentId } : {}) }
+        : { envClass }),
+    };
   }
 
   if (!view.connected) {
@@ -149,27 +164,81 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
             )}
           </p>
 
-          <div className={styles.rowActions} data-testid="env-class-selector">
-            <span className={styles.reason}>{t('Clase de ambiente:', 'Environment class:')}</span>
-            {(['DEV', 'QA', 'PROD'] as const).map((cls) => (
-              <Button
-                key={cls}
-                size="sm"
-                variant={envClass === cls ? 'primary' : 'ghost'}
-                data-testid={`env-class-${cls}`}
-                onClick={() => setEnvClass(cls)}
+          {connectOptions && connectOptions.projects.length > 0 && (
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>{t('Proyecto fusion-infra', 'fusion-infra project')}</span>
+              <select
+                className={styles.select}
+                aria-label="fusion-project"
+                data-testid="fusion-project-select"
+                value={fusionProjectId}
+                onChange={(e) => {
+                  setFusionProjectId(e.target.value);
+                  setEnvironmentId('');
+                }}
               >
-                {cls === 'DEV' ? t('Desarrollo', 'Dev') : cls === 'QA' ? 'QA' : t('Producción', 'Production')}
-              </Button>
-            ))}
-          </div>
-          <p className={styles.reason}>
-            {envClass === 'PROD'
-              ? t('Producción: las bases de datos se respaldan automáticamente cada día.', 'Production: databases are backed up automatically every day.')
-              : t('Dev/QA: sin backups automáticos (datos desechables).', 'Dev/QA: no automatic backups (disposable data).')}
-          </p>
+                <option value="">{t('— Crear proyecto nuevo —', '— Create new project —')}</option>
+                {connectOptions.projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
-          {connectOptions ? (
+          {connectOptions && fusionProjectId && (
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>{t('Entorno', 'Environment')}</span>
+              <select
+                className={styles.select}
+                aria-label="fusion-environment"
+                data-testid="fusion-environment-select"
+                value={environmentId}
+                onChange={(e) => setEnvironmentId(e.target.value)}
+              >
+                <option value="">{t('(production o el primero)', '(production or first)')}</option>
+                {(connectOptions.projects.find((p) => p.id === fusionProjectId)?.environments ?? []).map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {fusionProjectId ? (
+            <p className={styles.reason}>
+              {t(
+                'Se enlaza el proyecto existente tal cual: no se crea nada ni se cambia la clasificación de su entorno.',
+                'Links the existing project as-is: nothing is created and its environment classification is untouched.',
+              )}
+            </p>
+          ) : (
+            <>
+              <div className={styles.rowActions} data-testid="env-class-selector">
+                <span className={styles.reason}>{t('Clase de ambiente:', 'Environment class:')}</span>
+                {(['DEV', 'QA', 'PROD'] as const).map((cls) => (
+                  <Button
+                    key={cls}
+                    size="sm"
+                    variant={envClass === cls ? 'primary' : 'ghost'}
+                    data-testid={`env-class-${cls}`}
+                    onClick={() => setEnvClass(cls)}
+                  >
+                    {cls === 'DEV' ? t('Desarrollo', 'Dev') : cls === 'QA' ? 'QA' : t('Producción', 'Production')}
+                  </Button>
+                ))}
+              </div>
+              <p className={styles.reason}>
+                {envClass === 'PROD'
+                  ? t('Producción: las bases de datos se respaldan automáticamente cada día.', 'Production: databases are backed up automatically every day.')
+                  : t('Dev/QA: sin backups automáticos (datos desechables).', 'Dev/QA: no automatic backups (disposable data).')}
+              </p>
+            </>
+          )}
+
+          {connectOptions && connectOptions.servers.length > 1 ? (
             <div className={styles.grid}>
               <p className={styles.reason}>{t('Elige un servidor de destino:', 'Choose a target server:')}</p>
               {connectOptions.servers.map((s) => (
@@ -180,12 +249,27 @@ export function DeployClient({ slug, initial }: { slug: string; initial: DeployV
                     variant="primary"
                     size="sm"
                     disabled={busy === 'connect'}
-                    onClick={() => void apply('connect', connectDeployTargetAction(slug, { serverId: s.id, envClass }))}
+                    onClick={() => void apply('connect', connectDeployTargetAction(slug, connectInput(s.id)))}
                   >
                     {t('Usar este servidor', 'Use this server')}
                   </Button>
                 </div>
               ))}
+            </div>
+          ) : connectOptions ? (
+            <div className={styles.rowActions}>
+              <Button
+                variant="primary"
+                disabled={busy === 'connect'}
+                onClick={() =>
+                  void apply(
+                    'connect',
+                    connectDeployTargetAction(slug, connectInput(connectOptions.servers[0]?.id)),
+                  )
+                }
+              >
+                {busy === 'connect' ? t('Conectando…', 'Connecting…') : t('Conectar', 'Connect')}
+              </Button>
             </div>
           ) : (
             <div className={styles.rowActions}>

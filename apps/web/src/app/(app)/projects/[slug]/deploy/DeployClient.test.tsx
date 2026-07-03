@@ -139,6 +139,55 @@ describe('DeployClient — gates', () => {
     expect(await screen.findByText('no infra')).toBeInTheDocument();
     expect(h.connectDeployTargetAction).not.toHaveBeenCalled();
   });
+
+  it('ofrece los proyectos fusion-infra existentes y enlaza el elegido (sin envClass)', async () => {
+    const user = userEvent.setup();
+    h.getConnectOptionsAction.mockResolvedValue({
+      ok: true,
+      data: {
+        servers: [{ id: 's1', name: 'srv', agentStatus: 'ONLINE' }],
+        defaultTeamId: 't',
+        projects: [
+          { id: 'fpX', name: 'axon', environments: [{ id: 'eProd', name: 'production' }, { id: 'eDev', name: 'dev' }] },
+        ],
+      },
+    });
+    h.connectDeployTargetAction.mockResolvedValue({ ok: true, data: view() });
+    render(<DeployClient slug="p" initial={view({ connected: false })} />);
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+
+    // Con proyectos existentes NO auto-conecta: muestra el panel de decisión.
+    const projectSelect = await screen.findByTestId('fusion-project-select');
+    await user.selectOptions(projectSelect, 'fpX');
+    // Al elegir proyecto existente desaparece el selector de clase (no se toca).
+    expect(screen.queryByTestId('env-class-selector')).toBeNull();
+    await user.selectOptions(screen.getByTestId('fusion-environment-select'), 'eDev');
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', {
+      serverId: 's1',
+      fusionProjectId: 'fpX',
+      environmentId: 'eDev',
+    });
+  });
+
+  it('con proyectos existentes tambien permite crear uno nuevo (default) con envClass', async () => {
+    const user = userEvent.setup();
+    h.getConnectOptionsAction.mockResolvedValue({
+      ok: true,
+      data: {
+        servers: [{ id: 's1', name: 'srv', agentStatus: 'ONLINE' }],
+        defaultTeamId: 't',
+        projects: [{ id: 'fpX', name: 'axon', environments: [] }],
+      },
+    });
+    h.connectDeployTargetAction.mockResolvedValue({ ok: true, data: view() });
+    render(<DeployClient slug="p" initial={view({ connected: false })} />);
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    await screen.findByTestId('fusion-project-select');
+    await user.click(screen.getByTestId('env-class-QA'));
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    expect(h.connectDeployTargetAction).toHaveBeenCalledWith('p', { serverId: 's1', envClass: 'QA' });
+  });
 });
 
 describe('DeployClient — repos & deploy form', () => {

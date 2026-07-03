@@ -28,6 +28,7 @@ const { prismaMock, auditMock, assertMock, fusionMock, startPollingMock, revalid
         getContext: vi.fn(),
         createProject: vi.fn(),
         listEnvironments: vi.fn(),
+        updateEnvironmentClass: vi.fn(),
         listApps: vi.fn(),
         getApp: vi.fn(),
         createApp: vi.fn(),
@@ -239,6 +240,21 @@ describe('getConnectOptionsAction', () => {
     fusionMock.getContext.mockRejectedValue(new Error('cp down'));
     expect(await deploy.getConnectOptionsAction('slug')).toEqual({ ok: false, error: 'cp down' });
   });
+
+  it('lists the existing fusion-infra projects of the team (with environments)', async () => {
+    fusionMock.getContext.mockResolvedValue({
+      defaultTeamId: 't1',
+      servers: [],
+      projects: [
+        { id: 'fpA', name: 'axon', teamId: 't1', environments: [{ id: 'eA', name: 'production' }] },
+        { id: 'fpB', name: 'otro-team', teamId: 't2', environments: [] },
+      ],
+    });
+    const res = await deploy.getConnectOptionsAction('slug');
+    expect(res.ok && res.data.projects).toEqual([
+      { id: 'fpA', name: 'axon', environments: [{ id: 'eA', name: 'production' }] },
+    ]);
+  });
 });
 
 // -------------------------------------------------- connectDeployTargetAction ----
@@ -333,6 +349,88 @@ describe('connectDeployTargetAction', () => {
     fusionMock.getContext.mockResolvedValue({ defaultTeamId: 't1', servers: [{ id: 's1', teamId: 't1', agentStatus: 'ONLINE' }] });
     fusionMock.createProject.mockRejectedValue(new Error('boom'));
     expect(await deploy.connectDeployTargetAction('slug')).toEqual({ ok: false, error: 'boom' });
+  });
+
+  it('enlaza un proyecto fusion-infra EXISTENTE sin crear nada ni tocar envClass', async () => {
+    prismaMock.deployTarget.findUnique.mockResolvedValueOnce(null).mockResolvedValue(target);
+    fusionMock.getContext.mockResolvedValue({
+      defaultTeamId: 't1',
+      servers: [{ id: 's1', teamId: 't1', agentStatus: 'ONLINE' }],
+      projects: [
+        {
+          id: 'fpX',
+          name: 'axon',
+          teamId: 't1',
+          environments: [{ id: 'eDev', name: 'dev' }, { id: 'eProd', name: 'Production' }],
+        },
+      ],
+    });
+    const res = await deploy.connectDeployTargetAction('slug', { fusionProjectId: 'fpX', envClass: 'PROD' });
+    expect(res.ok).toBe(true);
+    expect(fusionMock.createProject).not.toHaveBeenCalled();
+    expect(fusionMock.updateEnvironmentClass).not.toHaveBeenCalled();
+    expect(prismaMock.deployTarget.create).toHaveBeenCalledWith({
+      data: { projectId: 'p1', fusionTeamId: 't1', fusionProjectId: 'fpX', environmentId: 'eProd', serverId: 's1' },
+    });
+    expect(auditMock).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ linkedExisting: true }) }),
+    );
+  });
+
+  it('respeta el environmentId elegido del proyecto existente', async () => {
+    prismaMock.deployTarget.findUnique.mockResolvedValueOnce(null).mockResolvedValue(target);
+    fusionMock.getContext.mockResolvedValue({
+      defaultTeamId: 't1',
+      servers: [{ id: 's1', teamId: 't1', agentStatus: 'ONLINE' }],
+      projects: [
+        { id: 'fpX', name: 'axon', teamId: 't1', environments: [{ id: 'eDev', name: 'dev' }, { id: 'eProd', name: 'production' }] },
+      ],
+    });
+    await deploy.connectDeployTargetAction('slug', { fusionProjectId: 'fpX', environmentId: 'eDev' });
+    expect(prismaMock.deployTarget.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ environmentId: 'eDev' }) }),
+    );
+  });
+
+  it('cae a listEnvironments cuando el proyecto existente viene sin environments', async () => {
+    prismaMock.deployTarget.findUnique.mockResolvedValueOnce(null).mockResolvedValue(target);
+    fusionMock.getContext.mockResolvedValue({
+      defaultTeamId: 't1',
+      servers: [{ id: 's1', teamId: 't1', agentStatus: 'ONLINE' }],
+      projects: [{ id: 'fpX', name: 'axon', teamId: 't1', environments: [] }],
+    });
+    fusionMock.listEnvironments.mockResolvedValue([{ id: 'eOnly', name: 'staging' }]);
+    await deploy.connectDeployTargetAction('slug', { fusionProjectId: 'fpX' });
+    expect(fusionMock.listEnvironments).toHaveBeenCalledWith('fpX', 't1');
+    expect(prismaMock.deployTarget.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ environmentId: 'eOnly' }) }),
+    );
+  });
+
+  it('rechaza un fusionProjectId que no existe en el team', async () => {
+    prismaMock.deployTarget.findUnique.mockResolvedValue(null);
+    fusionMock.getContext.mockResolvedValue({
+      defaultTeamId: 't1',
+      servers: [{ id: 's1', teamId: 't1', agentStatus: 'ONLINE' }],
+      projects: [{ id: 'fpOther', name: 'x', teamId: 't2', environments: [] }],
+    });
+    expect(await deploy.connectDeployTargetAction('slug', { fusionProjectId: 'fpOther' })).toEqual({
+      ok: false,
+      error: 'Proyecto fusion-infra no encontrado en el team',
+    });
+  });
+
+  it('rechaza un environmentId que no pertenece al proyecto existente', async () => {
+    prismaMock.deployTarget.findUnique.mockResolvedValue(null);
+    fusionMock.getContext.mockResolvedValue({
+      defaultTeamId: 't1',
+      servers: [{ id: 's1', teamId: 't1', agentStatus: 'ONLINE' }],
+      projects: [{ id: 'fpX', name: 'axon', teamId: 't1', environments: [{ id: 'eProd', name: 'production' }] }],
+    });
+    expect(await deploy.connectDeployTargetAction('slug', { fusionProjectId: 'fpX', environmentId: 'nope' })).toEqual({
+      ok: false,
+      error: 'El proyecto fusion-infra no tiene ese entorno',
+    });
   });
 });
 
