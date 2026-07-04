@@ -12,6 +12,8 @@ import { prisma } from '@/lib/db';
 import { generateImplementationPlan, type ImplRepoFile } from '@/lib/ai/planner';
 import type { PlanTask } from '@/lib/ai/plan-schema';
 import { repoReaderFor, type TreeNode } from '@/lib/repo/reader';
+import { githubGrounding, repoSlug } from '@/lib/repo/github';
+import { env } from '@/lib/env';
 import type { Lang } from '@/lib/ai/planner';
 
 function outlineTree(nodes: TreeNode[], depth = 0, acc: string[] = []): string[] {
@@ -138,7 +140,26 @@ export async function generateTaskImplPlan(opts: {
   const repoPath = byCategory?.repoPath ?? project?.repoPath ?? null;
 
   const planTask = planTaskFromTask(task);
-  const { outline, files } = await groundInRepo(planTask, repoPath);
+  let { outline, files } = await groundInRepo(planTask, repoPath);
+
+  // Sin repo local (caso normal en producción: el repo vive en GitHub y solo el
+  // worker lo clona) → grounding vía la API de GitHub. Así el impl-plan lleva el
+  // árbol real + archivos candidatos, y el Dev no quema presupuesto explorando.
+  if (!outline) {
+    const ghRepo = byCategory ?? repos.find((r) => r.url || r.githubFullName);
+    const slug = ghRepo ? repoSlug(ghRepo) : null;
+    const token = env().GITHUB_TOKEN;
+    if (slug && token) {
+      const g = await githubGrounding({
+        fullName: slug,
+        branch: ghRepo!.defaultBranch ?? 'main',
+        token,
+        keywords: keywordsFrom(planTask),
+      }).catch(() => ({ outline: '', files: [] as ImplRepoFile[] }));
+      outline = g.outline;
+      files = g.files;
+    }
+  }
 
   const markdown = await generateImplementationPlan(
     { name: project?.name ?? '', description: project?.description ?? null },

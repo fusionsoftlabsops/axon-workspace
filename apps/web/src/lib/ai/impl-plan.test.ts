@@ -7,6 +7,8 @@ const h = vi.hoisted(() => ({
   repoFindMany: vi.fn(),
   generateImplementationPlan: vi.fn(),
   repoReaderFor: vi.fn(),
+  githubGrounding: vi.fn(),
+  githubToken: undefined as string | undefined,
 }));
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -17,6 +19,11 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/lib/ai/planner', () => ({ generateImplementationPlan: h.generateImplementationPlan }));
 vi.mock('@/lib/repo/reader', () => ({ repoReaderFor: h.repoReaderFor }));
+vi.mock('@/lib/repo/github', () => ({
+  githubGrounding: h.githubGrounding,
+  repoSlug: (r: { githubFullName?: string | null; url?: string | null }) => r.githubFullName ?? null,
+}));
+vi.mock('@/lib/env', () => ({ env: () => ({ GITHUB_TOKEN: h.githubToken }) }));
 
 import { generateTaskImplPlan, planTaskFromTask } from './impl-plan';
 
@@ -35,7 +42,9 @@ const TASK = {
 };
 
 beforeEach(() => {
-  Object.values(h).forEach((fn) => fn.mockReset());
+  Object.values(h).forEach((fn) => {
+    if (fn && typeof (fn as { mockReset?: unknown }).mockReset === 'function') (fn as { mockReset: () => void }).mockReset();
+  });
   h.taskFindUnique.mockResolvedValue(TASK);
   h.projectFindUnique.mockResolvedValue({ name: 'axon', description: 'd', repoPath: null });
   h.repoFindMany.mockResolvedValue([]);
@@ -67,6 +76,25 @@ describe('generateTaskImplPlan', () => {
     expect(h.taskUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'task-24' }, data: expect.objectContaining({ implPlan: '# Plan técnico' }) }),
     );
+  });
+
+  it('sin repo local pero con repo de GitHub: aterriza vía la API de GitHub', async () => {
+    h.githubToken = 'ghp_x';
+    h.repoFindMany.mockResolvedValue([
+      { kind: 'backend', url: 'https://github.com/acme/app', githubFullName: 'acme/app', defaultBranch: 'main', repoPath: null },
+    ]);
+    h.githubGrounding.mockResolvedValue({
+      outline: 'src/\n  health.ts',
+      files: [{ path: 'src/health.ts', content: 'x', language: 'ts', truncated: false }],
+    });
+    await generateTaskImplPlan({ projectId: 'p1', taskId: 'task-24', userId: 'u1', lang: 'es' });
+    expect(h.githubGrounding).toHaveBeenCalledWith(
+      expect.objectContaining({ fullName: 'acme/app', branch: 'main', token: 'ghp_x' }),
+    );
+    const callArgs = h.generateImplementationPlan.mock.calls[0]!;
+    expect(callArgs[4]).toContain('health.ts'); // outline
+    expect(callArgs[5]).toEqual([{ path: 'src/health.ts', content: 'x', language: 'ts', truncated: false }]);
+    h.githubToken = undefined;
   });
 
   it('lanza si la HU no existe', async () => {
