@@ -142,3 +142,22 @@ describe('createQaHandler.handle', () => {
     expect(off.getTask).not.toHaveBeenCalled();
   });
 });
+
+describe('createQaHandler — review acotado', () => {
+  it('pasa los criterios de aceptación + la disciplina decisiva al prompt', async () => {
+    const prov = provider('{"decision":"approve","comment":"ok"}');
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({
+        title: 'HU',
+        description: 'd',
+        acceptanceCriteria: '- [ ] criterio-X-verificable',
+        comments: [{ body: 'PR: https://github.com/pr/9' }],
+      }),
+    });
+    await createQaHandler({ ...OPTS, api: a, provider: prov }).handle(evt());
+    const call = (prov.complete as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const dump = JSON.stringify(call);
+    expect(dump).toContain('criterio-X-verificable'); // los criterios llegan al review
+    expect(dump).toContain('DECISIVO'); // loop acotado (no re-lee todo el repo)
+  });
+});

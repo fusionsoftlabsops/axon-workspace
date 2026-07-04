@@ -35,7 +35,13 @@ export interface QaOptions {
 const QA_SYSTEM = `Sos el QA adversarial del equipo. Tu trabajo NO es confirmar que la HU está bien:
 es intentar demostrar que NO lo está. Contrastá cada criterio de aceptación contra el código real,
 buscá casos borde sin cubrir, tests faltantes y promesas del resumen del dev que el código no cumple.
-Solo si no lográs refutarla, aprobá. Respondé SOLO un JSON:
+
+Sé DECISIVO — tenés un número LIMITADO de turnos y presupuesto de tokens. Método (seguilo en orden):
+1. El handoff del dev NOMBRA los archivos que tocó. Leé DIRECTO esos archivos con read_file (no listes ni busques por todo el repo).
+2. Máximo ~5 lecturas en total. NO re-leas un archivo que ya viste. Después de leer los archivos del cambio, DECIDÍ.
+3. Verificá cada criterio de aceptación contra lo que leíste; si un criterio no tiene evidencia clara en el código, es reject.
+4. NO explores archivos no relacionados con el cambio.
+Cuando tengas el veredicto, TERMINÁ: respondé SOLO un JSON (sin más tool calls):
 {"decision": "approve" | "reject", "comment": "veredicto accionable en markdown (si reject: qué falta, concreto)"}`;
 
 /** Tools de repo SIN write_file: QA lee, jamás modifica. */
@@ -76,6 +82,7 @@ export function createQaHandler(opts: QaOptions): RoleHandler {
       const story = (await opts.api.getTask(opts.projectSlug, n)) as {
         title?: string;
         description?: string;
+        acceptanceCriteria?: string;
         comments?: Array<{ body: string }>;
       };
 
@@ -115,10 +122,11 @@ export function createQaHandler(opts: QaOptions): RoleHandler {
 
         const goal =
           `Revisión adversarial de la HU #${n} «${story.title ?? ''}».\n\n` +
-          `Criterios / descripción:\n${story.description ?? '(ver get_story)'}\n\n` +
-          `Handoff del dev (últimos comentarios):\n${handoff || '(sin handoff)'}\n\n` +
+          `Descripción:\n${story.description ?? '(ver get_story)'}\n\n` +
+          `Criterios de aceptación (verificá CADA uno contra el código):\n${story.acceptanceCriteria?.trim() || '(sin criterios explícitos)'}\n\n` +
+          `Handoff del dev (nombra los archivos tocados — leé DIRECTO esos):\n${handoff || '(sin handoff)'}\n\n` +
           (ws
-            ? `El repo está clonado en tu workspace (rama del dev si existía). Contrastá los criterios contra el código.`
+            ? `El repo está clonado en tu workspace (rama del dev). Leé solo los archivos del cambio, verificá los criterios y decidí.`
             : `SIN acceso al repo (no se pudo clonar): evaluá con el detalle de la HU y el contexto disponible, y sé conservador.`) +
           `\nAl final respondé SOLO el JSON del veredicto.`;
 
