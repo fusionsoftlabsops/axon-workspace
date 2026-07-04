@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/db';
 import { refineStoryForReadiness, type StoryRefinement } from '@/lib/ai/planner';
 import { publishDomainEvent } from '@/lib/agents/events';
+import { agentModelFor } from '@/lib/agents/model';
 import type { Lang } from '@/lib/ai/planner';
 
 export async function refineTaskForReadiness(opts: {
@@ -26,6 +27,7 @@ export async function refineTaskForReadiness(opts: {
     select: { name: true, description: true },
   });
 
+  const modelOverride = await agentModelFor(opts.projectId, opts.actorUserId);
   const refinement = await refineStoryForReadiness(
     {
       title: task.title,
@@ -37,6 +39,7 @@ export async function refineTaskForReadiness(opts: {
     opts.lang,
     opts.actorUserId,
     opts.projectId,
+    modelOverride,
   );
 
   await prisma.task.update({

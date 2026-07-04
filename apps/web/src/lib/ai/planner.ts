@@ -55,6 +55,8 @@ const PRICING: Record<string, { in: number; out: number }> = {
   'claude-sonnet-4-6': { in: 3, out: 15 },
   'claude-sonnet-5': { in: 3, out: 15 },
   'claude-opus-4-8': { in: 15, out: 75 },
+  // Placeholder al nivel de Opus hasta tener pricing oficial de Fable 5.
+  'claude-fable-5': { in: 15, out: 75 },
 };
 
 let _client: Anthropic | null = null;
@@ -64,6 +66,11 @@ function client(): Anthropic {
   if (!key) throw new Error('ANTHROPIC_API_KEY is not set');
   _client = new Anthropic({ apiKey: key });
   return _client;
+}
+
+/** Modelo efectivo de un generador: la config del agente si es claude-*, si no el default. */
+function pickModel(defaultModel: string, override?: string | null): string {
+  return override && override.startsWith('claude-') ? override : defaultModel;
 }
 
 function langName(lang: Lang): string {
@@ -474,8 +481,9 @@ export async function refineStoryForReadiness(
   lang: Lang,
   userId: string,
   projectId: string,
+  modelOverride?: string | null,
 ): Promise<StoryRefinement> {
-  const model = env().AI_MODEL_DEEP;
+  const model = pickModel(env().AI_MODEL_DEEP, modelOverride);
   const system = `Eres el Product Owner (PO) del equipo. Refiná UNA historia de usuario para que cumpla la Definition of Ready (DoR).
 Reglas:
 - description: 2-5 frases claras y accionables; CONSERVA la intención y el alcance original, no inventes features nuevas.
@@ -554,8 +562,9 @@ export async function generateDesignSpec(
   lang: Lang,
   userId: string,
   projectId: string,
+  modelOverride?: string | null,
 ): Promise<DesignSpec> {
-  const model = env().AI_MODEL_DEEP;
+  const model = pickModel(env().AI_MODEL_DEEP, modelOverride);
   const system = `Eres Aria, diseñadora de producto (UI/UX) del equipo. Para UNA historia de usuario de interfaz, producí un spec de diseño accionable.
 Reglas:
 - notes: markdown IMPLEMENTABLE (layout, componentes+jerarquía, estados vacío/carga/error/éxito, accesibilidad, responsive, microcopy). Concreto y consistente; nada genérico.
@@ -625,8 +634,9 @@ export async function generateTechDesign(
   lang: Lang,
   userId: string,
   projectId: string,
+  modelOverride?: string | null,
 ): Promise<string> {
-  const model = env().AI_MODEL_DEEP;
+  const model = pickModel(env().AI_MODEL_DEEP, modelOverride);
   const system = `Eres Dax, arquitecto/tech lead del equipo. Para UNA historia de usuario compleja, producí un diseño técnico de ALTO NIVEL que guíe al Dev (no escribas la implementación completa).
 Incluí: enfoque de arquitectura, decisiones clave (y alternativas descartadas con el porqué), componentes/módulos y contratos/datos afectados, riesgos + mitigaciones, y una DESCOMPOSICIÓN en pasos/sub-tareas ordenados.
 Alineate con la intención de la HU; no inventes alcance nuevo. Todo en ${langName(lang)}. Devuelve SOLO la herramienta EmitTechDesign.`;
@@ -696,8 +706,9 @@ export async function generateMarketingKit(
   lang: Lang,
   userId: string,
   projectId: string,
+  modelOverride?: string | null,
 ): Promise<MarketingKit> {
-  const model = env().AI_MODEL_DEEP;
+  const model = pickModel(env().AI_MODEL_DEEP, modelOverride);
   const system = `Eres Sol, especialista de branding/SEO/marketing del equipo. Para UNA historia de usuario de go-to-market, producí material de lanzamiento.
 - kit: markdown con headline+subhead, 3-5 value props, CTA, meta título SEO (≤60) + meta descripción (≤155), 2-3 posts sociales cortos, y nombre/tagline si aplica. Persuasivo pero honesto, sin promesas vacías.
 - assetPrompt: en INGLÉS, para un generador de imágenes, un asset de marca/hero de la landing (estilo limpio y moderno, coherente con el producto).

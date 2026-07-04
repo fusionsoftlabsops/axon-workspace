@@ -268,6 +268,20 @@ describe('refineStoryForReadiness (Product Owner)', () => {
     anthropicCreate.mockResolvedValue(textReply('nope'));
     await expect(refineStoryForReadiness(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el refinamiento');
   });
+
+  it('usa el modelo del agente (override claude-*) y cae al default con overrides no-claude', async () => {
+    anthropicCreate.mockResolvedValue(
+      toolReply('EmitRefinement', { description: 'd', acceptanceCriteria: '- [ ] c', priority: 'MEDIUM' }),
+    );
+    await refineStoryForReadiness(STORY, PROJECT, 'es', 'u', 'p', 'claude-haiku-4-5-20251001');
+    expect(anthropicCreate.mock.calls[0]![0].model).toBe('claude-haiku-4-5-20251001');
+
+    anthropicCreate.mockResolvedValue(
+      toolReply('EmitRefinement', { description: 'd', acceptanceCriteria: '- [ ] c', priority: 'MEDIUM' }),
+    );
+    await refineStoryForReadiness(STORY, PROJECT, 'es', 'u', 'p', 'qwen3-coder-next');
+    expect(anthropicCreate.mock.calls[1]![0].model).toBe('claude-opus-4-8'); // default DEEP
+  });
 });
 
 describe('generateDesignSpec (Aria)', () => {

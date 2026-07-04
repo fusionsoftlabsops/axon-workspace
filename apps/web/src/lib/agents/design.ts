@@ -11,6 +11,7 @@ import { prisma } from '@/lib/db';
 import { generateDesignSpec } from '@/lib/ai/planner';
 import { generateAndStoreProjectImage, imageGenerationConfigured } from '@/lib/ai/image';
 import { publishDomainEvent } from '@/lib/agents/events';
+import { agentModelFor } from '@/lib/agents/model';
 import type { Lang } from '@/lib/ai/planner';
 
 export interface DesignResult {
@@ -36,6 +37,7 @@ export async function designTaskForReadiness(opts: {
     select: { name: true, description: true },
   });
 
+  const modelOverride = await agentModelFor(opts.projectId, opts.actorUserId);
   const spec = await generateDesignSpec(
     {
       title: task.title,
@@ -46,6 +48,7 @@ export async function designTaskForReadiness(opts: {
     opts.lang,
     opts.actorUserId,
     opts.projectId,
+    modelOverride,
   );
 
   // Mockup de concepto (best-effort): degrada con gracia si no hay OpenAI/storage.
