@@ -386,3 +386,95 @@ export async function setDevExecutorAction(
   revalidatePath(`/projects/${slug}/agents`);
   return { ok: true, data: { devExecutor: mode } };
 }
+
+export interface VerifyAgentsResult {
+  worker: { reachable: boolean; subscribed: boolean };
+  refired: { backlog: number[]; development: number[]; review: number[] };
+  skippedRunning: number[];
+}
+
+/**
+ * Botón «Verificar y reactivar»: diagnóstico + rescate del equipo agéntico.
+ * 1) Chequea la salud del worker (¿vivo? ¿suscrito a Redis?).
+ * 2) RE-EMITE los eventos de dominio de las HUs no terminadas para que los
+ *    agentes retomen labores (caso típico: eventos perdidos durante un redeploy
+ *    del worker — la HU queda muda en el tablero):
+ *    - Backlog (TODO)        → story.created   (PO refina / Dax / Aria / SM asigna)
+ *    - En curso (IN_PROGRESS)→ state_changed   (el Dev retoma; consola no se toca)
+ *    - Verificación (REVIEW) → state_changed   (QA + Code Reviewer re-revisan)
+ *    Las HUs con una corrida RUNNING se saltan (no duplicar trabajo en vuelo).
+ */
+export async function verifyAgentsAction(slug: string): Promise<ActionResult<VerifyAgentsResult>> {
+  const { publishDomainEvent } = await import('@/lib/agents/events');
+  const ctx = await guard(slug);
+  if (!ctx.ok) return ctx;
+
+  // 1) Salud del worker: alias interno de la red fusion; fallback al público.
+  let reachable = false;
+  let subscribed = false;
+  for (const url of ['http://axon-agents:3060/health', 'https://axon-agents.fusion-soft-lab.com/health']) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const body = (await res.json()) as { ok?: boolean; subscribed?: boolean };
+        reachable = !!body.ok;
+        subscribed = !!body.subscribed;
+        break;
+      }
+    } catch {
+      /* probar el siguiente */
+    }
+  }
+
+  // 2) HUs no terminadas + corridas en vuelo.
+  const tasks = await prisma.task.findMany({
+    where: { projectId: ctx.projectId, state: { category: { in: ['OPEN', 'IN_PROGRESS', 'REVIEW'] } } },
+    include: { state: { select: { id: true, name: true, category: true } } },
+    orderBy: { taskNumber: 'asc' },
+  });
+  const runningIds = new Set(
+    (
+      await prisma.agentRun.findMany({
+        where: { status: 'RUNNING', agent: { projectId: ctx.projectId } },
+        select: { storyId: true },
+      })
+    )
+      .map((r) => r.storyId)
+      .filter((x): x is string => !!x),
+  );
+
+  const refired: VerifyAgentsResult['refired'] = { backlog: [], development: [], review: [] };
+  const skippedRunning: number[] = [];
+  for (const t of tasks) {
+    if (runningIds.has(t.id)) {
+      skippedRunning.push(t.taskNumber);
+      continue; // hay una corrida en vuelo: no duplicar
+    }
+    const base = {
+      projectId: ctx.projectId,
+      storyId: t.id,
+      storyNumber: t.taskNumber,
+      toState: { id: t.state.id, name: t.state.name, category: t.state.category },
+      actorId: ctx.userId,
+      assigneeId: t.assigneeId ?? null,
+    };
+    if (t.state.category === 'OPEN') {
+      publishDomainEvent({ ...base, type: 'story.created' });
+      refired.backlog.push(t.taskNumber);
+    } else {
+      publishDomainEvent({ ...base, type: 'story.state_changed' });
+      (t.state.category === 'IN_PROGRESS' ? refired.development : refired.review).push(t.taskNumber);
+    }
+  }
+
+  await audit({
+    actorId: ctx.userId,
+    action: 'agent.update',
+    resourceType: 'project',
+    resourceId: ctx.projectId,
+    projectId: ctx.projectId,
+    payload: { via: 'verify', reachable, subscribed, refired, skippedRunning },
+  });
+
+  return { ok: true, data: { worker: { reachable, subscribed }, refired, skippedRunning } };
+}

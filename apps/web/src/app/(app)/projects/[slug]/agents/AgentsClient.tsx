@@ -6,6 +6,8 @@ import { useI18n } from '@/lib/i18n/i18n';
 import {
   applyTeamPresetAction,
   setDevExecutorAction,
+  verifyAgentsAction,
+  type VerifyAgentsResult,
   provisionAgentAction,
   setAgentEnabledAction,
   updateAgentAction,
@@ -58,6 +60,17 @@ export function AgentsClient({
   const [activePreset, setActivePreset] = useState<string | null>(initialPreset);
   const [presetMinted, setPresetMinted] = useState<Array<{ role: string; token: string }>>([]);
   const [devExecutor, setDevExecutor] = useState<string>(initialDevExecutor);
+  const [verifyResult, setVerifyResult] = useState<VerifyAgentsResult | null>(null);
+
+  async function verify() {
+    setBusy('verify');
+    setError(null);
+    setVerifyResult(null);
+    const res = await verifyAgentsAction(slug);
+    setBusy(null);
+    if (!res.ok || !res.data) setError(res.ok ? 'Sin datos' : res.error);
+    else setVerifyResult(res.data);
+  }
 
   async function changeExecutor(mode: 'KAI' | 'CONSOLE' | 'HYBRID') {
     setBusy(`exec:${mode}`);
@@ -134,6 +147,47 @@ export function AgentsClient({
           </Button>
         </div>
       )}
+
+      <section data-testid="verify-agents">
+        <h3 className={styles.sectionTitle}>{t('Salud del equipo', 'Team health')}</h3>
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            disabled={!canManage || busy === 'verify'}
+            data-testid="verify-button"
+            onClick={() => void verify()}
+          >
+            {busy === 'verify' ? t('Verificando…', 'Verifying…') : t('🔁 Verificar y reactivar', '🔁 Verify & reactivate')}
+          </Button>
+          <span className={styles.hint}>
+            {t(
+              'Chequea el worker y re-dispara las HUs atascadas (ej. eventos perdidos durante un redeploy) para que los agentes retomen labores.',
+              'Checks the worker and re-fires stuck stories (e.g. events lost during a redeploy) so agents resume work.',
+            )}
+          </span>
+        </div>
+        {verifyResult && (
+          <div className={styles.card} style={{ marginTop: '0.5rem' }} data-testid="verify-result">
+            <p className={styles.hint} style={{ margin: 0 }}>
+              {verifyResult.worker.reachable
+                ? verifyResult.worker.subscribed
+                  ? t('✅ Worker vivo y suscrito a eventos.', '✅ Worker alive and subscribed to events.')
+                  : t('⚠️ Worker vivo pero SIN suscripción a eventos — revisá Redis / redesplegá axon-agents.', '⚠️ Worker alive but NOT subscribed — check Redis / redeploy axon-agents.')
+                : t('🛑 Worker inalcanzable — redesplegá axon-agents.', '🛑 Worker unreachable — redeploy axon-agents.')}
+            </p>
+            <p className={styles.hint} style={{ margin: '0.3rem 0 0' }}>
+              {t('Reactivadas', 'Re-fired')}: {t('backlog', 'backlog')}{' '}
+              {verifyResult.refired.backlog.length > 0 ? verifyResult.refired.backlog.map((n) => `#${n}`).join(', ') : '—'} ·{' '}
+              {t('desarrollo', 'development')}{' '}
+              {verifyResult.refired.development.length > 0 ? verifyResult.refired.development.map((n) => `#${n}`).join(', ') : '—'} ·{' '}
+              {t('verificación', 'review')}{' '}
+              {verifyResult.refired.review.length > 0 ? verifyResult.refired.review.map((n) => `#${n}`).join(', ') : '—'}
+              {verifyResult.skippedRunning.length > 0 &&
+                ` · ${t('en vuelo (no tocadas)', 'in flight (untouched)')}: ${verifyResult.skippedRunning.map((n) => `#${n}`).join(', ')}`}
+            </p>
+          </div>
+        )}
+      </section>
 
       <section data-testid="dev-executor">
         <h3 className={styles.sectionTitle}>{t('Ejecutor de desarrollo', 'Development executor')}</h3>

@@ -76,18 +76,18 @@ beforeEach(() => {
 });
 
 describe('planChatReply', () => {
-  it('greets on the opening turn and records cost on the balanced model', async () => {
+  it('greets on the opening turn and records cost on the CHAT model (fable-5 por default)', async () => {
     anthropicCreate.mockResolvedValue(textReply('¡Hola! ¿Cuál es el objetivo?'));
     const out = await planChatReply(PROJECT, [], 'es', '', 'u1', 'p1');
     expect(out).toContain('Hola');
     const arg = anthropicCreate.mock.calls[0]![0];
-    expect(arg.model).toBe('claude-sonnet-4-6');
+    expect(arg.model).toBe('claude-fable-5');
     expect(arg.messages[0].content).toContain('Inicia la planeación');
     expect(arg.messages[0].content).toContain('Proyecto: "Axon"');
     const rec = aiInteractionCreate.mock.calls[0]![0].data;
     expect(rec.purpose).toBe('plan.chat');
-    // sonnet 1000*3/1e6 + 500*15/1e6 = 0.0105
-    expect(String(rec.estimatedCostUsd)).toBe('0.010500');
+    // fable (placeholder nivel opus) 1000*15/1e6 + 500*75/1e6 = 0.0525
+    expect(String(rec.estimatedCostUsd)).toBe('0.052500');
   });
 
   it('includes the attachment manifest and prior messages on later turns', async () => {
@@ -107,7 +107,7 @@ describe('planChatReply', () => {
   });
 
   it('uses {in:0,out:0} pricing for an unpriced model and swallows record failures', async () => {
-    envConfig.AI_MODEL_BALANCED = 'unpriced';
+    envConfig.AI_MODEL_CHAT = 'unpriced';
     aiInteractionCreate.mockRejectedValueOnce(new Error('db down'));
     anthropicCreate.mockResolvedValue(textReply('ok'));
     const out = await planChatReply({ name: 'P', description: null }, [], 'es', '', 'u', 'p');

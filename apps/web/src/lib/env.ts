@@ -54,6 +54,8 @@ const schema = z.object({
   S3_FORCE_PATH_STYLE: z.preprocess((v) => v !== 'false', z.boolean().default(true)),
   AI_MODEL_FAST: z.string().default('claude-haiku-4-5-20251001'),
   AI_MODEL_BALANCED: z.string().default('claude-sonnet-5'),
+  // Modelo del CHAT de planeación (default fable-5; la conversación define el plan).
+  AI_MODEL_CHAT: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AI_MODEL_DEEP: z.string().default('claude-opus-4-8'),
   // Self-hosted LLM (Ollama on fusion-infra, reachable on the internal `fusion`
   // network) used for the context-graph summaries — keeps that cost off Anthropic.
