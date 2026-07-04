@@ -25,10 +25,11 @@ describe('loadConfig', () => {
       AGENT_DEV_TOKEN: '',
       AGENT_QA_TOKEN: 'ad_pk_qa',
       AGENT_DESIGN_TOKEN: 'ad_pk_design',
+      AGENT_REVIEWER_TOKEN: 'ad_pk_reviewer',
       PORT: '4000',
     });
     expect(c.REDIS_URL).toBeUndefined();
-    expect(c.tokens).toEqual({ SM: 'ad_pk_sm', DEV: undefined, QA: 'ad_pk_qa', DESIGN: 'ad_pk_design' });
+    expect(c.tokens).toEqual({ SM: 'ad_pk_sm', DEV: undefined, QA: 'ad_pk_qa', DESIGN: 'ad_pk_design', REVIEWER: 'ad_pk_reviewer' });
     expect(c.PORT).toBe(4000);
   });
 

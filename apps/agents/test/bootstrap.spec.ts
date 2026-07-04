@@ -12,6 +12,7 @@ const FULL_ENV = {
   AGENT_DESIGN_TOKEN: 'ad_pk_design',
   AGENT_DEV_TOKEN: 'ad_pk_dev',
   AGENT_QA_TOKEN: 'ad_pk_qa',
+  AGENT_REVIEWER_TOKEN: 'ad_pk_reviewer',
   FUSION_MODEL_URL: 'https://modelo.local/v1',
   FUSION_TOKEN: 'fsn_x',
   ANTHROPIC_API_KEY: 'sk-ant-x',
@@ -22,9 +23,9 @@ describe('buildTeam', () => {
   it('con config completa registra los handlers/sweep del equipo (incl. PO)', () => {
     const router = new EventRouter();
     const team = buildTeam(loadConfig(FULL_ENV), router);
-    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'DESIGN', 'DEV(+strong)', 'QA']);
+    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'DESIGN', 'DEV(+strong)', 'QA', 'REVIEWER']);
     expect(team.skipped).toEqual([]);
-    expect(router.size).toBe(6); // assign + retro + po + design + dev + qa (el sweep no es handler de eventos)
+    expect(router.size).toBe(7); // assign + retro + po + design + dev + qa + reviewer (el sweep no es handler de eventos)
     expect(team.staleSweep).not.toBeNull();
   });
 
@@ -47,12 +48,14 @@ describe('buildTeam', () => {
       router,
     );
     // El PO y Diseño son deterministas (no necesitan Claude) → siguen activos.
+    // Reviewer necesita Claude → queda fuera sin ANTHROPIC_API_KEY.
     expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO', 'DESIGN']);
     expect(team.skipped).toEqual(
       expect.arrayContaining([
         { role: 'SM:retro', reason: 'sin ANTHROPIC_API_KEY' },
         { role: 'DEV', reason: 'sin FUSION_MODEL_URL / FUSION_TOKEN' },
         { role: 'QA', reason: 'sin ANTHROPIC_API_KEY' },
+        { role: 'REVIEWER', reason: 'sin ANTHROPIC_API_KEY' },
       ]),
     );
   });
@@ -64,6 +67,6 @@ describe('buildTeam', () => {
       router,
     );
     expect(team.registered).toEqual([]);
-    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'DESIGN', 'DEV', 'QA']);
+    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'DESIGN', 'DEV', 'QA', 'REVIEWER']);
   });
 });

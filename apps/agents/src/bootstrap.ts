@@ -16,6 +16,7 @@ import { createSmAssignHandler } from './roles/sm.js';
 import { createSmRetroHandler } from './roles/sm-retro.js';
 import { createPoHandler } from './roles/po.js';
 import { createDesignHandler } from './roles/design.js';
+import { createReviewerHandler } from './roles/reviewer.js';
 import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
@@ -133,6 +134,26 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
       }),
     );
     registered.push('QA');
+  }
+
+  // ---- REVIEWER (Ren: code review de calidad, advisory) ----
+  if (!config.tokens.REVIEWER) {
+    skipped.push({ role: 'REVIEWER', reason: 'sin AGENT_REVIEWER_TOKEN' });
+  } else if (!anthropic) {
+    skipped.push({ role: 'REVIEWER', reason: 'sin ANTHROPIC_API_KEY' });
+  } else {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.REVIEWER);
+    router.register(
+      createReviewerHandler({
+        api,
+        projectId,
+        projectSlug,
+        provider: anthropic,
+        gitToken: config.GITHUB_TOKEN,
+        maxDurationMs: config.AGENT_MAX_DURATION_MS,
+      }),
+    );
+    registered.push('REVIEWER');
   }
 
   return { registered, skipped, staleSweep };
