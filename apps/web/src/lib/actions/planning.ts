@@ -233,20 +233,38 @@ export async function planChatAction(slug: string, userMessage: string): Promise
   const ctx = await assertProjectMember(slug);
   if (!ctx.ok) return ctx;
   if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
+  const author = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } });
+  return runPlanChat(ctx.projectId, ctx.userId, author?.name ?? null, ctx.role, userMessage);
+}
+
+/**
+ * Núcleo del chat de planeación, sin auth de sesión — reutilizable por la server
+ * action (UI) y por la ruta con API token (supervisor de consola). Persiste el
+ * mensaje del usuario, lo transmite en vivo, invoca al LLM (fable-5, o el modelo
+ * del agente si hay @mención) y persiste la respuesta.
+ */
+export async function runPlanChat(
+  projectId: string,
+  userId: string,
+  userName: string | null,
+  role: string,
+  userMessage: string,
+): Promise<ActionResult<PlanView>> {
+  if (role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
   const text = userMessage.trim();
   if (!text) return { ok: false, error: 'Mensaje vacío' };
 
-  const plan = await loadPlan(ctx.projectId);
+  const plan = await loadPlan(projectId);
   if (!plan) return { ok: false, error: 'Plan no encontrado' };
   if (plan.status === 'GENERATING') return { ok: false, error: 'Generando el plan…' };
 
+  const ctx = { projectId, userId };
   const history: ChatMsg[] = Array.isArray(plan.messages) ? (plan.messages as unknown as ChatMsg[]) : [];
-  const author = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } });
   const userMsg: ChatMsg = {
     role: 'user',
     content: text.slice(0, 4000),
-    authorId: ctx.userId,
-    authorName: author?.name ?? undefined,
+    authorId: userId,
+    authorName: userName ?? undefined,
   };
   const withUser: ChatMsg[] = [...history, userMsg];
   const keepStatus = plan.status === 'PUBLISHED' ? 'PUBLISHED' : 'CHATTING';
