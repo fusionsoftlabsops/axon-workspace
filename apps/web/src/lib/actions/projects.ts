@@ -107,6 +107,18 @@ export async function createProjectAction(
     }
   }
 
+  // Auto-provisiona el equipo agéntico por defecto (estilo axon: 9 roles
+  // habilitados). Best-effort — el proyecto ya existe y el equipo se puede
+  // aprovisionar luego desde la UI/consola, así que un fallo no debe romper la
+  // creación. El worker multi-tenant toma el equipo en su próximo refresco.
+  try {
+    const { provisionDefaultTeam } = await import('./agents');
+    await provisionDefaultTeam(createdProjectId, data.slug);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[projects] provisionDefaultTeam failed:', err);
+  }
+
   revalidatePath('/projects');
   return { ok: true, data: { slug: data.slug } };
 }

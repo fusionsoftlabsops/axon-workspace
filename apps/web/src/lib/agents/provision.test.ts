@@ -17,6 +17,8 @@ const { prismaMock, txMock } = vi.hoisted(() => {
 });
 
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
+// El sellado del token de runtime tiene su propio test; acá lo neutralizamos.
+vi.mock('@/lib/agents/runtime-tokens', () => ({ sealAgentToken: vi.fn(), openAgentToken: vi.fn() }));
 
 import {
   agentEmail,

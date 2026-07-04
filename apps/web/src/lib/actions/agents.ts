@@ -304,18 +304,20 @@ export async function setAgentEnabledAction(
  * - Roles OFF del preset: se apagan si existen (no se aprovisionan si faltan).
  * Persiste el preset activo en Project.teamPreset (informativo).
  */
-export async function applyTeamPresetAction(
+/**
+ * Núcleo de aplicar preset, SIN guard de sesión (el caller controla el acceso:
+ * la action de UI o la ruta con API token). Provisiona/actualiza cada rol según
+ * el preset y persiste Project.teamPreset.
+ */
+export async function applyTeamPreset(
+  projectId: string,
   slug: string,
   preset: import('@/lib/agents/presets').TeamPreset,
-): Promise<ActionResult<{ agents: AgentView[]; minted: Array<{ role: AgentRole; token: string }> }>> {
-  const { TEAM_PRESETS, isTeamPreset } = await import('@/lib/agents/presets');
-  if (!isTeamPreset(preset)) return { ok: false, error: 'Preset inválido' };
-  const ctx = await guard(slug);
-  if (!ctx.ok) return ctx;
-
+): Promise<{ agents: AgentView[]; minted: Array<{ role: AgentRole; token: string }>; provisioned: number }> {
+  const { TEAM_PRESETS } = await import('@/lib/agents/presets');
   const def = TEAM_PRESETS[preset];
   const existing = await prisma.agent.findMany({
-    where: { projectId: ctx.projectId },
+    where: { projectId },
     select: { id: true, role: true },
   });
   const byRole = new Map(existing.map((a) => [a.role, a]));
@@ -331,19 +333,15 @@ export async function applyTeamPresetAction(
       continue; // rol apagado en este preset: no se aprovisiona si falta
     }
     if (!current) {
-      try {
-        const prov = await provisionAgent({
-          projectId: ctx.projectId,
-          projectSlug: slug,
-          role,
-          llmModel: cfg.llmModel,
-          tokenBudget: cfg.tokenBudget,
-        });
-        await prisma.agent.update({ where: { id: prov.agentId }, data: { enabled: true } });
-        minted.push({ role, token: prov.tokenPlain });
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : `No se pudo aprovisionar ${role}` };
-      }
+      const prov = await provisionAgent({
+        projectId,
+        projectSlug: slug,
+        role,
+        llmModel: cfg.llmModel,
+        tokenBudget: cfg.tokenBudget,
+      });
+      await prisma.agent.update({ where: { id: prov.agentId }, data: { enabled: true } });
+      minted.push({ role, token: prov.tokenPlain });
     } else {
       await prisma.agent.update({
         where: { id: current.id },
@@ -352,7 +350,26 @@ export async function applyTeamPresetAction(
     }
   }
 
-  await prisma.project.update({ where: { id: ctx.projectId }, data: { teamPreset: preset } });
+  await prisma.project.update({ where: { id: projectId }, data: { teamPreset: preset } });
+  return { agents: await loadAgents(projectId), minted, provisioned: minted.length };
+}
+
+export async function applyTeamPresetAction(
+  slug: string,
+  preset: import('@/lib/agents/presets').TeamPreset,
+): Promise<ActionResult<{ agents: AgentView[]; minted: Array<{ role: AgentRole; token: string }> }>> {
+  const { isTeamPreset } = await import('@/lib/agents/presets');
+  if (!isTeamPreset(preset)) return { ok: false, error: 'Preset inválido' };
+  const ctx = await guard(slug);
+  if (!ctx.ok) return ctx;
+
+  let result;
+  try {
+    result = await applyTeamPreset(ctx.projectId, slug, preset);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'No se pudo aplicar el preset' };
+  }
+
   await audit({
     actorId: ctx.userId,
     action: 'agent.update',
@@ -363,7 +380,7 @@ export async function applyTeamPresetAction(
   });
 
   revalidatePath(`/projects/${slug}/agents`);
-  return { ok: true, data: { agents: await loadAgents(ctx.projectId), minted } };
+  return { ok: true, data: { agents: result.agents, minted: result.minted } };
 }
 
 /** Setea el ejecutor de desarrollo del proyecto (KAI | CONSOLE | HYBRID). */
@@ -477,4 +494,63 @@ export async function verifyAgentsAction(slug: string): Promise<ActionResult<Ver
   });
 
   return { ok: true, data: { worker: { reachable, subscribed }, refired, skippedRunning } };
+}
+
+/**
+ * Modelos por defecto del equipo "estilo axon": todos los roles en Sonnet 5,
+ * salvo el Dev en Qwen (mismo mapa que DEFAULT_MODEL de la UI de Agentes).
+ */
+const AXON_DEFAULT_MODEL: Record<AgentRole, string> = {
+  SM: 'claude-sonnet-5',
+  PO: 'claude-sonnet-5',
+  ARCHITECT: 'claude-sonnet-5',
+  DESIGN: 'claude-sonnet-5',
+  DEV: 'qwen3-coder-next',
+  QA: 'claude-sonnet-5',
+  REVIEWER: 'claude-sonnet-5',
+  MARKETING: 'claude-sonnet-5',
+  RELEASE: 'claude-sonnet-5',
+};
+
+export interface ProvisionTeamResult {
+  provisioned: number;
+  enabled: number;
+  agents: AgentView[];
+}
+
+/**
+ * Provisiona (o completa) el equipo por defecto de un proyecto: los 9 roles,
+ * habilitados, con los modelos estilo-axon. Idempotente y SIN guard de sesión
+ * (el caller —API/route o el hook de creación— hace el control de acceso). El
+ * worker multi-tenant toma el equipo en su próximo refresco.
+ */
+export async function provisionDefaultTeam(
+  projectId: string,
+  slug: string,
+): Promise<ProvisionTeamResult> {
+  let provisioned = 0;
+  let enabled = 0;
+  for (const role of ROLES) {
+    const existing = await prisma.agent.findUnique({
+      where: { projectId_role: { projectId, role } },
+      select: { id: true, enabled: true },
+    });
+    if (!existing) {
+      try {
+        await provisionAgent({ projectId, projectSlug: slug, role, llmModel: AXON_DEFAULT_MODEL[role] });
+        await prisma.agent.update({
+          where: { projectId_role: { projectId, role } },
+          data: { enabled: true },
+        });
+        provisioned += 1;
+        enabled += 1;
+      } catch {
+        /* carrera / ya existe: seguir */
+      }
+    } else if (!existing.enabled) {
+      await prisma.agent.update({ where: { id: existing.id }, data: { enabled: true } });
+      enabled += 1;
+    }
+  }
+  return { provisioned, enabled, agents: await loadAgents(projectId) };
 }

@@ -88,15 +88,20 @@ export async function POST(
   );
 }
 
-const patchBody = z.object({
-  role: z.enum(ROLES),
-  enabled: z.boolean(),
-});
+const patchBody = z
+  .object({
+    role: z.enum(ROLES),
+    enabled: z.boolean().optional(),
+    llmModel: z.string().min(1).max(100).optional(),
+  })
+  .refine((v) => v.enabled !== undefined || v.llmModel !== undefined, {
+    message: 'indicá enabled y/o llmModel',
+  });
 
 /**
- * Enciende/apaga el agente de un rol vía API (kill-switch del supervisor de
- * consola). Mismo guardarraíl que la provisión: solo OWNER/ADMIN del proyecto
- * (los agentes son MEMBER → un agente no puede apagar a otro).
+ * Actualiza el agente de un rol vía API: enciende/apaga (kill-switch del
+ * supervisor) y/o cambia su modelo (set_agent_model). Mismo guardarraíl que la
+ * provisión: solo OWNER/ADMIN (los agentes son MEMBER → no se tocan entre sí).
  */
 export async function PATCH(
   req: NextRequest,
@@ -131,15 +136,19 @@ export async function PATCH(
   });
   if (!agent) return NextResponse.json({ error: `project has no ${parsed.data.role} agent` }, { status: 404 });
 
-  await prisma.agent.update({ where: { id: agent.id }, data: { enabled: parsed.data.enabled } });
+  const data: { enabled?: boolean; llmModel?: string } = {};
+  if (parsed.data.enabled !== undefined) data.enabled = parsed.data.enabled;
+  if (parsed.data.llmModel !== undefined) data.llmModel = parsed.data.llmModel;
+
+  await prisma.agent.update({ where: { id: agent.id }, data });
   await audit({
     actorId: authd.userId,
     action: 'agent.update',
     resourceType: 'agent',
     resourceId: agent.id,
     projectId: project.id,
-    payload: { via: 'api', role: parsed.data.role, enabled: parsed.data.enabled },
+    payload: { via: 'api', role: parsed.data.role, ...data },
   });
 
-  return NextResponse.json({ ok: true, role: parsed.data.role, enabled: parsed.data.enabled });
+  return NextResponse.json({ ok: true, role: parsed.data.role, ...data });
 }

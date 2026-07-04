@@ -6,7 +6,9 @@ import { useI18n } from '@/lib/i18n/i18n';
 import { createApiTokenAction, revokeApiTokenAction } from '@/lib/actions/api-tokens';
 import type { ApiScope } from '@admin/shared/types';
 
-const SCOPES: ApiScope[] = [
+// Scopes que un usuario puede acuñar. Excluye 'agents:runtime' (privilegiado,
+// solo para el token de servicio del worker multi-tenant).
+const SCOPES = [
   'projects:read',
   'tasks:read',
   'tasks:write',
@@ -19,7 +21,9 @@ const SCOPES: ApiScope[] = [
   'repo:read',
   'skills:read',
   'skills:write',
-];
+] as const satisfies readonly ApiScope[];
+
+type UserScope = (typeof SCOPES)[number];
 
 interface TokenRow {
   id: string;
@@ -44,7 +48,7 @@ export function TokensPanel({
   const [pending, startTransition] = useTransition();
 
   const [name, setName] = useState('');
-  const [scopes, setScopes] = useState<Set<ApiScope>>(
+  const [scopes, setScopes] = useState<Set<UserScope>>(
     new Set(['tasks:read', 'tasks:write', 'comments:write', 'bugs:write']),
   );
   const [projectSlugs, setProjectSlugs] = useState<Set<string>>(new Set());
