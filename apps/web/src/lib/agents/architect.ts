@@ -7,6 +7,7 @@
  */
 import { prisma } from '@/lib/db';
 import { generateTechDesign, type Lang } from '@/lib/ai/planner';
+import { agentModelFor } from '@/lib/agents/model';
 
 export async function designTaskArchitecture(opts: {
   projectId: string;
@@ -25,6 +26,7 @@ export async function designTaskArchitecture(opts: {
     select: { name: true, description: true },
   });
 
+  const modelOverride = await agentModelFor(opts.projectId, opts.actorUserId);
   const design = await generateTechDesign(
     {
       title: task.title,
@@ -36,6 +38,7 @@ export async function designTaskArchitecture(opts: {
     opts.lang,
     opts.actorUserId,
     opts.projectId,
+    modelOverride,
   );
 
   await prisma.task.update({

@@ -8,6 +8,7 @@
 import { prisma } from '@/lib/db';
 import { generateMarketingKit, type Lang } from '@/lib/ai/planner';
 import { generateAndStoreProjectImage, imageGenerationConfigured } from '@/lib/ai/image';
+import { agentModelFor } from '@/lib/agents/model';
 
 export interface MarketingResult {
   kit: string;
@@ -32,12 +33,14 @@ export async function marketingTaskKit(opts: {
     select: { name: true, description: true },
   });
 
+  const modelOverride = await agentModelFor(opts.projectId, opts.actorUserId);
   const out = await generateMarketingKit(
     { title: task.title, description: task.description ?? '', acceptanceCriteria: task.acceptanceCriteria ?? '' },
     { name: project?.name ?? '', description: project?.description ?? null },
     opts.lang,
     opts.actorUserId,
     opts.projectId,
+    modelOverride,
   );
 
   // Asset de marca (best-effort): degrada con gracia si no hay OpenAI/storage.
