@@ -332,6 +332,41 @@ export function PlanChat({
         )}
         <div className={styles.chatRow}>
           <div className={styles.chat}>
+            <details data-testid="agent-chat-tips" style={{ fontSize: '0.78rem', margin: '0 0.25rem 0.5rem', opacity: 0.92 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+                {t('💡 Tips: chateá con los agentes del equipo (@menciones)', '💡 Tips: chat with the team agents (@mentions)')}
+              </summary>
+              <div style={{ padding: '0.5rem 0.25rem 0.2rem', lineHeight: 1.55 }}>
+                <p style={{ margin: '0 0 0.35rem' }}>
+                  {t(
+                    'Mencioná a un agente y responde EN PERSONA, con su lente de especialista y su modelo configurado:',
+                    'Mention an agent and it replies IN PERSONA, with its specialist lens and configured model:',
+                  )}
+                </p>
+                <ul style={{ margin: '0 0 0.45rem', paddingLeft: '1.2rem' }}>
+                  <li><code>@dax</code> — {t('arquitectura y descomposición técnica (trade-offs, riesgos)', 'architecture & technical decomposition (trade-offs, risks)')}</li>
+                  <li><code>@iris</code> — {t('valor de negocio, alcance y criterios de aceptación', 'business value, scope and acceptance criteria')}</li>
+                  <li><code>@aria</code> — {t('UI/UX: layout, componentes, estados, accesibilidad', 'UI/UX: layout, components, states, accessibility')}</li>
+                  <li><code>@kai</code> — {t('implementabilidad y esfuerzo real de desarrollo', 'implementability and real dev effort')}</li>
+                  <li><code>@vera</code> — {t('cómo se rompe: casos borde y testeabilidad', 'how it breaks: edge cases and testability')}</li>
+                  <li><code>@sol</code> — {t('branding, SEO y go-to-market', 'branding, SEO and go-to-market')}</li>
+                  <li><code>@nova</code> / <code>@ren</code> / <code>@marco</code> — {t('flujo del backlog · calidad de código · despliegue', 'backlog flow · code quality · deployment')}</li>
+                </ul>
+                <p style={{ margin: '0 0 0.25rem', fontWeight: 600 }}>{t('Ejemplos:', 'Examples:')}</p>
+                <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+                  <li>{t('«@dax ¿cómo descompondrías el módulo de inventario en microservicios?»', '"@dax how would you split the inventory module into microservices?"')}</li>
+                  <li>{t('«@iris ¿qué criterios de aceptación le pondrías al checkout?»', '"@iris what acceptance criteria would you set for checkout?"')}</li>
+                  <li>{t('«@aria ¿cómo debería verse el dashboard en móvil?»', '"@aria how should the dashboard look on mobile?"')}</li>
+                  <li>{t('«@vera ¿qué casos borde ves en la carga masiva de productos?»', '"@vera which edge cases do you see in bulk product upload?"')}</li>
+                </ul>
+                <p style={{ margin: '0.45rem 0 0', opacity: 0.75 }}>
+                  {t(
+                    'También funciona por rol (@po, @architect, @qa…). Sin mención, responde el asistente de planeación general. Los agentes acá ACONSEJAN; actúan cuando las HUs llegan al tablero.',
+                    'Role mentions work too (@po, @architect, @qa…). Without a mention, the general planning assistant replies. Agents ADVISE here; they act once stories reach the board.',
+                  )}
+                </p>
+              </div>
+            </details>
             <div className={styles.presence} style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)', padding: '0 0.25rem 0.4rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <span style={{ color: connected ? 'var(--color-success, #3fb950)' : 'var(--color-fg-muted)' }}>
                 {connected ? t('● Conectado', '● Connected') : t('○ Conectando…', '○ Connecting…')}
@@ -356,6 +391,14 @@ export function PlanChat({
                   {m.role === 'user' && m.authorName && (
                     <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.75, marginBottom: '0.15rem' }}>
                       {m.authorName}
+                    </span>
+                  )}
+                  {m.role === 'assistant' && m.agentName && (
+                    <span
+                      data-testid="agent-reply-name"
+                      style={{ display: 'block', fontSize: '0.7rem', opacity: 0.8, marginBottom: '0.15rem', fontWeight: 600 }}
+                    >
+                      🤖 {m.agentName}
                     </span>
                   )}
                   {m.role === 'assistant' ? <Markdown compact>{m.content}</Markdown> : m.content}

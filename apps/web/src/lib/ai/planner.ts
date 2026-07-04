@@ -36,6 +36,9 @@ export interface ChatMsg {
   // (attachment/file names + "Grafo de código"). Optional and back-compatible:
   // older messages have none. Set when a user message is sent and on generation.
   context?: { sources: string[] };
+  // Cuando la respuesta del asistente la da UN AGENTE del equipo (@mención en el
+  // chat del plan): "Dax · ARCHITECT". Opcional y retro-compatible.
+  agentName?: string;
 }
 export type Lang = 'es' | 'en';
 
@@ -183,8 +186,9 @@ export async function planChatReply(
   userId: string,
   projectId: string,
   codeContext?: string,
+  persona?: { name: string; system: string; model?: string | null },
 ): Promise<string> {
-  const model = env().AI_MODEL_BALANCED;
+  const model = pickModel(env().AI_MODEL_BALANCED, persona?.model);
   const lead =
     brief(project.name, project.description) +
     (attachmentManifest ? `\n\nContexto adjunto:\n${attachmentManifest}` : '') +
@@ -192,7 +196,9 @@ export async function planChatReply(
   const resp = await client().messages.create({
     model,
     max_tokens: 700,
-    system: chatSystem(lang, codeContext),
+    system: persona
+      ? `${chatSystem(lang, codeContext)}\n\n${persona.system}\nFirmá tus respuestas con tu criterio de especialista; no repitas tu nombre en el texto.`
+      : chatSystem(lang, codeContext),
     messages: [{ role: 'user', content: lead }, ...toApiMessages(messages)],
   });
   await record('plan.chat', model, resp.usage, userId, projectId);
