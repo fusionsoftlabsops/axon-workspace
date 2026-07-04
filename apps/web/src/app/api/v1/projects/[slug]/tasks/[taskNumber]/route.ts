@@ -11,6 +11,7 @@ async function loadTaskByNumber(slug: string, taskNumber: number, userId: string
     where: { slug },
     select: {
       id: true,
+      ownerId: true,
       members: { where: { userId }, select: { role: true } },
       workflows: {
         where: { isDefault: true },
@@ -101,6 +102,8 @@ const patchBody = z
     // Asignar la HU al AGENTE de un rol del proyecto (el server resuelve su
     // userId — el llamador no necesita conocer identidades internas).
     assignToAgentRole: z.enum(['SM', 'DEV', 'QA', 'PO', 'DESIGN', 'REVIEWER', 'ARCHITECT', 'MARKETING', 'RELEASE']).optional(),
+    // Asignar la HU al OWNER del proyecto (modo consola: el humano es el dev).
+    assignToOwner: z.boolean().optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'at least one field is required',
@@ -175,7 +178,9 @@ export async function PATCH(
 
   // Resolver el agente destino cuando se pide asignación por rol.
   let assigneeId: string | undefined;
-  if (body.assignToAgentRole) {
+  if (body.assignToOwner) {
+    assigneeId = project.ownerId;
+  } else if (body.assignToAgentRole) {
     const targetAgent = await prisma.agent.findUnique({
       where: { projectId_role: { projectId: project.id, role: body.assignToAgentRole } },
       select: { userId: true, enabled: true },

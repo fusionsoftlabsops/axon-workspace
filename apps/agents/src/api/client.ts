@@ -12,6 +12,8 @@ export interface AgentMe {
   credentialRef: string | null;
   tokenBudget: number;
   enabled: boolean;
+  /** Ejecutor de desarrollo del proyecto: KAI | CONSOLE | HYBRID. */
+  devExecutor?: string;
 }
 
 export interface RunHandle {
@@ -114,6 +116,7 @@ export class AxonApi {
       description?: string;
       priority?: string;
       assignToAgentRole?: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN' | 'REVIEWER' | 'ARCHITECT' | 'MARKETING';
+      assignToOwner?: boolean;
     },
   ): Promise<{ ok: boolean }> {
     return this.request('PATCH', `/projects/${slug}/tasks/${taskNumber}`, input);
