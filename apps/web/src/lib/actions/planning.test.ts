@@ -217,6 +217,21 @@ describe('planChatAction', () => {
     expect(await planChatAction('slug', 'hi')).toEqual({ ok: false, error: 'ai down' });
   });
 
+  it('con @mención responde EN PERSONA del agente (lente + modelo de la card)', async () => {
+    (prismaMock as Record<string, unknown>).agent = {
+      findUnique: vi.fn().mockResolvedValue({ displayName: null, llmModel: 'claude-fable-5' }),
+    };
+    plannerMock.planChatReply.mockResolvedValue('mi lectura de arquitectura');
+    prismaMock.projectPlan.update.mockResolvedValue(planRow());
+    const res = await planChatAction('slug', '@dax ¿cómo partirías el módulo de inventario?');
+    expect(res.ok).toBe(true);
+    const persona = plannerMock.planChatReply.mock.calls[0]![7] as { name: string; system: string; model: string };
+    expect(persona).toMatchObject({ name: 'Dax', model: 'claude-fable-5' });
+    expect(persona.system).toContain('Dax');
+    const savedMsgs = (prismaMock.projectPlan.update.mock.calls.at(-1)![0] as { data: { messages: Array<Record<string, unknown>> } }).data.messages;
+    expect(savedMsgs.at(-1)).toMatchObject({ role: 'assistant', agentName: 'Dax · ARCHITECT' });
+  });
+
   it('appends the reply (using brownfield code context)', async () => {
     prismaMock.codeAnalysis.findUnique.mockResolvedValue({ status: 'READY', summary: 'brief' });
     plannerMock.planChatReply.mockResolvedValue('the reply');
@@ -227,7 +242,7 @@ describe('planChatAction', () => {
     // default (null) → the code graph grounds the chat.
     expect(plannerMock.planChatReply).toHaveBeenCalledWith(
       expect.anything(), expect.anything(), expect.anything(), expect.anything(),
-      expect.anything(), expect.anything(), 'brief',
+      expect.anything(), expect.anything(), 'brief', undefined,
     );
   });
 
@@ -241,7 +256,7 @@ describe('planChatAction', () => {
     expect(prismaMock.codeAnalysis.findUnique).not.toHaveBeenCalled();
     expect(plannerMock.planChatReply).toHaveBeenCalledWith(
       expect.anything(), expect.anything(), expect.anything(), expect.anything(),
-      expect.anything(), expect.anything(), undefined,
+      expect.anything(), expect.anything(), undefined, undefined,
     );
   });
 

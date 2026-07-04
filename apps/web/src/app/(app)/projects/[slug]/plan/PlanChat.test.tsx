@@ -308,7 +308,8 @@ describe('PlanChat', () => {
     );
     expect(screen.getByText('pic')).toBeInTheDocument();
     expect(screen.getByText('doc')).toBeInTheDocument();
-    const list = screen.getByRole('list');
+    // Hay varias listas (los tips de @menciones también son <ul>): la de adjuntos es la última.
+    const list = screen.getAllByRole('list').at(-1)!;
     await user.click(within(list).getAllByRole('button', { name: 'Remove' })[0]);
     expect(h.removePlanAttachmentAction).toHaveBeenCalledWith('p', 'a1');
   });

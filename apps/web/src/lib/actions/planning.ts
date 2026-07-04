@@ -5,6 +5,7 @@ import { Prisma, type PlanAttachment } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { getServerLang } from '@/lib/i18n/server';
+import { parseAgentMention, personaSystem } from '@/lib/agents/mentions';
 import {
   planChatReply,
   generatePlan,
@@ -243,6 +244,28 @@ export async function planChatAction(slug: string, userMessage: string): Promise
   const manifest = [buildManifest(plan.attachments), await contextFilesManifest(ctx.projectId)]
     .filter(Boolean)
     .join('\n');
+  // @mención de un agente → responde EN PERSONA (lente + modelo configurado).
+  const mention = parseAgentMention(text);
+  let persona: { name: string; system: string; model?: string | null } | undefined;
+  let agentLabel: string | undefined;
+  if (mention) {
+    let displayName: string | null = null;
+    let llmModel: string | null = null;
+    try {
+      const agent = await prisma.agent.findUnique({
+        where: { projectId_role: { projectId: ctx.projectId, role: mention.role } },
+        select: { displayName: true, llmModel: true },
+      });
+      displayName = agent?.displayName ?? null;
+      llmModel = agent?.llmModel ?? null;
+    } catch {
+      /* sin agente aprovisionado: persona con defaults */
+    }
+    const name = displayName?.trim() || mention.name;
+    persona = { name, system: personaSystem(mention.role, lang), model: llmModel };
+    agentLabel = `${name} · ${mention.role}`;
+  }
+
   let reply: string;
   try {
     reply = await planChatReply(
@@ -253,12 +276,13 @@ export async function planChatAction(slug: string, userMessage: string): Promise
       ctx.userId,
       ctx.projectId,
       code,
+      persona,
     );
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Error de IA' };
   }
 
-  const assistantMsg: ChatMsg = { role: 'assistant', content: reply };
+  const assistantMsg: ChatMsg = { role: 'assistant', content: reply, ...(agentLabel ? { agentName: agentLabel } : {}) };
   const next: ChatMsg[] = [...withUser, assistantMsg];
   const updated = await prisma.projectPlan.update({
     where: { id: plan.id },
