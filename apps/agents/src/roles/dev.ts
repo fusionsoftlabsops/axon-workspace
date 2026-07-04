@@ -109,14 +109,18 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
         `Tomo la HU #${n} «${story.title ?? ''}». Clonando el repo y arrancando la implementación.`,
         { kind: 'STATUS', storyNumber: n },
       );
-      const ws = await GitWorkspace.clone({
-        repoUrl: repo.url,
-        branch: repo.defaultBranch,
-        gitToken: opts.gitToken,
-        run: opts.run,
-      });
-
+      // Todo el trabajo (clone incluido) va dentro del try: CUALQUIER fallo —
+      // git push rechazado, clone caído, error del PR — comenta en la HU y
+      // narra, JAMÁS queda mudo (causa raíz del "cuelgue" fantasma de HU#24:
+      // el push rechazado tumbaba el run sin dejar rastro en el tablero).
+      let ws: GitWorkspace | null = null;
       try {
+        ws = await GitWorkspace.clone({
+          repoUrl: repo.url,
+          branch: repo.defaultBranch,
+          gitToken: opts.gitToken,
+          run: opts.run,
+        });
         await ws.createBranch(branch);
 
         const goal =
@@ -191,8 +195,25 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
             `${result.iterations} iteraciones). Pasa a Verificación — QA, te toca.`,
           { kind: 'HANDOFF', storyNumber: n },
         );
+      } catch (err) {
+        // Fallo duro del pipeline (git/PR/clone): comentar SIEMPRE para que el
+        // fallo sea visible en el tablero, nunca mudo.
+        const msg = err instanceof Error ? err.message : String(err);
+        await opts.api
+          .comment(
+            opts.projectSlug,
+            n,
+            `🤖 **Dev**: la corrida falló con un error de pipeline: ${msg}. La HU sigue en Desarrollo.`,
+          )
+          .catch((e) => console.error('[agents] no se pudo comentar el fallo del Dev:', e));
+        await narrate(
+          opts.api,
+          opts.projectSlug,
+          `Falló mi corrida en la HU #${n}: ${msg}. Queda en Desarrollo.`,
+          { kind: 'STATUS', storyNumber: n },
+        );
       } finally {
-        await ws.cleanup();
+        if (ws) await ws.cleanup();
       }
     },
   };

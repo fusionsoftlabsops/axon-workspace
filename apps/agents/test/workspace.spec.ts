@@ -56,6 +56,9 @@ describe('GitWorkspace', () => {
     await ws.push('agent/hu-13');
     const ops = calls.map((c) => c.args[0]);
     expect(ops).toEqual(expect.arrayContaining(['checkout', 'add', 'commit', 'push']));
+    // El push es --force sobre la rama del agente (evita rechazo al re-trabajar una HU).
+    const pushCall = calls.find((c) => c.args[0] === 'push')!;
+    expect(pushCall.args).toContain('--force');
     await ws.cleanup();
   });
 
@@ -90,10 +93,25 @@ describe('GitWorkspace', () => {
     await ws.cleanup();
   });
 
-  it('openPr falla claro en errores del API y en repos no-GitHub', async () => {
+  it('openPr reusa el PR existente cuando la rama ya tiene uno abierto (422)', async () => {
     const { run } = okRunner();
     const ws = await GitWorkspace.clone({ ...OPTS, run });
-    fetchMock.mockResolvedValue({ ok: false, status: 422, json: async () => ({ message: 'no diff' }) });
+    // 1º POST /pulls → 422 (ya existe); 2º GET /pulls?head=… → lista con el PR.
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 422, json: async () => ({ message: 'already exists' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [{ html_url: 'https://github.com/x/pr/36' }] });
+    const url = await ws.openPr({ title: 't', body: 'b', head: 'agent/hu-24', base: 'main' });
+    expect(url).toBe('https://github.com/x/pr/36');
+    expect(fetchMock.mock.calls[1]![0]).toContain('/pulls?head=fusionsoftlabsops:agent/hu-24&state=open');
+    await ws.cleanup();
+  });
+
+  it('openPr falla claro si no hay PR reusable y en repos no-GitHub', async () => {
+    const { run } = okRunner();
+    const ws = await GitWorkspace.clone({ ...OPTS, run });
+    fetchMock
+      .mockResolvedValueOnce({ ok: false, status: 422, json: async () => ({ message: 'no diff' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
     await expect(ws.openPr({ title: 't', body: 'b', head: 'h', base: 'main' })).rejects.toThrow('422');
     await ws.cleanup();
 
