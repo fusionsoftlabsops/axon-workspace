@@ -736,6 +736,7 @@ enum AgentRole {
   QA
   PO
   DESIGN
+  REVIEWER
 }
 
 enum AgentRunStatus {
