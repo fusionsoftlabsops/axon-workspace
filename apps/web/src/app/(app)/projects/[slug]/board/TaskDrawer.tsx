@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Badge, Button, Modal } from '@/components/ui';
+import { Badge, Button, Modal, Markdown } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import {
   getTaskDetailAction,
@@ -95,9 +95,7 @@ export function TaskDrawer({ slug, canWrite }: { slug: string; canWrite: boolean
               <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.8rem', textTransform: 'uppercase', opacity: 0.6 }}>
                 {t('Criterios de aceptación', 'Acceptance criteria')}
               </h4>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                {detail.acceptanceCriteria}
-              </p>
+              <Markdown>{detail.acceptanceCriteria}</Markdown>
             </section>
           )}
 
@@ -116,24 +114,20 @@ export function TaskDrawer({ slug, canWrite }: { slug: string; canWrite: boolean
             )}
 
             {hasPlan ? (
-              <pre
+              <div
                 data-testid="impl-plan-content"
                 style={{
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
                   fontSize: '0.82rem',
-                  lineHeight: 1.5,
                   maxHeight: '40vh',
                   overflowY: 'auto',
                   padding: '0.75rem',
                   border: '1px solid var(--border, rgba(127,127,127,0.22))',
                   borderRadius: 8,
                   margin: '0 0 0.6rem',
-                  fontFamily: 'inherit',
                 }}
               >
-                {detail.implPlan}
-              </pre>
+                <Markdown>{detail.implPlan ?? ''}</Markdown>
+              </div>
             ) : (
               <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem', opacity: 0.7 }}>
                 {t(

@@ -37,9 +37,9 @@ es intentar demostrar que NO lo está. Contrastá cada criterio de aceptación c
 buscá casos borde sin cubrir, tests faltantes y promesas del resumen del dev que el código no cumple.
 
 Sé DECISIVO — tenés un número LIMITADO de turnos y presupuesto de tokens. Método (seguilo en orden):
-1. El handoff del dev NOMBRA los archivos que tocó. Leé DIRECTO esos archivos con read_file (no listes ni busques por todo el repo).
-2. Máximo ~5 lecturas en total. NO re-leas un archivo que ya viste. Después de leer los archivos del cambio, DECIDÍ.
-3. Verificá cada criterio de aceptación contra lo que leíste; si un criterio no tiene evidencia clara en el código, es reject.
+1. Si tenés la tool git_diff, EMPEZÁ por ella: te da el cambio exacto en una llamada. Solo leé un archivo completo si el diff no alcanza para juzgar un criterio.
+2. Máximo ~5 lecturas en total. NO re-leas un archivo que ya viste. Después, DECIDÍ.
+3. Verificá cada criterio de aceptación contra lo que viste; si un criterio no tiene evidencia clara en el código, es reject.
 4. NO explores archivos no relacionados con el cambio.
 Cuando tengas el veredicto, TERMINÁ: respondé SOLO un JSON (sin más tool calls):
 {"decision": "approve" | "reject", "comment": "veredicto accionable en markdown (si reject: qué falta, concreto)"}`;
@@ -47,6 +47,17 @@ Cuando tengas el veredicto, TERMINÁ: respondé SOLO un JSON (sin más tool call
 /** Tools de repo SIN write_file: QA lee, jamás modifica. */
 function readOnlyRepoTools(root: string): ToolDef[] {
   return repoTools(root).filter((t) => t.name !== 'write_file');
+}
+
+/** Tool git_diff: el cambio exacto de la rama del dev vs. la base, en una llamada. */
+export function gitDiffTool(ws: GitWorkspace, baseBranch: string): ToolDef {
+  return {
+    name: 'git_diff',
+    description:
+      'Diff exacto del cambio bajo revisión (rama del dev vs. la rama base): archivos cambiados + patch. Empezá por acá.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    execute: async () => ws.diffAgainst(baseBranch),
+  };
 }
 
 export function createQaHandler(opts: QaOptions): RoleHandler {
@@ -137,7 +148,10 @@ export function createQaHandler(opts: QaOptions): RoleHandler {
           payload: { via: 'qa', storyNumber: n },
           provider: opts.provider,
           system: QA_SYSTEM,
-          tools: [...(ws ? readOnlyRepoTools(ws.dir) : []), ...contextTools(opts.api, opts.projectSlug)],
+          tools: [
+            ...(ws ? [gitDiffTool(ws, repo?.defaultBranch ?? 'main'), ...readOnlyRepoTools(ws.dir)] : []),
+            ...contextTools(opts.api, opts.projectSlug),
+          ],
           maxIterations: opts.maxIterations ?? 16,
           maxDurationMs: opts.maxDurationMs,
         });
@@ -172,6 +186,31 @@ export function createQaHandler(opts: QaOptions): RoleHandler {
           decision: verdict.decision,
           comment: verdict.comment?.trim() || (verdict.decision === 'reject' ? 'Revisión adversarial: criterios sin evidencia en el código.' : undefined),
         });
+
+        // Aprendizaje: veredicto → cerebro PERSONAL del QA; un rechazo además
+        // deja un GOTCHA en el cerebro COMPARTIDO (el equipo aprende qué faltó).
+        try {
+          await opts.api.captureMemory(opts.projectSlug, {
+            type: 'NOTE',
+            title: `QA HU #${n}: ${verdict.decision}`,
+            body: (verdict.comment ?? '').slice(0, 2000) || verdict.decision,
+            tags: ['qa', 'veredicto'],
+            scope: 'LOCAL',
+            sourceTaskNumber: n,
+          });
+          if (verdict.decision === 'reject') {
+            await opts.api.captureMemory(opts.projectSlug, {
+              type: 'GOTCHA',
+              title: `QA rechazó la HU #${n} — qué faltó`,
+              body: (verdict.comment ?? 'criterios sin evidencia').slice(0, 2000),
+              tags: ['qa', 'reject'],
+              scope: 'PROJECT',
+              sourceTaskNumber: n,
+            });
+          }
+        } catch {
+          /* el aprendizaje es best-effort: jamás rompe el veredicto */
+        }
         await narrate(
           opts.api,
           opts.projectSlug,

@@ -115,6 +115,20 @@ export class GitWorkspace {
     await this.git(['commit', '-m', message]);
   }
 
+  /**
+   * Diff del workspace (rama del dev, clone shallow) contra la rama base.
+   * Trae la base con fetch shallow y devuelve stat + patch (truncado). Le da a
+   * QA/Reviewer el cambio EXACTO en una sola llamada, en vez de leer archivos
+   * enteros para deducirlo — el mayor ahorro de tokens del review.
+   */
+  async diffAgainst(baseBranch: string, maxChars = 60_000): Promise<string> {
+    await this.git(['fetch', '--depth', '1', 'origin', baseBranch]);
+    const stat = await this.git(['diff', '--stat', 'FETCH_HEAD...HEAD']);
+    const patch = await this.git(['diff', 'FETCH_HEAD...HEAD']);
+    const body = `## Archivos cambiados\n${stat}\n\n## Diff\n${patch}`;
+    return body.length > maxChars ? `${body.slice(0, maxChars)}\n…(diff truncado)` : body;
+  }
+
   async push(branch: string): Promise<void> {
     // --force sobre la rama DEDICADA del agente (agent/hu-N): si quedó una
     // versión vieja de una corrida anterior de la MISMA HU, se sobrescribe.

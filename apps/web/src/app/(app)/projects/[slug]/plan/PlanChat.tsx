@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button, Card } from '@/components/ui';
+import { Button, Card, Markdown } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import {
   planChatAction,
@@ -358,7 +358,7 @@ export function PlanChat({
                       {m.authorName}
                     </span>
                   )}
-                  {m.content}
+                  {m.role === 'assistant' ? <Markdown compact>{m.content}</Markdown> : m.content}
                 </div>
                 );
               })}
