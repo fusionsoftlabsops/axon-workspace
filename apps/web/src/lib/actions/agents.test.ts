@@ -20,6 +20,7 @@ vi.mock('@/lib/auth/membership', () => ({ assertProjectMember: assertMock }));
 vi.mock('@/lib/agents/provision', () => ({
   provisionAgent: provisionMock,
 }));
+vi.mock('@/lib/agents/events', () => ({ publishDomainEvent: vi.fn() }));
 
 import {
   listAgentsAction,
@@ -29,6 +30,7 @@ import {
   listAgentRunsAction,
   getAgentStatsAction,
   applyTeamPresetAction,
+  verifyAgentsAction,
 } from './agents';
 
 const OWNER = { ok: true as const, userId: 'u1', projectId: 'p1', role: 'OWNER' as const };
@@ -243,5 +245,48 @@ describe('applyTeamPresetAction', () => {
     expect(await applyTeamPresetAction('axon', 'NOPE' as never)).toMatchObject({ ok: false });
     assertMock.mockResolvedValue({ ok: true, userId: 'u1', projectId: 'p1', role: 'MEMBER' });
     expect(await applyTeamPresetAction('axon', 'ECO')).toMatchObject({ ok: false });
+  });
+});
+
+
+describe('verifyAgentsAction', () => {
+  it('chequea el worker y re-dispara las HUs no terminadas (saltando corridas en vuelo)', async () => {
+    const { publishDomainEvent } = await import('@/lib/agents/events');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, subscribed: true }) }));
+    (prismaMock as Record<string, any>).task = {
+      findMany: vi.fn().mockResolvedValue([
+        { id: 't1', taskNumber: 1, assigneeId: null, state: { id: 's1', name: 'Preparación', category: 'OPEN' } },
+        { id: 't2', taskNumber: 2, assigneeId: 'u-dev', state: { id: 's2', name: 'Desarrollo', category: 'IN_PROGRESS' } },
+        { id: 't3', taskNumber: 3, assigneeId: 'u-dev', state: { id: 's3', name: 'Verificación', category: 'REVIEW' } },
+      ]),
+    };
+    prismaMock.agentRun.findMany.mockResolvedValue([{ storyId: 't2' }]); // t2 en vuelo
+    (prismaMock as Record<string, any>).project = { update: vi.fn() };
+    const res = await verifyAgentsAction('axon');
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.data!.worker).toEqual({ reachable: true, subscribed: true });
+      expect(res.data!.refired.backlog).toEqual([1]);
+      expect(res.data!.refired.development).toEqual([]); // t2 saltada (RUNNING)
+      expect(res.data!.refired.review).toEqual([3]);
+      expect(res.data!.skippedRunning).toEqual([2]);
+    }
+    const calls = (publishDomainEvent as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(calls).toEqual([
+      expect.objectContaining({ type: 'story.created', storyNumber: 1 }),
+      expect.objectContaining({ type: 'story.state_changed', storyNumber: 3 }),
+    ]);
+    vi.unstubAllGlobals();
+    delete (prismaMock as Record<string, any>).task;
+  });
+
+  it('reporta worker inalcanzable sin romper', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
+    (prismaMock as Record<string, any>).task = { findMany: vi.fn().mockResolvedValue([]) };
+    prismaMock.agentRun.findMany.mockResolvedValue([]);
+    const res = await verifyAgentsAction('axon');
+    expect(res.ok && res.data!.worker.reachable).toBe(false);
+    vi.unstubAllGlobals();
+    delete (prismaMock as Record<string, any>).task;
   });
 });

@@ -188,7 +188,10 @@ export async function planChatReply(
   codeContext?: string,
   persona?: { name: string; system: string; model?: string | null },
 ): Promise<string> {
-  const model = pickModel(env().AI_MODEL_BALANCED, persona?.model);
+  // Chat de planeación en fable-5 por defecto (pedido del usuario): la calidad
+  // de la conversación define el plan. Las @menciones siguen usando el modelo
+  // del agente; AI_MODEL_CHAT permite override por env sin tocar código.
+  const model = pickModel(env().AI_MODEL_CHAT ?? 'claude-fable-5', persona?.model);
   const lead =
     brief(project.name, project.description) +
     (attachmentManifest ? `\n\nContexto adjunto:\n${attachmentManifest}` : '') +
