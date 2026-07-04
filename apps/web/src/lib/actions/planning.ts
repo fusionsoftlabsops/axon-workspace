@@ -6,6 +6,26 @@ import { prisma } from '@/lib/db';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { getServerLang } from '@/lib/i18n/server';
 import { parseAgentMention, personaSystem } from '@/lib/agents/mentions';
+
+/** HUs YA publicadas del tablero (título + estado) para que el chat y el
+ *  generador iteren SIN repetir. Defensivo: fallo → '' (cero impacto). */
+async function boardManifest(projectId: string, cap = 120): Promise<string> {
+  try {
+    const tasks = await prisma.task.findMany({
+      where: { projectId },
+      select: { taskNumber: true, title: true, state: { select: { name: true } } },
+      orderBy: { taskNumber: 'asc' },
+      take: cap,
+    });
+    if (tasks.length === 0) return '';
+    return (
+      'HUs ya publicadas en el tablero (contexto — no proponer duplicados):\n' +
+      tasks.map((t) => `- #${t.taskNumber} ${t.title} [${t.state.name}]`).join('\n')
+    );
+  } catch {
+    return '';
+  }
+}
 import {
   planChatReply,
   generatePlan,
@@ -241,7 +261,7 @@ export async function planChatAction(slug: string, userMessage: string): Promise
   const meta = await projectMeta(ctx.projectId);
   const lang = await getServerLang();
   const code = await codeContext(ctx.projectId, plan.contextGraph as ContextGraph | null);
-  const manifest = [buildManifest(plan.attachments), await contextFilesManifest(ctx.projectId)]
+  const manifest = [buildManifest(plan.attachments), await contextFilesManifest(ctx.projectId), await boardManifest(ctx.projectId)]
     .filter(Boolean)
     .join('\n');
   // @mención de un agente → responde EN PERSONA (lente + modelo configurado).
@@ -709,6 +729,7 @@ async function runPlanGeneration(
     await bumpPlanPhase(planId, 'code_context', startedAt);
     const code = await codeContext(projectId, contextGraph);
     await bumpPlanPhase(planId, 'calling_opus', startedAt);
+    const existingStories = await boardManifest(projectId);
     const plan = await generatePlan(
       { name: meta?.name ?? '', description: meta?.description ?? null },
       messages,
@@ -718,6 +739,7 @@ async function runPlanGeneration(
       userId,
       projectId,
       code,
+      existingStories || undefined,
     );
     await bumpPlanPhase(planId, 'normalizing', startedAt);
     normalizeEstimates(plan); // derive "junior–senior" range per HU
@@ -1090,8 +1112,33 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
   const firstState = workflow?.states[0];
   if (!firstState) return { ok: false, error: 'El proyecto no tiene workflow' };
 
-  const totalTasks = gen.sprints.reduce((n, s) => n + s.tasks.length, 0);
-  if (totalTasks === 0) return { ok: false, error: 'El plan no tiene tareas' };
+  // Iteración sin duplicados: las HUs cuyo título ya existe en el tablero se
+  // saltan, y los sprints se REUSAN por nombre (publicar de nuevo no clona).
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+  let existingTitles = new Set<string>();
+  let existingSprints = new Map<string, string>();
+  let sprintCount = 0;
+  try {
+    const [curTasks, curSprints] = await Promise.all([
+      prisma.task.findMany({ where: { projectId: ctx.projectId }, select: { title: true } }),
+      prisma.sprint.findMany({ where: { projectId: ctx.projectId }, select: { id: true, name: true } }),
+    ]);
+    existingTitles = new Set(curTasks.map((t) => norm(t.title)));
+    existingSprints = new Map(curSprints.map((s) => [norm(s.name), s.id]));
+    sprintCount = curSprints.length;
+  } catch {
+    /* primer publish / tests: sin dedupe */
+  }
+  const sprintsToCreate = gen.sprints
+    .map((s) => ({ ...s, tasks: s.tasks.filter((t) => !existingTitles.has(norm(t.title))) }))
+    .filter((s) => s.tasks.length > 0);
+  const skipped = gen.sprints.reduce((n, s) => n + s.tasks.length, 0) -
+    sprintsToCreate.reduce((n, s) => n + s.tasks.length, 0);
+
+  const totalTasks = sprintsToCreate.reduce((n, s) => n + s.tasks.length, 0);
+  if (totalTasks === 0) {
+    return { ok: false, error: skipped > 0 ? 'Todas las HUs del plan ya existen en el tablero (0 nuevas)' : 'El plan no tiene tareas' };
+  }
 
   await prisma.$transaction(async (tx) => {
     const counter = await tx.projectTaskCounter.update({
@@ -1101,10 +1148,13 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
     let nextNumber = counter.next - totalTasks;
     let pos = 0;
 
-    for (const [si, sprint] of gen.sprints.entries()) {
-      const createdSprint = await tx.sprint.create({
-        data: { projectId: ctx.projectId, name: sprint.name, goal: sprint.goal || null, order: si },
-      });
+    for (const [si, sprint] of sprintsToCreate.entries()) {
+      const reusedId = existingSprints.get(norm(sprint.name));
+      const createdSprint = reusedId
+        ? { id: reusedId }
+        : await tx.sprint.create({
+            data: { projectId: ctx.projectId, name: sprint.name, goal: sprint.goal || null, order: sprintCount + si },
+          });
       for (const t of sprint.tasks) {
         const task = await tx.task.create({
           data: {

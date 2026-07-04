@@ -205,6 +205,11 @@ describe('PlanChat', () => {
     vi.useRealTimers();
   });
 
+  it('publicado: muestra la barra de iteración (Generar HUs nuevas)', () => {
+    render(<PlanChat slug="p" canWrite initialPlan={plan({ status: 'PUBLISHED', generated: genPlan(), improvedIdea: 'x' })} />);
+    expect(screen.getByTestId('iterate-generate')).toBeInTheDocument();
+  });
+
   it('renders the published banner and hides the composer', () => {
     render(<PlanChat slug="p" canWrite initialPlan={plan({ status: 'PUBLISHED' })} />);
     expect(screen.getByText(/Plan published to the board/i)).toBeInTheDocument();

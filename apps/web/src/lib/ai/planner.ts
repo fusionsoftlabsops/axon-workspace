@@ -215,6 +215,7 @@ export async function generatePlan(
   userId: string,
   projectId: string,
   codeContext?: string,
+  existingStories?: string,
 ): Promise<GeneratedPlan> {
   const model = env().AI_MODEL_DEEP;
 
@@ -227,6 +228,10 @@ export async function generatePlan(
       type: 'text',
       text:
         'Con todo el contexto anterior y los adjuntos, genera el plan completo llamando a EmitPlan.' +
+        (existingStories
+          ? `\n\nEl tablero YA tiene estas HUs publicadas — NO las repitas ni propongas variantes de lo mismo. ` +
+            `Generá SOLO las HUs NUEVAS/incrementales que surgen de la conversación reciente:\n${existingStories}`
+          : '') +
         docContext,
     },
     ...images.map(

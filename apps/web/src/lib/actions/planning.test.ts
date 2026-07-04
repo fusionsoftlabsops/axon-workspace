@@ -217,6 +217,18 @@ describe('planChatAction', () => {
     expect(await planChatAction('slug', 'hi')).toEqual({ ok: false, error: 'ai down' });
   });
 
+  it('el chat recibe las HUs ya publicadas como contexto (anti-duplicados)', async () => {
+    (prismaMock as Record<string, any>).task = {
+      findMany: vi.fn().mockResolvedValue([{ taskNumber: 12, title: 'Login con OTP', state: { name: 'Terminada' } }]),
+    };
+    plannerMock.planChatReply.mockResolvedValue('ok');
+    prismaMock.projectPlan.update.mockResolvedValue(planRow());
+    await planChatAction('slug', 'qué sigue?');
+    const manifest = plannerMock.planChatReply.mock.calls[0]![3] as string;
+    expect(manifest).toContain('#12 Login con OTP [Terminada]');
+    delete (prismaMock as Record<string, any>).task;
+  });
+
   it('con @mención responde EN PERSONA del agente (lente + modelo de la card)', async () => {
     (prismaMock as Record<string, unknown>).agent = {
       findUnique: vi.fn().mockResolvedValue({ displayName: null, llmModel: 'claude-fable-5' }),
@@ -720,6 +732,35 @@ describe('publishPlanAction', () => {
     });
     prismaMock.workflow.findFirst.mockResolvedValue({ states: [{ id: 'st1' }] });
     expect(await publishPlanAction('slug')).toEqual({ ok: false, error: 'El plan no tiene tareas' });
+  });
+
+  it('iteración: dedupe por título y reuso de sprint por nombre al publicar', async () => {
+    schemaMock.generatedPlanSchema.safeParse.mockReturnValue({
+      success: true,
+      data: {
+        improvedIdea: 'i',
+        suggestedRepos: [],
+        sprints: [
+          { name: 'Sprint X', goal: '', tasks: [
+            { title: 'Ya Existe', description: '', acceptanceCriteria: '', estimate: '', estimateBySeniority: {}, category: 'backend', recommendedRoles: [], priority: 'MEDIUM', kind: 'TASK', repo: '', assignment: null },
+            { title: 'Nueva HU', description: '', acceptanceCriteria: '', estimate: '', estimateBySeniority: {}, category: 'backend', recommendedRoles: [], priority: 'MEDIUM', kind: 'TASK', repo: '', assignment: null },
+          ] },
+        ],
+      },
+    });
+    (prismaMock as Record<string, any>).task = { findMany: vi.fn().mockResolvedValue([{ title: '  ya   existe ' }]) };
+    (prismaMock as Record<string, any>).sprint = { findMany: vi.fn().mockResolvedValue([{ id: 'spOld', name: 'sprint x' }]) };
+    prismaMock.workflow.findFirst.mockResolvedValue({ states: [{ id: 'st1' }] });
+    txMock.projectTaskCounter.update.mockResolvedValue({ next: 10 });
+    txMock.task.create.mockResolvedValue({ id: 't1' });
+    const res = await publishPlanAction('slug');
+    expect(res.ok).toBe(true);
+    // el sprint se REUSA (no se crea) y solo entra la HU nueva
+    expect(txMock.sprint.create).not.toHaveBeenCalled();
+    expect(txMock.task.create).toHaveBeenCalledTimes(1);
+    expect(txMock.task.create.mock.calls[0]![0].data).toMatchObject({ title: 'Nueva HU', sprintId: 'spOld' });
+    delete (prismaMock as Record<string, any>).task;
+    delete (prismaMock as Record<string, any>).sprint;
   });
 
   it('publishes the plan into sprints + tasks', async () => {
