@@ -22,7 +22,7 @@ describe('buildTeam', () => {
   it('con config completa registra los handlers/sweep del equipo (incl. PO)', () => {
     const router = new EventRouter();
     const team = buildTeam(loadConfig(FULL_ENV), router);
-    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'DESIGN', 'DEV', 'QA']);
+    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'DESIGN', 'DEV(+strong)', 'QA']);
     expect(team.skipped).toEqual([]);
     expect(router.size).toBe(6); // assign + retro + po + design + dev + qa (el sweep no es handler de eventos)
     expect(team.staleSweep).not.toBeNull();

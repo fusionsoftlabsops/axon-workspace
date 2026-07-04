@@ -15,6 +15,7 @@ import type { AxonApi } from '../api/client.js';
 import type { DomainEventV1 } from '../events.js';
 import type { RoleHandler } from '../router.js';
 import type { LlmProvider } from '../runtime/types.js';
+import { looksLikeUi } from '../ui-story.js';
 import { runTrackedLoop } from '../runtime/tracked.js';
 import { contextTools } from '../tools/context.js';
 import { repoTools } from '../tools/repo.js';
@@ -25,7 +26,12 @@ export interface DevOptions {
   api: AxonApi;
   projectId: string;
   projectSlug: string;
+  /** Modelo primario (Qwen): barato, cierra HUs triviales/backend. */
   provider: LlmProvider;
+  /** Modelo fuerte (Claude) para HUs de UI/complejas, donde Qwen no converge.
+   *  Si no se pasa, el Dev usa siempre el primario. Selección por HU vía
+   *  `looksLikeUi` (misma heurística que Aria/SM). */
+  strongProvider?: LlmProvider;
   /** Token de GitHub para clone/push/PR (repos privados). */
   gitToken?: string;
   /** Runner de comandos inyectable (tests). */
@@ -88,8 +94,14 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
       const story = (await opts.api.getTask(opts.projectSlug, n)) as {
         title?: string;
         description?: string;
+        category?: string | null;
         designSpec?: string | null;
       };
+
+      // Selección de modelo por HU: las de UI/complejas van al modelo fuerte
+      // (Claude), donde Qwen no converge; el resto al primario (Qwen, barato).
+      const useStrong = !!opts.strongProvider && looksLikeUi(story);
+      const provider = useStrong ? opts.strongProvider! : opts.provider;
 
       // Repo del proyecto: el primero vinculado (v1: un repo por proyecto).
       const { repos } = await opts.api.listRepos(opts.projectSlug);
@@ -107,7 +119,8 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
       await narrate(
         opts.api,
         opts.projectSlug,
-        `Tomo la HU #${n} «${story.title ?? ''}». Clonando el repo y arrancando la implementación.`,
+        `Tomo la HU #${n} «${story.title ?? ''}»${useStrong ? ' (UI → modelo fuerte)' : ''}. ` +
+          `Clonando el repo y arrancando la implementación.`,
         { kind: 'STATUS', storyNumber: n },
       );
       // Todo el trabajo (clone incluido) va dentro del try: CUALQUIER fallo —
@@ -160,8 +173,8 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           api: opts.api,
           projectSlug: opts.projectSlug,
           storyId: event.storyId,
-          payload: { via: 'dev', storyNumber: n, branch },
-          provider: opts.provider,
+          payload: { via: 'dev', storyNumber: n, branch, model: useStrong ? 'strong' : 'primary' },
+          provider,
           system: DEV_SYSTEM,
           tools: [...repoTools(ws.dir), ...contextTools(opts.api, opts.projectSlug)],
           maxIterations: opts.maxIterations ?? 40,

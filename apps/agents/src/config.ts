@@ -31,6 +31,9 @@ const schema = z.object({
   // Claude (credencial server de la instancia) para los roles SM/QA.
   ANTHROPIC_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   ANTHROPIC_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('claude-sonnet-4-6')),
+  // Modelo fuerte del Dev para HUs de UI/complejas (Claude), donde Qwen no
+  // converge. Usa la misma ANTHROPIC_API_KEY. Si no hay key, el Dev usa siempre Qwen.
+  DEV_STRONG_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('claude-sonnet-5')),
   // Token de GitHub para clone/push/PR del Dev y clone de QA (repos privados).
   GITHUB_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // Intervalo del sweep de estancadas del SM (minutos; 0 = apagado).

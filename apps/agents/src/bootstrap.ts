@@ -95,18 +95,24 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
       apiKey: config.FUSION_TOKEN,
       model: config.QWEN_MODEL,
     });
+    // Modelo fuerte para HUs de UI/complejas (Claude): mismo tool-loop que el QA.
+    // Sin ANTHROPIC_API_KEY, el Dev usa siempre Qwen (degradación limpia).
+    const strongProvider = config.ANTHROPIC_API_KEY
+      ? createAnthropicProvider({ apiKey: config.ANTHROPIC_API_KEY, model: config.DEV_STRONG_MODEL })
+      : undefined;
     router.register(
       createDevHandler({
         api,
         projectId,
         projectSlug,
         provider: qwen,
+        strongProvider,
         gitToken: config.GITHUB_TOKEN,
         maxIterations: config.DEV_MAX_ITERATIONS,
         maxDurationMs: config.AGENT_MAX_DURATION_MS,
       }),
     );
-    registered.push('DEV');
+    registered.push(strongProvider ? 'DEV(+strong)' : 'DEV');
   }
 
   // ---- QA (Claude) ----
