@@ -57,7 +57,7 @@ export default async function NewStoryPage({
       id: 'server',
       provider: 'ANTHROPIC',
       label: 'Credencial del servidor (Anthropic)',
-      modelDefault: 'claude-sonnet-4-6',
+      modelDefault: 'claude-sonnet-5',
       keyPrefix: 'server',
     });
   }

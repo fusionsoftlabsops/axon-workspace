@@ -22,6 +22,7 @@ interface ModelPricing {
 const PRICING: Record<string, ModelPricing> = {
   'claude-haiku-4-5-20251001': { inputPerM: 0.8, outputPerM: 4, cacheReadPerM: 0.08 },
   'claude-sonnet-4-6': { inputPerM: 3, outputPerM: 15, cacheReadPerM: 0.3 },
+  'claude-sonnet-5': { inputPerM: 3, outputPerM: 15, cacheReadPerM: 0.3 },
   'claude-opus-4-8': { inputPerM: 15, outputPerM: 75, cacheReadPerM: 1.5 },
 };
 

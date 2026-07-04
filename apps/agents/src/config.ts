@@ -34,7 +34,7 @@ const schema = z.object({
   QWEN_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('qwen3-coder-next')),
   // Claude (credencial server de la instancia) para los roles SM/QA.
   ANTHROPIC_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  ANTHROPIC_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('claude-sonnet-4-6')),
+  ANTHROPIC_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('claude-sonnet-5')),
   // Modelo fuerte del Dev para HUs de UI/complejas (Claude), donde Qwen no
   // converge. Usa la misma ANTHROPIC_API_KEY. Si no hay key, el Dev usa siempre Qwen.
   DEV_STRONG_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('claude-sonnet-5')),

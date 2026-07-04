@@ -238,7 +238,7 @@ describe('registry', () => {
     expect(getProvider('OPENAI')).toBe(OpenAIProvider);
     expect(getProvider('MOONSHOT')).toBe(MoonshotProvider);
     expect(listProviders().map((p) => p.name).sort()).toEqual(['ANTHROPIC', 'GOOGLE', 'MOONSHOT', 'OPENAI']);
-    expect(defaultModelFor('ANTHROPIC')).toBe('claude-sonnet-4-6');
+    expect(defaultModelFor('ANTHROPIC')).toBe('claude-sonnet-5');
     expect(defaultModelFor('MOONSHOT')).toBe('kimi-latest');
   });
 });

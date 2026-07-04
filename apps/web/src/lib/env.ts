@@ -53,7 +53,7 @@ const schema = z.object({
   // MinIO needs path-style addressing (bucket in the path, not the host).
   S3_FORCE_PATH_STYLE: z.preprocess((v) => v !== 'false', z.boolean().default(true)),
   AI_MODEL_FAST: z.string().default('claude-haiku-4-5-20251001'),
-  AI_MODEL_BALANCED: z.string().default('claude-sonnet-4-6'),
+  AI_MODEL_BALANCED: z.string().default('claude-sonnet-5'),
   AI_MODEL_DEEP: z.string().default('claude-opus-4-8'),
   // Self-hosted LLM (Ollama on fusion-infra, reachable on the internal `fusion`
   // network) used for the context-graph summaries — keeps that cost off Anthropic.

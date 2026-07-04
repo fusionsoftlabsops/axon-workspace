@@ -3,6 +3,7 @@ import type { ChatProvider, ChatOptions, ChatChunk, ProviderInfo } from './types
 
 const MODELS = [
   { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', inputPerMTokens: 0.8, outputPerMTokens: 4, supportsJsonMode: true },
+  { id: 'claude-sonnet-5',           displayName: 'Claude Sonnet 5',   inputPerMTokens: 3,    outputPerMTokens: 15, supportsJsonMode: true },
   { id: 'claude-sonnet-4-6',         displayName: 'Claude Sonnet 4.6', inputPerMTokens: 3,    outputPerMTokens: 15, supportsJsonMode: true },
   { id: 'claude-opus-4-7',           displayName: 'Claude Opus 4.7',   inputPerMTokens: 15,   outputPerMTokens: 75, supportsJsonMode: true },
 ] as const;
@@ -11,7 +12,7 @@ const INFO: ProviderInfo = {
   name: 'ANTHROPIC',
   displayName: 'Anthropic (Claude)',
   models: [...MODELS],
-  defaultModel: 'claude-sonnet-4-6',
+  defaultModel: 'claude-sonnet-5',
 };
 
 export const AnthropicProvider: ChatProvider = {
