@@ -17,15 +17,15 @@ const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARK
 type Role = (typeof ROLES)[number];
 
 const DEFAULT_MODEL: Record<Role, string> = {
-  SM: 'claude-sonnet-4-6',
-  PO: 'claude-sonnet-4-6',
-  ARCHITECT: 'claude-sonnet-4-6',
-  DESIGN: 'claude-sonnet-4-6',
+  SM: 'claude-sonnet-5',
+  PO: 'claude-sonnet-5',
+  ARCHITECT: 'claude-sonnet-5',
+  DESIGN: 'claude-sonnet-5',
   DEV: 'qwen3-coder-next',
-  QA: 'claude-sonnet-4-6',
-  REVIEWER: 'claude-sonnet-4-6',
-  MARKETING: 'claude-sonnet-4-6',
-  RELEASE: 'claude-sonnet-4-6',
+  QA: 'claude-sonnet-5',
+  REVIEWER: 'claude-sonnet-5',
+  MARKETING: 'claude-sonnet-5',
+  RELEASE: 'claude-sonnet-5',
 };
 
 export function AgentsClient({
