@@ -749,6 +749,7 @@ enum AgentRole {
   REVIEWER
   ARCHITECT
   MARKETING
+  RELEASE
 }
 
 enum AgentRunStatus {

@@ -15,6 +15,7 @@ const FULL_ENV = {
   AGENT_DEV_TOKEN: 'ad_pk_dev',
   AGENT_QA_TOKEN: 'ad_pk_qa',
   AGENT_REVIEWER_TOKEN: 'ad_pk_reviewer',
+  AGENT_RELEASE_TOKEN: 'ad_pk_release',
   FUSION_MODEL_URL: 'https://modelo.local/v1',
   FUSION_TOKEN: 'fsn_x',
   ANTHROPIC_API_KEY: 'sk-ant-x',
@@ -25,9 +26,9 @@ describe('buildTeam', () => {
   it('con config completa registra los handlers/sweep del equipo (incl. PO)', () => {
     const router = new EventRouter();
     const team = buildTeam(loadConfig(FULL_ENV), router);
-    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV(+strong)', 'QA', 'REVIEWER']);
+    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV(+strong)', 'QA', 'REVIEWER', 'RELEASE']);
     expect(team.skipped).toEqual([]);
-    expect(router.size).toBe(9); // assign+retro+po+architect+marketing+design+dev+qa+reviewer
+    expect(router.size).toBe(10); // +release (el sweep no es handler)
     expect(team.staleSweep).not.toBeNull();
   });
 
@@ -51,7 +52,7 @@ describe('buildTeam', () => {
     );
     // PO, Arquitecto y Diseño son deterministas (no necesitan Claude) → siguen activos.
     // Reviewer necesita Claude → queda fuera sin ANTHROPIC_API_KEY.
-    expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN']);
+    expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'RELEASE']);
     expect(team.skipped).toEqual(
       expect.arrayContaining([
         { role: 'SM:retro', reason: 'sin ANTHROPIC_API_KEY' },
@@ -69,6 +70,6 @@ describe('buildTeam', () => {
       router,
     );
     expect(team.registered).toEqual([]);
-    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV', 'QA', 'REVIEWER']);
+    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'RELEASE']);
   });
 });

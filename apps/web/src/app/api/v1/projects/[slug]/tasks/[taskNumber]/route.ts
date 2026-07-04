@@ -100,7 +100,7 @@ const patchBody = z
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
     // Asignar la HU al AGENTE de un rol del proyecto (el server resuelve su
     // userId — el llamador no necesita conocer identidades internas).
-    assignToAgentRole: z.enum(['SM', 'DEV', 'QA', 'PO', 'DESIGN', 'REVIEWER', 'ARCHITECT', 'MARKETING']).optional(),
+    assignToAgentRole: z.enum(['SM', 'DEV', 'QA', 'PO', 'DESIGN', 'REVIEWER', 'ARCHITECT', 'MARKETING', 'RELEASE']).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'at least one field is required',

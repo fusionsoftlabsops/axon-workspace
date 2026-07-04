@@ -19,6 +19,7 @@ import { createDesignHandler } from './roles/design.js';
 import { createReviewerHandler } from './roles/reviewer.js';
 import { createArchitectHandler } from './roles/architect.js';
 import { createMarketingHandler } from './roles/marketing.js';
+import { createReleaseHandler } from './roles/release.js';
 import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
@@ -174,6 +175,15 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
       }),
     );
     registered.push('REVIEWER');
+  }
+
+  // ---- RELEASE (Marco: verifica readiness del PR en DONE, advisory) ----
+  if (config.tokens.RELEASE) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.RELEASE);
+    router.register(createReleaseHandler({ api, projectId, projectSlug, gitToken: config.GITHUB_TOKEN }));
+    registered.push('RELEASE');
+  } else {
+    skipped.push({ role: 'RELEASE', reason: 'sin AGENT_RELEASE_TOKEN' });
   }
 
   return { registered, skipped, staleSweep };

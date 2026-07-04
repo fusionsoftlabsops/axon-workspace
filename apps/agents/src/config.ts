@@ -24,6 +24,7 @@ const schema = z.object({
   AGENT_REVIEWER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_ARCHITECT_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_MARKETING_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  AGENT_RELEASE_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // Proyecto que este worker atiende (v1: un proyecto por instancia).
   AGENT_PROJECT_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_PROJECT_SLUG: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
@@ -64,7 +65,7 @@ export type AgentsConfig = z.infer<typeof schema> & {
   enabled: boolean;
   tokens: {
     SM?: string; PO?: string; DEV?: string; QA?: string;
-    DESIGN?: string; REVIEWER?: string; ARCHITECT?: string; MARKETING?: string;
+    DESIGN?: string; REVIEWER?: string; ARCHITECT?: string; MARKETING?: string; RELEASE?: string;
   };
 };
 
@@ -87,6 +88,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentsConfig {
       REVIEWER: parsed.data.AGENT_REVIEWER_TOKEN,
       ARCHITECT: parsed.data.AGENT_ARCHITECT_TOKEN,
       MARKETING: parsed.data.AGENT_MARKETING_TOKEN,
+      RELEASE: parsed.data.AGENT_RELEASE_TOKEN,
     },
   };
 }

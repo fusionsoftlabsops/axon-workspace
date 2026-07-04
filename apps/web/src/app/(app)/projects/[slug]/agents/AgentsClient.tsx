@@ -13,7 +13,7 @@ import {
 } from '@/lib/actions/agents';
 import styles from './agents.module.scss';
 
-const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING'] as const;
+const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
 type Role = (typeof ROLES)[number];
 
 const DEFAULT_MODEL: Record<Role, string> = {
@@ -25,6 +25,7 @@ const DEFAULT_MODEL: Record<Role, string> = {
   QA: 'claude-sonnet-4-6',
   REVIEWER: 'claude-sonnet-4-6',
   MARKETING: 'claude-sonnet-4-6',
+  RELEASE: 'claude-sonnet-4-6',
 };
 
 export function AgentsClient({
