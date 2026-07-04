@@ -365,6 +365,12 @@ export function PlanChat({
                     'Role mentions work too (@po, @architect, @qa…). Without a mention, the general planning assistant replies. Agents ADVISE here; they act once stories reach the board.',
                   )}
                 </p>
+                <p style={{ margin: '0.3rem 0 0', opacity: 0.75 }}>
+                  {t(
+                    '♻️ Iteración continua: después de publicar, seguí conversando y usá «Generar HUs nuevas» — el chat y el generador ven las HUs ya publicadas y NO las repiten.',
+                    '♻️ Continuous iteration: after publishing, keep chatting and use "Generate new stories" — the chat and generator see published stories and will NOT repeat them.',
+                  )}
+                </p>
               </div>
             </details>
             <div className={styles.presence} style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)', padding: '0 0.25rem 0.4rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -640,6 +646,21 @@ export function PlanChat({
                   <Button variant="secondary" onClick={generate} disabled={generating}>
                     {t('Regenerar', 'Regenerate')}
                   </Button>
+                </div>
+              )}
+              {canWrite && published && (
+                <div className={styles.publishBar} data-testid="iterate-bar">
+                  <Button variant="primary" onClick={generate} disabled={generating} data-testid="iterate-generate">
+                    {generating
+                      ? t('Generando…', 'Generating…')
+                      : t('➕ Generar HUs nuevas (iterar)', '➕ Generate new stories (iterate)')}
+                  </Button>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.7, alignSelf: 'center' }}>
+                    {t(
+                      'Seguí conversando y generá el incremento: las HUs ya publicadas no se repiten.',
+                      'Keep chatting and generate the increment: already-published stories are not repeated.',
+                    )}
+                  </span>
                 </div>
               )}
             </>
