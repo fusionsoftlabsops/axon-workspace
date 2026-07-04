@@ -123,9 +123,31 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
         });
         await ws.createBranch(branch);
 
+        // Contexto: generar (con IA server-side) el plan de implementación de la
+        // HU y usarlo como guía técnica. Best-effort — si falla, se implementa
+        // igual. Queda persistido y visible en el detalle de la HU.
+        let implPlan = '';
+        try {
+          const gen = await opts.api.generateImplPlan(opts.projectSlug, n);
+          implPlan = gen.implPlan ?? '';
+          if (implPlan) {
+            await narrate(
+              opts.api,
+              opts.projectSlug,
+              `Generé el plan de implementación de la HU #${n} y lo uso como guía para implementar.`,
+              { kind: 'STATUS', storyNumber: n },
+            );
+          }
+        } catch (err) {
+          console.error('[agents] no se pudo generar el plan de implementación:', err instanceof Error ? err.message : err);
+        }
+
         const goal =
           `Implementá la HU #${n} «${story.title ?? ''}».\n\n` +
           `Descripción / criterios:\n${story.description ?? '(ver get_story)'}\n\n` +
+          (implPlan
+            ? `## Plan de implementación (guía técnica — seguila)\n${implPlan}\n\n`
+            : '') +
           `El repo ya está clonado en tu workspace (rama ${branch}). Explorá, implementá y al final ` +
           `respondé SOLO el resumen markdown del cambio.`;
 

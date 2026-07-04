@@ -20,6 +20,7 @@ export interface TaskView {
   dueDate: string | null;
   category?: string | null;
   estimate?: string | null;
+  hasImplPlan?: boolean;
 }
 
 const PRIORITY_LABEL: Record<Priority, string> = {
@@ -95,6 +96,11 @@ export function TaskCard({
       <div className={styles.cardFooter}>
         {task.category && <span className={styles.cat}>{task.category}</span>}
         {task.estimate && <span className={styles.meta}>{task.estimate}</span>}
+        {task.hasImplPlan && (
+          <span className={styles.meta} title={t('Plan de implementación generado', 'Implementation plan generated')}>
+            📄
+          </span>
+        )}
         {task.assignee && (
           <span className={styles.assignee} title={task.assignee.name}>
             {initials(task.assignee.name)}

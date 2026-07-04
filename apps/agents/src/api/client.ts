@@ -127,6 +127,14 @@ export class AxonApi {
     return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/qa-review`, input);
   }
 
+  /**
+   * Genera (con IA, server-side) el plan de implementación de la HU y lo
+   * persiste en la HU. Lo usa el Dev al tomarla como contexto para implementar.
+   */
+  generateImplPlan(slug: string, taskNumber: number): Promise<{ ok: boolean; implPlan: string }> {
+    return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/impl-plan`, { lang: 'es' });
+  }
+
   qaDecision(
     slug: string,
     taskNumber: number,

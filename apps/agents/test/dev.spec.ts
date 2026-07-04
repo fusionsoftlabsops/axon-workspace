@@ -44,6 +44,7 @@ function api(over: Partial<Record<string, unknown>> = {}): AxonApi {
     finishRun: vi.fn().mockResolvedValue({ ok: true }),
     comment: vi.fn().mockResolvedValue({ id: 'c' }),
     submitQaReview: vi.fn().mockResolvedValue({ ok: true }),
+    generateImplPlan: vi.fn().mockResolvedValue({ ok: true, implPlan: '# Plan\n1. tocar health.ts' }),
     postTeamChat: vi.fn().mockResolvedValue({ message: { id: 'tc' } }),
     recallBrain: vi.fn().mockResolvedValue({ memories: [] }),
     codeContext: vi.fn().mockResolvedValue({ status: 'NONE' }),
@@ -84,6 +85,8 @@ describe('createDevHandler.handle', () => {
     const h = createDevHandler({ ...OPTS, api: a, provider: provider(), run: runner() });
     await h.handle(evt());
     expect(a.openRun).toHaveBeenCalled();
+    // Genera el plan de implementación como contexto antes de implementar.
+    expect(a.generateImplPlan).toHaveBeenCalledWith('axon', 13);
     const qa = (a.submitQaReview as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(qa[1]).toBe(13);
     expect(JSON.stringify(qa[2])).toContain('https://github.com/pr/9');
@@ -140,6 +143,15 @@ describe('createDevHandler.handle', () => {
     const h = createDevHandler({ ...OPTS, api: a, provider: provider(), run: runner() });
     await h.handle(evt());
     expect(a.getTask).not.toHaveBeenCalled();
+  });
+
+  it('si la generación del plan de implementación falla, el run sigue igual (best-effort)', async () => {
+    const a = api({ generateImplPlan: vi.fn().mockRejectedValue(new Error('IA caída')) });
+    const h = createDevHandler({ ...OPTS, api: a, provider: provider(), run: runner() });
+    await h.handle(evt());
+    // La corrida completa igual: abre PR y entrega a QA pese al fallo del plan.
+    expect(a.submitQaReview).toHaveBeenCalled();
+    expect(a.comment).not.toHaveBeenCalled();
   });
 
   it('un fallo de git push COMENTA en la HU y narra — nunca queda mudo', async () => {
