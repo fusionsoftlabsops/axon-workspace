@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { getServerLang } from '@/lib/i18n/server';
 import { parseAgentMention, personaSystem } from '@/lib/agents/mentions';
+import { publishDomainEvent } from '@/lib/agents/events';
 
 /** HUs YA publicadas del tablero (título + estado) para que el chat y el
  *  generador iteren SIN repetir. Defensivo: fallo → '' (cero impacto). */
@@ -1135,6 +1136,7 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
   const skipped = gen.sprints.reduce((n, s) => n + s.tasks.length, 0) -
     sprintsToCreate.reduce((n, s) => n + s.tasks.length, 0);
 
+  const createdTasks: Array<{ id: string; taskNumber: number }> = [];
   const totalTasks = sprintsToCreate.reduce((n, s) => n + s.tasks.length, 0);
   if (totalTasks === 0) {
     return { ok: false, error: skipped > 0 ? 'Todas las HUs del plan ya existen en el tablero (0 nuevas)' : 'El plan no tiene tareas' };
@@ -1179,11 +1181,27 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
         await tx.taskActivity.create({
           data: { taskId: task.id, actorId: ctx.userId, type: 'CREATED', payload: { via: 'plan' } },
         });
+        createdTasks.push({ id: task.id, taskNumber: task.taskNumber });
       }
     }
 
     await tx.projectPlan.update({ where: { id: plan.id }, data: { status: 'PUBLISHED' } });
   });
+
+  // Arranque del equipo agéntico: emitir story.created por cada HU publicada,
+  // DESPUÉS del commit (los agentes reaccionan al instante: PO refina → Aria/Dax
+  // → SM asigna → Dev…). Antes las HUs del plan quedaban mudas hasta el sweep.
+  for (const t of createdTasks) {
+    publishDomainEvent({
+      type: 'story.created',
+      projectId: ctx.projectId,
+      storyId: t.id,
+      storyNumber: t.taskNumber,
+      toState: { id: firstState.id, name: firstState.name, category: firstState.category },
+      actorId: ctx.userId,
+      assigneeId: null,
+    });
+  }
 
   // Auto-seed the project brain from the plan so an external coding agent (Fusion
   // Code / Qwen) has the plan's context via `recall` from the start. Best-effort:
