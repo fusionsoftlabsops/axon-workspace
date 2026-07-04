@@ -11,6 +11,8 @@ vi.mock('@/lib/actions/files', () => ({
   setFileContextAction: h.setFileContextAction,
   generateFileContextAction: h.generateFileContextAction,
 }));
+// Server action con deps server-only → stub (comportamiento cubierto en image.test.ts).
+vi.mock('@/lib/actions/image', () => ({ generateProjectImageAction: vi.fn() }));
 
 import { FilesClient } from './FilesClient';
 

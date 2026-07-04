@@ -16,6 +16,7 @@ export type AuditAction =
   | 'member.role_change'
   | 'member.remove'
   | 'project.transfer_ownership'
+  | 'project.image'
   | 'credential.create'
   | 'credential.read'
   | 'credential.share'
