@@ -150,6 +150,7 @@ export async function generateTaskImplPlan(opts: {
     opts.lang,
     opts.userId,
     opts.projectId,
+    'agent', // plan para el Dev autónomo: solo el cambio técnico, sin guía MCP
   );
 
   await prisma.task.update({

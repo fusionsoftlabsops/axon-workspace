@@ -331,7 +331,24 @@ export interface ImplRepoFile {
   truncated?: boolean;
 }
 
-function implSystem(lang: Lang): string {
+/** Audiencia del plan: 'human' (desarrollador en el editor con MCP) o 'agent'
+ *  (agente Dev autónomo, cuyo único toolset es leer/buscar/escribir archivos del
+ *  repo clonado — sin MCP ni gestión de tareas). */
+export type ImplPlanAudience = 'human' | 'agent';
+
+function implSystem(lang: Lang, audience: ImplPlanAudience = 'human'): string {
+  if (audience === 'agent') {
+    // Para el Dev autónomo: enfocado en cambios de código concretos, sin la guía
+    // MCP/gestión-de-tareas (herramientas que el agente NO tiene en su loop).
+    return `Eres un Staff Engineer. Escribe un PLAN DE IMPLEMENTACIÓN conciso y accionable, en Markdown, para UNA historia de usuario (HU). El plan lo EJECUTARÁ un AGENTE DE CODING AUTÓNOMO cuyo ÚNICO toolset es leer, buscar y ESCRIBIR archivos del repositorio ya clonado (no tiene MCP, ni gestión de tareas, ni acceso a internet). Sé directo: el agente va a editar archivos y correr tests, nada más.
+Estructura (usa encabezados Markdown):
+1. Resumen — qué se construye, en 2-3 frases.
+2. Archivos a tocar — lista \`ruta\` → qué cambio exacto. Usa RUTAS REALES del repo provisto; no inventes.
+3. Cambios concretos — por archivo, describe la edición precisa (funciones/ramas/estructuras a agregar o modificar), mencionando módulos/funciones reales del repo. Suficiente para que el agente escriba el código sin adivinar.
+4. Pruebas — qué archivo(s) de test tocar y qué casos cubrir; reusa el stack de pruebas del repo.
+5. Riesgos — qué NO romper (comportamiento existente a preservar).
+Reglas: NADA de gestión de tareas, MCP, ni pasos de proceso — solo el cambio técnico. Específico al repositorio real (usa el árbol y los archivos provistos). Cambios mínimos, sin refactors colaterales. TODO en ${langName(lang)}. Devuelve SOLO el Markdown del plan, sin vallas de código alrededor del documento.`;
+  }
   return `Eres un Staff Engineer. Escribe un PLAN DE IMPLEMENTACIÓN accionable, en Markdown, para UNA historia de usuario (HU). El plan lo EJECUTARÁ un desarrollador con el modelo Qwen (coding) + el MCP de Axon, leyendo el repositorio real que se te entrega.
 Estructura (usa encabezados Markdown):
 1. Resumen — qué se construye y por qué (2-4 frases).
@@ -356,6 +373,7 @@ export async function generateImplementationPlan(
   lang: Lang,
   userId: string,
   projectId: string,
+  audience: ImplPlanAudience = 'human',
 ): Promise<string> {
   const model = env().AI_MODEL_DEEP;
   const filesText = repoFiles.length
@@ -378,7 +396,7 @@ export async function generateImplementationPlan(
   const resp = await client().messages.create({
     model,
     max_tokens: 4500,
-    system: implSystem(lang),
+    system: implSystem(lang, audience),
     messages: [{ role: 'user', content: user }],
   });
   await record('plan.implplan', model, resp.usage, userId, projectId);
