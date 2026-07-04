@@ -88,6 +88,7 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
       const story = (await opts.api.getTask(opts.projectSlug, n)) as {
         title?: string;
         description?: string;
+        designSpec?: string | null;
       };
 
       // Repo del proyecto: el primero vinculado (v1: un repo por proyecto).
@@ -142,9 +143,13 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           console.error('[agents] no se pudo generar el plan de implementación:', err instanceof Error ? err.message : err);
         }
 
+        const designSpec = (story.designSpec ?? '').trim();
         const goal =
           `Implementá la HU #${n} «${story.title ?? ''}».\n\n` +
           `Descripción / criterios:\n${story.description ?? '(ver get_story)'}\n\n` +
+          (designSpec
+            ? `## Diseño (seguí este spec de UI/UX de Aria)\n${designSpec}\n\n`
+            : '') +
           (implPlan
             ? `## Plan de implementación (guía técnica — seguila)\n${implPlan}\n\n`
             : '') +

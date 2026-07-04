@@ -10,6 +10,7 @@
 import type { AxonApi } from '../api/client.js';
 import type { DomainEventV1 } from '../events.js';
 import type { RoleHandler } from '../router.js';
+import { looksLikeUi } from '../ui-story.js';
 import { narrate } from './narrate.js';
 
 export interface SmAssignOptions {
@@ -23,6 +24,9 @@ export interface SmAssignOptions {
   /** Si hay un Product Owner activo: el SM asigna SOLO HUs ya refinadas (con
    *  criterios de aceptación). Sin PO, asigna todo (cero regresión). */
   poEnabled?: boolean;
+  /** Si hay un agente Diseño activo: el SM espera el spec de diseño antes de
+   *  asignar las HUs de UI. Las de backend y todo el resto fluyen igual. */
+  designEnabled?: boolean;
 }
 
 const TODO_CATEGORY = 'TODO';
@@ -56,6 +60,7 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
       if (!event.storyNumber) return false;
       if (event.type === 'story.created') return true;
       if (event.type === 'story.refined') return true; // el PO la dejó lista → asignar
+      if (event.type === 'story.designed') return true; // Aria terminó el diseño → asignar
       return event.type === 'story.state_changed' && event.toState?.category === TODO_CATEGORY;
     },
 
@@ -66,9 +71,12 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
       const story = (await opts.api.getTask(opts.projectSlug, event.storyNumber!)) as {
         state?: string;
         title?: string;
+        description?: string;
+        category?: string | null;
         assignee?: { id: string } | null;
         reporter?: { id: string } | null;
         acceptanceCriteria?: string;
+        designSpec?: string | null;
       };
       const stateName = (story.state ?? '').toLowerCase();
       if (!stateName.startsWith('prepara')) return; // ya la movió alguien
@@ -76,6 +84,15 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
       // refinadas (con criterios). Las que no, las deja para que el PO las refine
       // (que luego dispara `story.refined` → el SM asigna). Sin PO, asigna todo.
       if (opts.poEnabled && (story.acceptanceCriteria ?? '').trim().length === 0) return;
+      // Gate de Diseño: con un agente Diseño activo, una HU de UI espera su spec
+      // de diseño (Aria dispara `story.designed` → el SM asigna). Las de backend
+      // y las que ya tienen diseño pasan directo. Sin agente Diseño, asigna todo.
+      if (
+        opts.designEnabled &&
+        (story.designSpec ?? '').trim().length === 0 &&
+        looksLikeUi(story)
+      )
+        return;
       // Respetar SOLO una delegación humana DELIBERADA (asignada a alguien
       // distinto del creador). La AUTO-asignación al crear —assignee === reporter,
       // que hacen tanto create_task (MCP) como el quick-add del tablero— NO cuenta

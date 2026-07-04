@@ -506,6 +506,12 @@ model Task {
   // detalle de la HU. Opcional y retro-compatible.
   implPlan           String?  @db.Text
   implPlanAt         DateTime?
+  // Spec de diseño (markdown, generado por el agente Diseño/Aria): notas de UI/UX
+  // (layout, componentes, estados, a11y, responsive) + referencia al mockup de
+  // concepto (imagen gpt-image-1 en el store). Para HUs de UI; el Dev implementa
+  // contra esto. Opcional y retro-compatible.
+  designSpec         String?  @db.Text
+  designSpecAt       DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -729,6 +735,7 @@ enum AgentRole {
   DEV
   QA
   PO
+  DESIGN
 }
 
 enum AgentRunStatus {

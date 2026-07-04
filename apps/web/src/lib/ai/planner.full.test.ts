@@ -36,6 +36,7 @@ import {
   reestimatePlan,
   estimateTaskForSeniority,
   refineStoryForReadiness,
+  generateDesignSpec,
   genSystem,
 } from './planner';
 import type { PlanTask } from './plan-schema';
@@ -264,6 +265,28 @@ describe('refineStoryForReadiness (Product Owner)', () => {
   it('lanza si el modelo no emite la herramienta', async () => {
     anthropicCreate.mockResolvedValue(textReply('nope'));
     await expect(refineStoryForReadiness(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el refinamiento');
+  });
+});
+
+describe('generateDesignSpec (Aria)', () => {
+  const STORY = { title: 'Pantalla de login', description: 'clara', acceptanceCriteria: '- [ ] c' };
+
+  it('devuelve notas + mockupPrompt desde EmitDesign', async () => {
+    anthropicCreate.mockResolvedValue(
+      toolReply('EmitDesign', { notes: '## Layout\n...', mockupPrompt: 'a clean login screen' }),
+    );
+    const out = await generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p');
+    expect(out).toEqual({ notes: '## Layout\n...', mockupPrompt: 'a clean login screen' });
+    const arg = anthropicCreate.mock.calls[0]![0];
+    expect(arg.tool_choice).toMatchObject({ name: 'EmitDesign' });
+    expect(arg.messages[0].content).toContain('Pantalla de login');
+  });
+
+  it('lanza si el spec viene incompleto o sin herramienta', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitDesign', { notes: 'solo notas' }));
+    await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('incompleto');
+    anthropicCreate.mockResolvedValue(textReply('nope'));
+    await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el spec de diseño');
   });
 });
 

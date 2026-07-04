@@ -9,6 +9,7 @@ const FULL_ENV = {
   AGENT_PROJECT_SLUG: 'axon',
   AGENT_SM_TOKEN: 'ad_pk_sm',
   AGENT_PO_TOKEN: 'ad_pk_po',
+  AGENT_DESIGN_TOKEN: 'ad_pk_design',
   AGENT_DEV_TOKEN: 'ad_pk_dev',
   AGENT_QA_TOKEN: 'ad_pk_qa',
   FUSION_MODEL_URL: 'https://modelo.local/v1',
@@ -21,9 +22,9 @@ describe('buildTeam', () => {
   it('con config completa registra los handlers/sweep del equipo (incl. PO)', () => {
     const router = new EventRouter();
     const team = buildTeam(loadConfig(FULL_ENV), router);
-    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'DEV', 'QA']);
+    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'DESIGN', 'DEV', 'QA']);
     expect(team.skipped).toEqual([]);
-    expect(router.size).toBe(5); // assign + retro + po + dev + qa (el sweep no es handler de eventos)
+    expect(router.size).toBe(6); // assign + retro + po + design + dev + qa (el sweep no es handler de eventos)
     expect(team.staleSweep).not.toBeNull();
   });
 
@@ -45,8 +46,8 @@ describe('buildTeam', () => {
       }),
       router,
     );
-    // El PO es determinista (no necesita Claude) → sigue activo.
-    expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO']);
+    // El PO y Diseño son deterministas (no necesitan Claude) → siguen activos.
+    expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO', 'DESIGN']);
     expect(team.skipped).toEqual(
       expect.arrayContaining([
         { role: 'SM:retro', reason: 'sin ANTHROPIC_API_KEY' },
@@ -63,6 +64,6 @@ describe('buildTeam', () => {
       router,
     );
     expect(team.registered).toEqual([]);
-    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'DEV', 'QA']);
+    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'DESIGN', 'DEV', 'QA']);
   });
 });

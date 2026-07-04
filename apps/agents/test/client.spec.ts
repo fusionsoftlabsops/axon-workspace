@@ -89,6 +89,15 @@ describe('AxonApi', () => {
     expect(res.refinement.acceptanceCriteria).toBe('- [ ] c');
   });
 
+  it('designTask pega al endpoint design de la HU', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true, design: { notes: 'n', mockupFileId: 'f1' } }, 201));
+    const res = await api.designTask('axon', 40);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/projects/axon/tasks/40/design');
+    expect(init.method).toBe('POST');
+    expect(res.design.mockupFileId).toBe('f1');
+  });
+
   it('postTeamChat manda al hilo del equipo con kind/storyNumber opcionales', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ message: { id: 'm1' } }, 201));
     await api.postTeamChat('axon', { body: 'Tomo la HU #24', kind: 'HANDOFF', storyNumber: 24 });

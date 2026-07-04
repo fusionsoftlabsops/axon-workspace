@@ -16,7 +16,7 @@ const stateRef = z.object({
 
 export const domainEventV1Schema = z.object({
   v: z.literal(1),
-  type: z.enum(['story.created', 'story.state_changed', 'story.commented', 'story.refined']),
+  type: z.enum(['story.created', 'story.state_changed', 'story.commented', 'story.refined', 'story.designed']),
   projectId: z.string().min(1),
   storyId: z.string().min(1),
   storyNumber: z.number().int().positive().optional(),

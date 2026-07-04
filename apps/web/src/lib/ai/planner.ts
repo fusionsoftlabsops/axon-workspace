@@ -520,6 +520,80 @@ Todo en ${langName(lang)}. Devuelve SOLO la herramienta EmitRefinement.`;
   };
 }
 
+const DESIGN_TOOL_SCHEMA = {
+  type: 'object',
+  properties: {
+    notes: {
+      type: 'string',
+      description:
+        'Notas de diseño en markdown, IMPLEMENTABLES por el Dev: layout/estructura, componentes y jerarquía, estados (vacío/carga/error/éxito), accesibilidad (roles/labels/contraste/foco), responsive (breakpoints), y microcopy clave. Concreto, no genérico.',
+    },
+    mockupPrompt: {
+      type: 'string',
+      description:
+        'Prompt en INGLÉS, detallado, para gpt-image-1: renderiza un mockup de concepto de alta fidelidad de la pantalla/componente (estilo UI limpio, etiquetas legibles). Describe layout, colores, tipografía y estado principal. Sin texto lorem ipsum.',
+    },
+  },
+  required: ['notes', 'mockupPrompt'],
+} as const;
+
+export interface DesignSpec {
+  notes: string;
+  mockupPrompt: string;
+}
+
+/**
+ * Genera el spec de diseño de UNA HU de UI: notas implementables + un prompt de
+ * mockup para gpt-image-1. Es el rol del agente Diseño (Aria). No escribe código;
+ * produce el norte visual + las notas contra las que el Dev implementa.
+ */
+export async function generateDesignSpec(
+  story: { title: string; description: string; acceptanceCriteria: string },
+  project: { name: string; description: string | null },
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<DesignSpec> {
+  const model = env().AI_MODEL_DEEP;
+  const system = `Eres Aria, diseñadora de producto (UI/UX) del equipo. Para UNA historia de usuario de interfaz, producí un spec de diseño accionable.
+Reglas:
+- notes: markdown IMPLEMENTABLE (layout, componentes+jerarquía, estados vacío/carga/error/éxito, accesibilidad, responsive, microcopy). Concreto y consistente; nada genérico.
+- mockupPrompt: en INGLÉS, describe un mockup de concepto de alta fidelidad de la pantalla/componente para un generador de imágenes. Layout, colores, tipografía y el estado principal. Etiquetas legibles, sin lorem ipsum.
+Alineate con la intención de la HU; no inventes alcance nuevo. Las notas en ${langName(lang)}. Devuelve SOLO la herramienta EmitDesign.`;
+  const user =
+    `${brief(project.name, project.description)}\n\n` +
+    `## Historia de usuario (UI)\n` +
+    `Título: ${story.title}\n` +
+    `Descripción: ${story.description || '(vacía)'}\n` +
+    `Criterios de aceptación:\n${story.acceptanceCriteria || '(ninguno)'}`;
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 2000,
+    system,
+    tools: [
+      {
+        name: 'EmitDesign',
+        description: 'Emite el spec de diseño (notas implementables + prompt de mockup).',
+        input_schema: DESIGN_TOOL_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'EmitDesign' },
+    messages: [{ role: 'user', content: user }],
+  });
+  await record('plan.design', model, resp.usage, userId, projectId);
+
+  const toolUse = resp.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitDesign',
+  );
+  if (!toolUse) throw new Error('El modelo no devolvió el spec de diseño');
+  const out = toolUse.input as { notes?: string; mockupPrompt?: string };
+  const notes = (out.notes ?? '').trim();
+  const mockupPrompt = (out.mockupPrompt ?? '').trim();
+  if (!notes || !mockupPrompt) throw new Error('Spec de diseño incompleto');
+  return { notes, mockupPrompt };
+}
+
 export interface ReestimateItemInput {
   s: number;
   t: number;
