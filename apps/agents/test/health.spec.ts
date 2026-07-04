@@ -28,15 +28,19 @@ describe('createHealthServer', () => {
     const port = await listen(state);
     const res = await fetch(`http://127.0.0.1:${port}/health`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({
+    const body = await res.json();
+    expect(body).toMatchObject({
       ok: true,
       service: 'axon-agents',
+      pid: expect.any(Number),
       enabled: true,
       subscribed: true,
       eventsReceived: 3,
       eventsDispatched: 2,
       startedAt: 'x',
     });
+    expect(Number.isInteger(body.pid)).toBe(true);
+    expect(body.pid).toBe(process.pid);
 
     // El estado es por referencia: los contadores se reflejan sin reiniciar.
     state.eventsReceived = 10;
