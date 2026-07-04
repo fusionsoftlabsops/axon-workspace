@@ -116,10 +116,19 @@ export class GitWorkspace {
   }
 
   async push(branch: string): Promise<void> {
-    await this.git(['push', '-u', 'origin', branch]);
+    // --force sobre la rama DEDICADA del agente (agent/hu-N): si quedó una
+    // versión vieja de una corrida anterior de la MISMA HU, se sobrescribe.
+    // Es una rama del agente, no de humanos — evita el rechazo
+    // non-fast-forward al re-trabajar una HU ya intentada (causa raíz de los
+    // "cuelgues mudos" de HU#24: el push rechazado tumbaba el run sin comentar).
+    await this.git(['push', '-u', '--force', 'origin', branch]);
   }
 
-  /** Crea el PR vía API REST de GitHub. Devuelve la URL del PR. */
+  /**
+   * Crea el PR vía API REST de GitHub. Devuelve la URL del PR. Si ya existe un
+   * PR abierto para esta rama (re-trabajo de la misma HU), reusa su URL en vez
+   * de fallar con 422.
+   */
   async openPr(input: { title: string; body: string; head: string; base: string }): Promise<string> {
     const m = this.opts.repoUrl.match(/github\.com\/([^/]+)\/([^/.]+)/);
     if (!m) throw new Error('repoUrl no es de GitHub — no se puede abrir PR');
@@ -134,10 +143,30 @@ export class GitWorkspace {
       signal: AbortSignal.timeout(30_000),
     });
     const data = (await res.json().catch(() => ({}))) as { html_url?: string; message?: string };
-    if (!res.ok || !data.html_url) {
-      throw new Error(`GitHub PR falló (${res.status}): ${redact(data.message ?? '', this.opts.gitToken)}`);
+    if (res.ok && data.html_url) return data.html_url;
+    // Ya existe un PR para la rama → reusarlo (el force-push actualizó su HEAD).
+    if (res.status === 422) {
+      const existing = await this.findOpenPr(m[1]!, m[2]!, input.head);
+      if (existing) return existing;
     }
-    return data.html_url;
+    throw new Error(`GitHub PR falló (${res.status}): ${redact(data.message ?? '', this.opts.gitToken)}`);
+  }
+
+  /** URL del PR abierto para `head` (rama del agente), o null si no hay. */
+  private async findOpenPr(owner: string, repo: string, head: string): Promise<string | null> {
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls?head=${owner}:${head}&state=open`,
+      {
+        headers: {
+          authorization: `Bearer ${this.opts.gitToken ?? ''}`,
+          accept: 'application/vnd.github+json',
+        },
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+    if (!res.ok) return null;
+    const list = (await res.json().catch(() => [])) as Array<{ html_url?: string }>;
+    return list[0]?.html_url ?? null;
   }
 
   async cleanup(): Promise<void> {

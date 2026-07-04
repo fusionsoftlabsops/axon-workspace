@@ -141,4 +141,21 @@ describe('createDevHandler.handle', () => {
     await h.handle(evt());
     expect(a.getTask).not.toHaveBeenCalled();
   });
+
+  it('un fallo de git push COMENTA en la HU y narra — nunca queda mudo', async () => {
+    const a = api();
+    // Reproduce el caso HU#24: la rama ya existe en el remoto → push rechazado.
+    const failPush: Runner = async (_cmd, args) => {
+      if (args[0] === 'push') return { code: 1, stdout: '', stderr: '! [rejected] (fetch first)' };
+      return { code: 0, stdout: args[0] === 'status' ? ' M src/x.ts\n' : '', stderr: '' };
+    };
+    const h = createDevHandler({ ...OPTS, api: a, provider: provider(), run: failPush });
+    await h.handle(evt()); // NO debe lanzar: el fallo se maneja comentando
+    const body = (a.comment as ReturnType<typeof vi.fn>).mock.calls[0]![2] as string;
+    expect(body).toContain('error de pipeline');
+    expect(body).toContain('push');
+    expect(a.submitQaReview).not.toHaveBeenCalled();
+    const narrated = (a.postTeamChat as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1] as { body: string };
+    expect(narrated.body).toContain('Falló');
+  });
 });
