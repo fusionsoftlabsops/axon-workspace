@@ -295,3 +295,73 @@ export async function setAgentEnabledAction(
   revalidatePath(`/projects/${slug}/agents`);
   return { ok: true, data: await loadAgents(ctx.projectId) };
 }
+
+/**
+ * Aplica un PRESET de equipo (ECO/BALANCED/MAX) al proyecto con un click:
+ * - Roles ON del preset: se aprovisionan si faltan (sus tokens se devuelven UNA
+ *   vez, para configurarlos en el worker) y se les setea modelo + presupuesto +
+ *   enabled.
+ * - Roles OFF del preset: se apagan si existen (no se aprovisionan si faltan).
+ * Persiste el preset activo en Project.teamPreset (informativo).
+ */
+export async function applyTeamPresetAction(
+  slug: string,
+  preset: import('@/lib/agents/presets').TeamPreset,
+): Promise<ActionResult<{ agents: AgentView[]; minted: Array<{ role: AgentRole; token: string }> }>> {
+  const { TEAM_PRESETS, isTeamPreset } = await import('@/lib/agents/presets');
+  if (!isTeamPreset(preset)) return { ok: false, error: 'Preset inválido' };
+  const ctx = await guard(slug);
+  if (!ctx.ok) return ctx;
+
+  const def = TEAM_PRESETS[preset];
+  const existing = await prisma.agent.findMany({
+    where: { projectId: ctx.projectId },
+    select: { id: true, role: true },
+  });
+  const byRole = new Map(existing.map((a) => [a.role, a]));
+  const minted: Array<{ role: AgentRole; token: string }> = [];
+
+  for (const role of ROLES) {
+    const cfg = def.roles[role];
+    const current = byRole.get(role);
+    if (!cfg.enabled) {
+      if (current) {
+        await prisma.agent.update({ where: { id: current.id }, data: { enabled: false } });
+      }
+      continue; // rol apagado en este preset: no se aprovisiona si falta
+    }
+    if (!current) {
+      try {
+        const prov = await provisionAgent({
+          projectId: ctx.projectId,
+          projectSlug: slug,
+          role,
+          llmModel: cfg.llmModel,
+          tokenBudget: cfg.tokenBudget,
+        });
+        await prisma.agent.update({ where: { id: prov.agentId }, data: { enabled: true } });
+        minted.push({ role, token: prov.tokenPlain });
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : `No se pudo aprovisionar ${role}` };
+      }
+    } else {
+      await prisma.agent.update({
+        where: { id: current.id },
+        data: { llmModel: cfg.llmModel, tokenBudget: cfg.tokenBudget, enabled: true },
+      });
+    }
+  }
+
+  await prisma.project.update({ where: { id: ctx.projectId }, data: { teamPreset: preset } });
+  await audit({
+    actorId: ctx.userId,
+    action: 'agent.update',
+    resourceType: 'project',
+    resourceId: ctx.projectId,
+    projectId: ctx.projectId,
+    payload: { via: 'preset', preset },
+  });
+
+  revalidatePath(`/projects/${slug}/agents`);
+  return { ok: true, data: { agents: await loadAgents(ctx.projectId), minted } };
+}

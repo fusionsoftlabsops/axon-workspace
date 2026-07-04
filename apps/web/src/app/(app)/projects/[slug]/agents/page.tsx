@@ -40,6 +40,7 @@ export default async function AgentsPage({ params }: { params: Promise<{ slug: s
       <AgentsClient
         slug={slug}
         canManage={canManage}
+        initialPreset={project.teamPreset ?? null}
         initialAgents={agents.ok ? (agents.data ?? []) : []}
         initialRuns={runs.ok ? (runs.data ?? []) : []}
         initialStats={stats.ok ? (stats.data ?? null) : null}

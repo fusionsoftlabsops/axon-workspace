@@ -235,6 +235,9 @@ model Project {
   description String?
   status      ProjectStatus @default(ACTIVE)
   ownerId     String
+  // Preset de equipo agéntico activo (ECO | BALANCED | MAX) — informativo; la
+  // config real vive en cada Agent (modelo/presupuesto/enabled).
+  teamPreset  String?
 
   // Repositorio asociado (lectura desde el filesystem del server)
   repoPath           String?

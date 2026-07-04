@@ -57,17 +57,17 @@ Método (seguilo en orden, sin vueltas):
    qué cambiaste y por qué (es el handoff a QA). No re-verifiques leyendo lo que acabás de escribir.`;
 
 export function createDevHandler(opts: DevOptions): RoleHandler {
-  let meCache: { enabled: boolean; userId: string | null; at: number } | null = null;
+  let meCache: { enabled: boolean; userId: string | null; llmModel: string; at: number } | null = null;
   const meCacheMs = opts.meCacheMs ?? 60_000;
 
-  async function me(): Promise<{ enabled: boolean; userId: string | null }> {
+  async function me(): Promise<{ enabled: boolean; userId: string | null; llmModel: string }> {
     const now = Date.now();
     if (meCache && now - meCache.at < meCacheMs) return meCache;
     try {
-      const m = (await opts.api.getMe(opts.projectSlug)) as { enabled: boolean; userId?: string };
-      meCache = { enabled: m.enabled, userId: m.userId ?? null, at: now };
+      const m = (await opts.api.getMe(opts.projectSlug)) as { enabled: boolean; userId?: string; llmModel?: string };
+      meCache = { enabled: m.enabled, userId: m.userId ?? null, llmModel: m.llmModel ?? '', at: now };
     } catch {
-      meCache = { enabled: false, userId: null, at: now };
+      meCache = { enabled: false, userId: null, llmModel: '', at: now };
     }
     return meCache;
   }
@@ -101,7 +101,10 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
 
       // Selección de modelo por HU: las de UI/complejas van al modelo fuerte
       // (Claude), donde Qwen no converge; el resto al primario (Qwen, barato).
-      const useStrong = !!opts.strongProvider && looksLikeUi(story);
+      // Además, si la config del agente (preset de equipo) pide un modelo Claude
+      // como primario (p.ej. MAX: sonnet-5), TODAS las HUs van al fuerte.
+      const claudeConfigured = self.llmModel.startsWith('claude-');
+      const useStrong = !!opts.strongProvider && (claudeConfigured || looksLikeUi(story));
       const provider = useStrong ? opts.strongProvider! : opts.provider;
 
       // Repo del proyecto: el primero vinculado (v1: un repo por proyecto).

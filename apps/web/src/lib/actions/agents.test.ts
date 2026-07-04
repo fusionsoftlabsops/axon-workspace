@@ -5,6 +5,7 @@ const { prismaMock, assertMock, auditMock, provisionMock, revalidateMock } = vi.
     agent: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     agentRun: { findMany: vi.fn() },
     auditLog: { count: vi.fn() },
+    project: { update: vi.fn() },
   },
   assertMock: vi.fn(),
   auditMock: vi.fn(),
@@ -27,6 +28,7 @@ import {
   updateAgentAction,
   listAgentRunsAction,
   getAgentStatsAction,
+  applyTeamPresetAction,
 } from './agents';
 
 const OWNER = { ok: true as const, userId: 'u1', projectId: 'p1', role: 'OWNER' as const };
@@ -211,5 +213,35 @@ describe('setAgentEnabledAction', () => {
     expect(prismaMock.agent.update).toHaveBeenCalledWith({ where: { id: 'ag1' }, data: { enabled: true } });
     expect(auditMock).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.update' }));
     expect(res.ok).toBe(true);
+  });
+});
+
+
+describe('applyTeamPresetAction', () => {
+  it('aplica ECO: actualiza existentes, apaga los off, aprovisiona faltantes y persiste el preset', async () => {
+    // Existe solo DEV; SM/PO/DESIGN/QA/MARKETING (on en ECO) faltan → se aprovisionan.
+    prismaMock.agent.findMany
+      .mockResolvedValueOnce([{ id: 'ag1', role: 'DEV' }]) // lectura inicial (select id/role)
+      .mockResolvedValue([AGENT_ROW]); // loadAgents final
+    const res = await applyTeamPresetAction('axon', 'ECO');
+    expect(res.ok).toBe(true);
+    // DEV existente → update con el modelo/presupuesto del preset ECO
+    expect(prismaMock.agent.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'ag1' }, data: expect.objectContaining({ llmModel: 'qwen3-coder-next', enabled: true }) }),
+    );
+    // Se aprovisionaron los 5 roles ON faltantes de ECO (SM, PO, DESIGN, QA, MARKETING)
+    expect(provisionMock).toHaveBeenCalledTimes(5);
+    // Tokens acuñados devueltos UNA vez
+    if (res.ok) expect(res.data!.minted).toHaveLength(5);
+    // Preset persistido
+    expect(prismaMock.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { teamPreset: 'ECO' } }),
+    );
+  });
+
+  it('rechaza preset inválido y no-admin', async () => {
+    expect(await applyTeamPresetAction('axon', 'NOPE' as never)).toMatchObject({ ok: false });
+    assertMock.mockResolvedValue({ ok: true, userId: 'u1', projectId: 'p1', role: 'MEMBER' });
+    expect(await applyTeamPresetAction('axon', 'ECO')).toMatchObject({ ok: false });
   });
 });

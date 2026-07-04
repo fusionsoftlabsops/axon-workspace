@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Badge, Button } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import {
+  applyTeamPresetAction,
   provisionAgentAction,
   setAgentEnabledAction,
   updateAgentAction,
@@ -11,6 +12,7 @@ import {
   type AgentStatsView,
   type AgentView,
 } from '@/lib/actions/agents';
+import { TEAM_PRESETS, PRESET_IDS, type TeamPreset } from '@/lib/agents/presets';
 import styles from './agents.module.scss';
 
 const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
@@ -34,12 +36,14 @@ export function AgentsClient({
   initialAgents,
   initialRuns,
   initialStats = null,
+  initialPreset = null,
 }: {
   slug: string;
   canManage: boolean;
   initialAgents: AgentView[];
   initialRuns: AgentRunView[];
   initialStats?: AgentStatsView | null;
+  initialPreset?: string | null;
 }) {
   const { t } = useI18n();
   const [agents, setAgents] = useState<AgentView[]>(initialAgents);
@@ -47,6 +51,23 @@ export function AgentsClient({
   const [error, setError] = useState<string | null>(null);
   // Token recién acuñado: se muestra UNA vez (no se persiste en claro).
   const [mintedToken, setMintedToken] = useState<string | null>(null);
+  // Preset activo + tokens acuñados en bloque al aplicar un preset.
+  const [activePreset, setActivePreset] = useState<string | null>(initialPreset);
+  const [presetMinted, setPresetMinted] = useState<Array<{ role: string; token: string }>>([]);
+
+  async function applyPreset(preset: TeamPreset) {
+    setBusy(`preset:${preset}`);
+    setError(null);
+    const res = await applyTeamPresetAction(slug, preset);
+    setBusy(null);
+    if (!res.ok || !res.data) {
+      setError(res.ok ? 'Sin datos' : res.error);
+      return;
+    }
+    setAgents(res.data.agents);
+    setActivePreset(preset);
+    setPresetMinted(res.data.minted);
+  }
 
   const byRole = new Map(agents.map((a) => [a.role, a]));
   const missing = ROLES.filter((r) => !byRole.has(r));
@@ -100,6 +121,112 @@ export function AgentsClient({
           </Button>
         </div>
       )}
+
+      <section data-testid="team-presets">
+        <h3 className={styles.sectionTitle}>{t('Configuración del equipo', 'Team configuration')}</h3>
+        <p className={styles.hint}>
+          {t(
+            'Elegí una configuración según el esfuerzo del proyecto: setea modelos, presupuestos y qué agentes participan, con un click.',
+            'Pick a configuration for the project effort: it sets models, budgets and which agents participate, in one click.',
+          )}
+        </p>
+        <div style={{ overflowX: 'auto', margin: '0.6rem 0' }}>
+          <table className={styles.runs} data-testid="preset-table">
+            <thead>
+              <tr>
+                <th>{t('Rol', 'Role')}</th>
+                {PRESET_IDS.map((id) => (
+                  <th key={id}>{t(TEAM_PRESETS[id].name[0], TEAM_PRESETS[id].name[1])}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const).map((role) => (
+                <tr key={role}>
+                  <td>{role}</td>
+                  {PRESET_IDS.map((id) => {
+                    const cfg = TEAM_PRESETS[id].roles[role];
+                    return (
+                      <td key={id}>
+                        {cfg.enabled ? (
+                          <>
+                            <code>{cfg.llmModel.replace('claude-', '').replace('-20251001', '')}</code>{' '}
+                            <span style={{ opacity: 0.6 }}>· {Math.round(cfg.tokenBudget / 1000)}k</span>
+                          </>
+                        ) : (
+                          <span style={{ opacity: 0.45 }}>{t('apagado', 'off')}</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              <tr>
+                <td>{t('Costo aprox.', 'Approx. cost')}</td>
+                {PRESET_IDS.map((id) => (
+                  <td key={id}>{TEAM_PRESETS[id].costHint}</td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div className={styles.cards}>
+          {PRESET_IDS.map((id) => {
+            const def = TEAM_PRESETS[id];
+            const isActive = activePreset === id;
+            return (
+              <div key={id} className={styles.card} data-testid={`preset-${id}`}>
+                <div className={styles.cardTop}>
+                  <span className={styles.name}>{t(def.name[0], def.name[1])}</span>
+                  {isActive && <Badge tone="ok">{t('activa', 'active')}</Badge>}
+                </div>
+                <p className={styles.hint}>{t(def.tagline[0], def.tagline[1])}</p>
+                <p className={styles.hint}>
+                  <strong>{t('Ideal para:', 'Ideal for:')}</strong>
+                </p>
+                <ul className={styles.hint} style={{ margin: '0 0 0.5rem', paddingLeft: '1.1rem' }}>
+                  {def.examples.map((ex, i) => (
+                    <li key={i}>{t(ex[0], ex[1])}</li>
+                  ))}
+                </ul>
+                {canManage && (
+                  <Button
+                    size="sm"
+                    variant={isActive ? 'secondary' : 'primary'}
+                    disabled={busy === `preset:${id}` || isActive}
+                    data-testid={`apply-preset-${id}`}
+                    onClick={() => void applyPreset(id)}
+                  >
+                    {busy === `preset:${id}`
+                      ? t('Aplicando…', 'Applying…')
+                      : isActive
+                        ? t('Configuración activa', 'Active configuration')
+                        : t('Usar esta configuración', 'Use this configuration')}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {presetMinted.length > 0 && (
+          <div className={styles.tokenBox} data-testid="preset-minted-tokens">
+            <p>
+              {t(
+                'Tokens de los agentes nuevos (se muestran UNA sola vez — configúralos en el worker axon-agents):',
+                'New agent tokens (shown ONCE — set them on the axon-agents worker):',
+              )}
+            </p>
+            {presetMinted.map((m) => (
+              <p key={m.role} style={{ margin: '0.2rem 0' }}>
+                <strong>AGENT_{m.role}_TOKEN</strong>: <code>{m.token}</code>
+              </p>
+            ))}
+            <Button size="sm" variant="secondary" onClick={() => setPresetMinted([])}>
+              {t('Entendido, los guardé', 'Got it, saved')}
+            </Button>
+          </div>
+        )}
+      </section>
 
       <section>
         <h3 className={styles.sectionTitle}>{t('Equipo', 'Team')}</h3>

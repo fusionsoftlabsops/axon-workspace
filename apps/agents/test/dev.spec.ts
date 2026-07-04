@@ -216,3 +216,28 @@ describe('createDevHandler — aprendizaje y contexto', () => {
     expect(caps.some((c: { scope: string; tags: string[] }) => c.scope === 'LOCAL' && c.tags.includes('dev'))).toBe(true);
   });
 });
+
+describe('createDevHandler — preset de equipo (llmModel Claude → siempre fuerte)', () => {
+  it('con llmModel claude-* configurado, una HU de BACKEND también va al modelo fuerte', async () => {
+    const primary = provider();
+    const strong = provider();
+    const a = api({
+      getMe: vi.fn().mockResolvedValue({ enabled: true, userId: 'u-dev', role: 'DEV', llmModel: 'claude-sonnet-5' }),
+      getTask: vi.fn().mockResolvedValue({ title: 'Agregar índice a la tabla de usuarios', description: 'x', comments: [] }),
+    });
+    await createDevHandler({ ...OPTS, api: a, provider: primary, strongProvider: strong, run: runner() }).handle(evt());
+    expect((strong.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect((primary.complete as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+  });
+
+  it('con llmModel qwen configurado, el backend sigue en el primario', async () => {
+    const primary = provider();
+    const strong = provider();
+    const a = api({
+      getMe: vi.fn().mockResolvedValue({ enabled: true, userId: 'u-dev', role: 'DEV', llmModel: 'qwen3-coder-next' }),
+      getTask: vi.fn().mockResolvedValue({ title: 'Agregar índice a la tabla', description: 'x', comments: [] }),
+    });
+    await createDevHandler({ ...OPTS, api: a, provider: primary, strongProvider: strong, run: runner() }).handle(evt());
+    expect((primary.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+  });
+});
