@@ -36,6 +36,13 @@ describe('createHealthServer', () => {
     expect((await res2.json()).eventsReceived).toBe(10);
   });
 
+  it('sirve /pong con 200 {pong:true}', async () => {
+    const port = await listen(baseState());
+    const res = await fetch(`http://127.0.0.1:${port}/pong`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ pong: true });
+  });
+
   it('404 en cualquier otra ruta', async () => {
     const port = await listen(baseState());
     const res = await fetch(`http://127.0.0.1:${port}/nope`);
