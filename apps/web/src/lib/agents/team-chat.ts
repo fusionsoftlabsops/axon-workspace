@@ -23,6 +23,9 @@ export const DEFAULT_AGENT_NAMES: Record<AgentRole, string> = {
   PO: 'Iris',
   DESIGN: 'Aria',
   REVIEWER: 'Ren',
+  ARCHITECT: 'Dax',
+  MARKETING: 'Sol',
+  RELEASE: 'Marco',
 };
 
 export function agentDisplayName(role: AgentRole, displayName?: string | null): string {

@@ -28,3 +28,33 @@ describe('looksLikeUi', () => {
     expect(looksLikeUi({ title: 'Escribir un review del código de pagos' })).toBe(false);
   });
 });
+
+import { looksComplex } from '../src/ui-story.js';
+
+describe('looksComplex', () => {
+  it('compleja: ≥5 criterios, o URGENT, o HIGH con descripción larga', () => {
+    expect(looksComplex({ acceptanceCriteria: ['a','b','c','d','e'].map((x)=>`- [ ] ${x}`).join('\n') })).toBe(true);
+    expect(looksComplex({ priority: 'URGENT', acceptanceCriteria: '- [ ] uno' })).toBe(true);
+    expect(looksComplex({ priority: 'HIGH', description: 'x'.repeat(500), acceptanceCriteria: '- [ ] uno' })).toBe(true);
+  });
+  it('no compleja: pocos criterios y prioridad normal', () => {
+    expect(looksComplex({ acceptanceCriteria: '- [ ] uno\n- [ ] dos', priority: 'MEDIUM' })).toBe(false);
+    expect(looksComplex({ priority: 'HIGH', description: 'corta', acceptanceCriteria: '- [ ] uno' })).toBe(false);
+    expect(looksComplex({})).toBe(false);
+  });
+});
+
+import { looksLikeMarketing } from '../src/ui-story.js';
+
+describe('looksLikeMarketing', () => {
+  it('detecta HUs de go-to-market', () => {
+    expect(looksLikeMarketing({ title: 'Landing de lanzamiento' })).toBe(true);
+    expect(looksLikeMarketing({ title: 'Optimizar SEO del blog' })).toBe(true);
+    expect(looksLikeMarketing({ title: 'X', category: 'marketing' })).toBe(true);
+    expect(looksLikeMarketing({ title: 'Copy de la campaña de social' })).toBe(true);
+  });
+  it('NO marca backend/UI como marketing', () => {
+    expect(looksLikeMarketing({ title: 'Agregar índice a la tabla' })).toBe(false);
+    expect(looksLikeMarketing({ title: 'Rediseñar el botón del tablero' })).toBe(false);
+  });
+});

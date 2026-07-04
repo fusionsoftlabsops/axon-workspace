@@ -13,16 +13,19 @@ import {
 } from '@/lib/actions/agents';
 import styles from './agents.module.scss';
 
-const ROLES = ['SM', 'PO', 'DESIGN', 'DEV', 'QA', 'REVIEWER'] as const;
+const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
 type Role = (typeof ROLES)[number];
 
 const DEFAULT_MODEL: Record<Role, string> = {
   SM: 'claude-sonnet-4-6',
   PO: 'claude-sonnet-4-6',
+  ARCHITECT: 'claude-sonnet-4-6',
   DESIGN: 'claude-sonnet-4-6',
   DEV: 'qwen3-coder-next',
   QA: 'claude-sonnet-4-6',
   REVIEWER: 'claude-sonnet-4-6',
+  MARKETING: 'claude-sonnet-4-6',
+  RELEASE: 'claude-sonnet-4-6',
 };
 
 export function AgentsClient({
