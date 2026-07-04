@@ -38,6 +38,15 @@ const enableSchema = z.object({
   role: z.enum(ROLES),
   enabled: z.boolean(),
 });
+const listPrsSchema = z.object({
+  projectSlug: z.string(),
+  state: z.enum(['open', 'closed', 'all']).default('open'),
+});
+const prDiffSchema = z.object({
+  projectSlug: z.string(),
+  prNumber: z.number().int().positive(),
+  repo: z.string().optional(),
+});
 
 function asText(value: unknown) {
   return {
@@ -151,6 +160,50 @@ export function registerSupervisorTools(registry: ToolRegistry, api: ApiClient):
           enabled: input.enabled,
         }),
       );
+    },
+  });
+
+  registry.register({
+    tool: {
+      name: 'list_prs',
+      description:
+        'Lista los Pull Requests de los repos GitHub del proyecto — el objeto central de la REVISIÓN de código. ' +
+        'Marca las ramas agent/hu-N con su storyNumber para atar cada PR a su HU. state: open|closed|all.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectSlug: { type: 'string' },
+          state: { type: 'string', description: 'open | closed | all (default open)' },
+        },
+        required: ['projectSlug'],
+      },
+    },
+    handler: async (args) => {
+      const input = listPrsSchema.parse(args);
+      return asText(await api.get(`/projects/${input.projectSlug}/prs?state=${input.state}`));
+    },
+  });
+
+  registry.register({
+    tool: {
+      name: 'get_pr_diff',
+      description:
+        'Diff completo de un PR (truncado a ~120k) + metadatos (additions/deletions/changedFiles) — para AUDITAR ' +
+        'exactamente qué cambió un agente: bugs, malas prácticas, seguridad, tests faltantes, consistencia con la HU.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectSlug: { type: 'string' },
+          prNumber: { type: 'number' },
+          repo: { type: 'string', description: 'Nombre del repo si el proyecto tiene varios.' },
+        },
+        required: ['projectSlug', 'prNumber'],
+      },
+    },
+    handler: async (args) => {
+      const input = prDiffSchema.parse(args);
+      const qs = input.repo ? `?repo=${encodeURIComponent(input.repo)}` : '';
+      return asText(await api.get(`/projects/${input.projectSlug}/prs/${input.prNumber}/diff${qs}`));
     },
   });
 }

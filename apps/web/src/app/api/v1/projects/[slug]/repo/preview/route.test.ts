@@ -6,10 +6,20 @@ const h = vi.hoisted(() => ({
   projectFindUnique: vi.fn(),
   repoReaderFor: vi.fn(),
   readFiles: vi.fn(),
+  env: vi.fn(),
+  repoFindFirst: vi.fn(),
+  githubFileContent: vi.fn(),
 }));
 vi.mock('@/lib/api-auth', () => ({ requireSessionOrToken: h.requireSessionOrToken }));
 vi.mock('@/lib/repo/reader', () => ({ repoReaderFor: h.repoReaderFor }));
-vi.mock('@/lib/db', () => ({ prisma: { project: { findUnique: h.projectFindUnique } } }));
+vi.mock('@/lib/db', () => ({
+  prisma: { project: { findUnique: h.projectFindUnique }, projectRepo: { findFirst: h.repoFindFirst } },
+}));
+vi.mock('@/lib/env', () => ({ env: h.env }));
+vi.mock('@/lib/repo/github', async (orig) => ({
+  ...(await orig<typeof import('@/lib/repo/github')>()),
+  githubFileContent: h.githubFileContent,
+}));
 
 import { GET } from './route';
 
@@ -21,6 +31,8 @@ const member = { id: 'p1', repoPath: '/r', members: [{ role: 'ADMIN' }] };
 beforeEach(() => {
   Object.values(h).forEach((fn) => fn.mockReset());
   h.requireSessionOrToken.mockResolvedValue({ ...authd });
+  h.env.mockReturnValue({ GITHUB_TOKEN: undefined });
+  h.repoFindFirst.mockResolvedValue(null);
 });
 
 describe('GET repo/preview', () => {
@@ -32,10 +44,23 @@ describe('GET repo/preview', () => {
     h.projectFindUnique.mockResolvedValue(null);
     expect((await GET(url('?path=a.ts'), ctx)).status).toBe(404);
   });
-  it('412 repo not configured', async () => {
+  it('412 sin reader local y sin repo GitHub + token', async () => {
     h.projectFindUnique.mockResolvedValue(member);
     h.repoReaderFor.mockResolvedValue(null);
     expect((await GET(url('?path=a.ts'), ctx)).status).toBe(412);
+  });
+  it('200 fallback GitHub por archivo (con slice)', async () => {
+    h.projectFindUnique.mockResolvedValue(member);
+    h.repoReaderFor.mockResolvedValue(null);
+    h.env.mockReturnValue({ GITHUB_TOKEN: 'ghtok' });
+    h.repoFindFirst.mockResolvedValue({ githubFullName: 'org/repo', defaultBranch: 'main' });
+    h.githubFileContent.mockResolvedValue({ content: 'l1\nl2\nl3', bytes: 8, truncated: false });
+    const res = await GET(url('?path=a.ts&start=2&end=3'), ctx);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.source).toBe('github');
+    expect(body.content).toBe('l2\nl3');
+    expect(h.githubFileContent).toHaveBeenCalledWith('org/repo', 'main', 'a.ts', 'ghtok');
   });
   it('400 missing path', async () => {
     h.projectFindUnique.mockResolvedValue(member);
