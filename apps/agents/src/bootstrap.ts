@@ -14,6 +14,7 @@ import { createOpenAiProvider } from './runtime/providers/openai.js';
 import { createAnthropicProvider } from './runtime/providers/anthropic.js';
 import { createSmAssignHandler } from './roles/sm.js';
 import { createSmRetroHandler } from './roles/sm-retro.js';
+import { createPoHandler } from './roles/po.js';
 import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
@@ -41,10 +42,13 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
     ? createAnthropicProvider({ apiKey: config.ANTHROPIC_API_KEY, model: config.ANTHROPIC_MODEL })
     : null;
 
+  const poEnabled = !!config.tokens.PO;
+
   // ---- SM ----
   if (config.tokens.SM) {
     const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.SM);
-    router.register(createSmAssignHandler({ api, projectId, projectSlug }));
+    // Con PO activo, el SM asigna solo HUs refinadas (gate de Definition of Ready).
+    router.register(createSmAssignHandler({ api, projectId, projectSlug, poEnabled }));
     registered.push('SM:assign');
     if (anthropic) {
       router.register(createSmRetroHandler({ api, projectId, projectSlug, provider: anthropic }));
@@ -56,6 +60,15 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
     registered.push('SM:stale-sweep');
   } else {
     skipped.push({ role: 'SM', reason: 'sin AGENT_SM_TOKEN' });
+  }
+
+  // ---- PO (refina el backlog: DoR + DoD) ----
+  if (config.tokens.PO) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.PO);
+    router.register(createPoHandler({ api, projectId, projectSlug }));
+    registered.push('PO');
+  } else {
+    skipped.push({ role: 'PO', reason: 'sin AGENT_PO_TOKEN' });
   }
 
   // ---- DEV (Qwen) ----

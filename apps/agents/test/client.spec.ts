@@ -80,6 +80,15 @@ describe('AxonApi', () => {
     expect(res.implPlan).toBe('# Plan');
   });
 
+  it('refineTask pega al endpoint refine de la HU', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true, refinement: { description: 'd', acceptanceCriteria: '- [ ] c', priority: 'MEDIUM' } }, 201));
+    const res = await api.refineTask('axon', 30);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/projects/axon/tasks/30/refine');
+    expect(init.method).toBe('POST');
+    expect(res.refinement.acceptanceCriteria).toBe('- [ ] c');
+  });
+
   it('postTeamChat manda al hilo del equipo con kind/storyNumber opcionales', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ message: { id: 'm1' } }, 201));
     await api.postTeamChat('axon', { body: 'Tomo la HU #24', kind: 'HANDOFF', storyNumber: 24 });

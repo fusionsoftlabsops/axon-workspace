@@ -728,6 +728,7 @@ enum AgentRole {
   SM
   DEV
   QA
+  PO
 }
 
 enum AgentRunStatus {

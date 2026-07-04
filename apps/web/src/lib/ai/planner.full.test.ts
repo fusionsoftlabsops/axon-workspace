@@ -35,6 +35,7 @@ import {
   generateImplementationPlan,
   reestimatePlan,
   estimateTaskForSeniority,
+  refineStoryForReadiness,
   genSystem,
 } from './planner';
 import type { PlanTask } from './plan-schema';
@@ -234,6 +235,35 @@ describe('generateImplementationPlan', () => {
     await expect(
       generateImplementationPlan(PROJECT, SAMPLE_TASK, { name: 'S', goal: '' }, '', 'tree', [], 'es', 'u', 'p'),
     ).rejects.toThrow('no devolvió el plan de implementación');
+  });
+});
+
+describe('refineStoryForReadiness (Product Owner)', () => {
+  const STORY = { title: 'HU X', description: '', acceptanceCriteria: '', priority: 'LOW' };
+
+  it('devuelve descripción + criterios + prioridad desde EmitRefinement', async () => {
+    anthropicCreate.mockResolvedValue(
+      toolReply('EmitRefinement', { description: 'clara', acceptanceCriteria: '- [ ] c', priority: 'HIGH' }),
+    );
+    const out = await refineStoryForReadiness(STORY, PROJECT, 'es', 'u', 'p');
+    expect(out).toEqual({ description: 'clara', acceptanceCriteria: '- [ ] c', priority: 'HIGH' });
+    const arg = anthropicCreate.mock.calls[0]![0];
+    expect(arg.tool_choice).toMatchObject({ name: 'EmitRefinement' });
+    expect(arg.messages[0].content).toContain('HU X');
+  });
+
+  it('cae a MEDIUM ante una prioridad inválida y conserva la descripción original si falta', async () => {
+    anthropicCreate.mockResolvedValue(
+      toolReply('EmitRefinement', { acceptanceCriteria: '- [ ] c', priority: 'BOGUS' }),
+    );
+    const out = await refineStoryForReadiness({ ...STORY, description: 'vieja' }, PROJECT, 'es', 'u', 'p');
+    expect(out.priority).toBe('MEDIUM');
+    expect(out.description).toBe('vieja');
+  });
+
+  it('lanza si el modelo no emite la herramienta', async () => {
+    anthropicCreate.mockResolvedValue(textReply('nope'));
+    await expect(refineStoryForReadiness(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el refinamiento');
   });
 });
 

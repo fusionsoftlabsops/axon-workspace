@@ -444,6 +444,82 @@ export async function generateQaTests(
   return qaTestsResultSchema.parse(toolUse.input).tests;
 }
 
+export interface StoryRefinement {
+  description: string;
+  acceptanceCriteria: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+}
+
+const REFINE_TOOL_SCHEMA = {
+  type: 'object',
+  properties: {
+    description: { type: 'string', description: 'Descripción clara (valor + alcance), 2-5 frases.' },
+    acceptanceCriteria: { type: 'string', description: 'Markdown: 3-8 ítems "- [ ] ..." verificables (Given/When/Then).' },
+    priority: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] },
+  },
+  required: ['description', 'acceptanceCriteria', 'priority'],
+} as const;
+
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+
+/**
+ * Refina UNA HU para que cumpla la Definition of Ready: descripción clara +
+ * criterios de aceptación verificables + prioridad. Es el rol del Product Owner
+ * (agente Iris). Preserva la intención original; no inventa alcance nuevo.
+ */
+export async function refineStoryForReadiness(
+  story: { title: string; description: string; acceptanceCriteria: string; priority: string },
+  project: { name: string; description: string | null },
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<StoryRefinement> {
+  const model = env().AI_MODEL_DEEP;
+  const system = `Eres el Product Owner (PO) del equipo. Refiná UNA historia de usuario para que cumpla la Definition of Ready (DoR).
+Reglas:
+- description: 2-5 frases claras y accionables; CONSERVA la intención y el alcance original, no inventes features nuevas.
+- acceptanceCriteria: markdown con 3-8 ítems "- [ ] ..." VERIFICABLES (Given/When/Then o checklist comprobable por QA). Si la HU ya trae criterios, mejorálos sin perder ninguno.
+- priority: LOW/MEDIUM/HIGH/URGENT según valor y urgencia; si dudás, MEDIUM.
+Todo en ${langName(lang)}. Devuelve SOLO la herramienta EmitRefinement.`;
+  const user =
+    `${brief(project.name, project.description)}\n\n` +
+    `## Historia de usuario a refinar\n` +
+    `Título: ${story.title}\n` +
+    `Descripción: ${story.description || '(vacía)'}\n` +
+    `Criterios actuales: ${story.acceptanceCriteria || '(ninguno)'}\n` +
+    `Prioridad actual: ${story.priority}`;
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 1500,
+    system,
+    tools: [
+      {
+        name: 'EmitRefinement',
+        description: 'Emite la HU refinada (descripción, criterios de aceptación, prioridad).',
+        input_schema: REFINE_TOOL_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'EmitRefinement' },
+    messages: [{ role: 'user', content: user }],
+  });
+  await record('plan.refine', model, resp.usage, userId, projectId);
+
+  const toolUse = resp.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitRefinement',
+  );
+  if (!toolUse) throw new Error('El modelo no devolvió el refinamiento');
+  const out = toolUse.input as { description?: string; acceptanceCriteria?: string; priority?: string };
+  const priority = (PRIORITIES as readonly string[]).includes(out.priority ?? '')
+    ? (out.priority as StoryRefinement['priority'])
+    : 'MEDIUM';
+  return {
+    description: (out.description ?? story.description ?? '').trim(),
+    acceptanceCriteria: (out.acceptanceCriteria ?? '').trim(),
+    priority,
+  };
+}
+
 export interface ReestimateItemInput {
   s: number;
   t: number;

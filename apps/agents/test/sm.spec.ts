@@ -92,6 +92,37 @@ describe('createSmAssignHandler.handle', () => {
     expect(a2.patchTask).not.toHaveBeenCalled();
   });
 
+  it('con PO activo, DIFIERE una HU sin criterios (gate de DoR) y asigna la refinada', async () => {
+    // Sin criterios → el SM espera al PO (no asigna).
+    const sinCriterios = api({
+      getTask: vi.fn().mockResolvedValue({ state: 'Preparación', title: 'HU', assignee: null, acceptanceCriteria: '' }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: sinCriterios, poEnabled: true }).handle(evt());
+    expect(sinCriterios.patchTask).not.toHaveBeenCalled();
+
+    // Con criterios (el PO ya refinó) → asigna. Dispara vía story.refined.
+    const refinada = api({
+      getTask: vi.fn().mockResolvedValue({
+        state: 'Preparación',
+        title: 'HU',
+        assignee: null,
+        acceptanceCriteria: '- [ ] criterio listo',
+      }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: refinada, poEnabled: true }).handle(
+      evt({ type: 'story.refined' as never }),
+    );
+    expect(refinada.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
+  });
+
+  it('SIN PO, asigna aunque falten criterios (cero regresión)', async () => {
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({ state: 'Preparación', title: 'HU', assignee: null, acceptanceCriteria: '' }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: a /* poEnabled: false */ }).handle(evt());
+    expect(a.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
+  });
+
   it('reclama una HU AUTO-asignada al crear (assignee === reporter) — create_task / quick-add', async () => {
     // create_task (MCP) y el quick-add del tablero asignan la HU al creador;
     // eso NO es un dueño real, así que el SM la levanta igual y se la pasa al Dev.

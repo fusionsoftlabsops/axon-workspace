@@ -20,6 +20,9 @@ export interface SmAssignOptions {
   developmentState?: string;
   /** TTL del cache de config del agente (ms). */
   meCacheMs?: number;
+  /** Si hay un Product Owner activo: el SM asigna SOLO HUs ya refinadas (con
+   *  criterios de aceptación). Sin PO, asigna todo (cero regresión). */
+  poEnabled?: boolean;
 }
 
 const TODO_CATEGORY = 'TODO';
@@ -52,6 +55,7 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
       if (event.projectId !== opts.projectId) return false;
       if (!event.storyNumber) return false;
       if (event.type === 'story.created') return true;
+      if (event.type === 'story.refined') return true; // el PO la dejó lista → asignar
       return event.type === 'story.state_changed' && event.toState?.category === TODO_CATEGORY;
     },
 
@@ -64,9 +68,14 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
         title?: string;
         assignee?: { id: string } | null;
         reporter?: { id: string } | null;
+        acceptanceCriteria?: string;
       };
       const stateName = (story.state ?? '').toLowerCase();
       if (!stateName.startsWith('prepara')) return; // ya la movió alguien
+      // Gate de Definition of Ready: con un PO activo, el SM asigna SOLO HUs ya
+      // refinadas (con criterios). Las que no, las deja para que el PO las refine
+      // (que luego dispara `story.refined` → el SM asigna). Sin PO, asigna todo.
+      if (opts.poEnabled && (story.acceptanceCriteria ?? '').trim().length === 0) return;
       // Respetar SOLO una delegación humana DELIBERADA (asignada a alguien
       // distinto del creador). La AUTO-asignación al crear —assignee === reporter,
       // que hacen tanto create_task (MCP) como el quick-add del tablero— NO cuenta

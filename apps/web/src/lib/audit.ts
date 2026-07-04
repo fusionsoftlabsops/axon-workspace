@@ -29,6 +29,7 @@ export type AuditAction =
   | 'task.qa_review'
   | 'task.qa_decision'
   | 'task.impl_plan'
+  | 'task.refine'
   | 'task.self_approval_blocked'
   | 'agent.provision'
   | 'agent.update'
