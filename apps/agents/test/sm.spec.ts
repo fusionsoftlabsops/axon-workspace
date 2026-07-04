@@ -75,14 +75,36 @@ describe('createSmAssignHandler.handle', () => {
     expect(a.getMe).toHaveBeenCalledTimes(1); // cache
   });
 
-  it('no pisa HUs que ya salieron de Preparación o ya tienen dueño', async () => {
+  it('no pisa HUs que ya salieron de Preparación ni con dueño humano DELIBERADO', async () => {
     const a1 = api({ getTask: vi.fn().mockResolvedValue({ state: 'Desarrollo', assignee: null }) });
     await createSmAssignHandler({ ...OPTS, api: a1 }).handle(evt());
     expect(a1.patchTask).not.toHaveBeenCalled();
 
-    const a2 = api({ getTask: vi.fn().mockResolvedValue({ state: 'Preparación', assignee: { id: 'humano' } }) });
+    // Delegación deliberada: asignada a alguien DISTINTO del creador → respetar.
+    const a2 = api({
+      getTask: vi.fn().mockResolvedValue({
+        state: 'Preparación',
+        assignee: { id: 'ana' },
+        reporter: { id: 'manuel' },
+      }),
+    });
     await createSmAssignHandler({ ...OPTS, api: a2 }).handle(evt());
     expect(a2.patchTask).not.toHaveBeenCalled();
+  });
+
+  it('reclama una HU AUTO-asignada al crear (assignee === reporter) — create_task / quick-add', async () => {
+    // create_task (MCP) y el quick-add del tablero asignan la HU al creador;
+    // eso NO es un dueño real, así que el SM la levanta igual y se la pasa al Dev.
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({
+        state: 'Preparación',
+        title: 'HU nueva',
+        assignee: { id: 'manuel' },
+        reporter: { id: 'manuel' },
+      }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: a }).handle(evt());
+    expect(a.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
   });
 
   it('asigna igual cuando el recall del cerebro falla (contexto opcional)', async () => {
