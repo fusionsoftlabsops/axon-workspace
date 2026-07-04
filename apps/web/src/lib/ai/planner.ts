@@ -569,7 +569,9 @@ Alineate con la intención de la HU; no inventes alcance nuevo. Las notas en ${l
 
   const resp = await client().messages.create({
     model,
-    max_tokens: 2000,
+    // Las notas de diseño son extensas; con poco cap el tool_use se trunca antes
+    // de emitir `mockupPrompt` y el spec queda incompleto.
+    max_tokens: 4000,
     system,
     tools: [
       {
@@ -589,8 +591,12 @@ Alineate con la intención de la HU; no inventes alcance nuevo. Las notas en ${l
   if (!toolUse) throw new Error('El modelo no devolvió el spec de diseño');
   const out = toolUse.input as { notes?: string; mockupPrompt?: string };
   const notes = (out.notes ?? '').trim();
-  const mockupPrompt = (out.mockupPrompt ?? '').trim();
-  if (!notes || !mockupPrompt) throw new Error('Spec de diseño incompleto');
+  // Las notas son lo esencial (implementables). Si el prompt del mockup falta,
+  // sintetizamos uno básico desde la HU en vez de fallar todo el spec.
+  const mockupPrompt =
+    (out.mockupPrompt ?? '').trim() ||
+    `High-fidelity concept mockup for the UI story "${story.title}". Clean modern UI, legible labels, primary state. ${story.description}`.slice(0, 900);
+  if (!notes) throw new Error('Spec de diseño incompleto');
   return { notes, mockupPrompt };
 }
 
