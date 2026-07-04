@@ -6,7 +6,7 @@
 
 export interface AgentMe {
   id: string;
-  role: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN';
+  role: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN' | 'REVIEWER' | 'ARCHITECT';
   userId: string;
   llmModel: string;
   credentialRef: string | null;
@@ -113,7 +113,7 @@ export class AxonApi {
       title?: string;
       description?: string;
       priority?: string;
-      assignToAgentRole?: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN';
+      assignToAgentRole?: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN' | 'REVIEWER' | 'ARCHITECT';
     },
   ): Promise<{ ok: boolean }> {
     return this.request('PATCH', `/projects/${slug}/tasks/${taskNumber}`, input);
@@ -155,6 +155,14 @@ export class AxonApi {
     taskNumber: number,
   ): Promise<{ ok: boolean; design: { notes: string; mockupFileId: string | null } }> {
     return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/design`, { lang: 'es' });
+  }
+
+  /**
+   * Genera el diseño técnico de una HU compleja (arquitectura + descomposición)
+   * y lo persiste. Advisory (no cambia estado). Lo usa el Arquitecto (Dax).
+   */
+  techDesign(slug: string, taskNumber: number): Promise<{ ok: boolean; design: string }> {
+    return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/tech-design`, { lang: 'es' });
   }
 
   qaDecision(

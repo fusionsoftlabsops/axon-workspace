@@ -17,6 +17,7 @@ import { createSmRetroHandler } from './roles/sm-retro.js';
 import { createPoHandler } from './roles/po.js';
 import { createDesignHandler } from './roles/design.js';
 import { createReviewerHandler } from './roles/reviewer.js';
+import { createArchitectHandler } from './roles/architect.js';
 import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
@@ -73,6 +74,15 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
     registered.push('PO');
   } else {
     skipped.push({ role: 'PO', reason: 'sin AGENT_PO_TOKEN' });
+  }
+
+  // ---- ARCHITECT (Dax: diseño técnico de HUs complejas, advisory) ----
+  if (config.tokens.ARCHITECT) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.ARCHITECT);
+    router.register(createArchitectHandler({ api, projectId, projectSlug }));
+    registered.push('ARCHITECT');
+  } else {
+    skipped.push({ role: 'ARCHITECT', reason: 'sin AGENT_ARCHITECT_TOKEN' });
   }
 
   // ---- DESIGN (Aria: diseña las HUs de UI antes del Dev) ----

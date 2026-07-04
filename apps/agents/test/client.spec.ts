@@ -98,6 +98,15 @@ describe('AxonApi', () => {
     expect(res.design.mockupFileId).toBe('f1');
   });
 
+  it('techDesign pega al endpoint tech-design de la HU', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true, design: '## Arquitectura' }, 201));
+    const res = await api.techDesign('axon', 50);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/projects/axon/tasks/50/tech-design');
+    expect(init.method).toBe('POST');
+    expect(res.design).toContain('Arquitectura');
+  });
+
   it('postTeamChat manda al hilo del equipo con kind/storyNumber opcionales', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ message: { id: 'm1' } }, 201));
     await api.postTeamChat('axon', { body: 'Tomo la HU #24', kind: 'HANDOFF', storyNumber: 24 });

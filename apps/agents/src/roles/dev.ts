@@ -96,6 +96,7 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
         description?: string;
         category?: string | null;
         designSpec?: string | null;
+        techDesign?: string | null;
       };
 
       // Selección de modelo por HU: las de UI/complejas van al modelo fuerte
@@ -157,9 +158,13 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
         }
 
         const designSpec = (story.designSpec ?? '').trim();
+        const techDesign = (story.techDesign ?? '').trim();
         const goal =
           `Implementá la HU #${n} «${story.title ?? ''}».\n\n` +
           `Descripción / criterios:\n${story.description ?? '(ver get_story)'}\n\n` +
+          (techDesign
+            ? `## Diseño técnico (guía de arquitectura de Dax — respetá el enfoque y la descomposición)\n${techDesign}\n\n`
+            : '') +
           (designSpec
             ? `## Diseño (seguí este spec de UI/UX de Aria)\n${designSpec}\n\n`
             : '') +

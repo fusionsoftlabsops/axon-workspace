@@ -37,6 +37,7 @@ import {
   estimateTaskForSeniority,
   refineStoryForReadiness,
   generateDesignSpec,
+  generateTechDesign,
   genSystem,
 } from './planner';
 import type { PlanTask } from './plan-schema';
@@ -294,6 +295,24 @@ describe('generateDesignSpec (Aria)', () => {
     await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('incompleto');
     anthropicCreate.mockResolvedValue(textReply('nope'));
     await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el spec de diseño');
+  });
+});
+
+describe('generateTechDesign (Arquitecto)', () => {
+  const STORY = { title: 'HU compleja', description: 'd', acceptanceCriteria: '- [ ] c', priority: 'HIGH' };
+
+  it('devuelve el diseño técnico desde EmitTechDesign', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitTechDesign', { design: '## Arquitectura\n- decisión' }));
+    const out = await generateTechDesign(STORY, PROJECT, 'es', 'u', 'p');
+    expect(out).toContain('Arquitectura');
+    expect(anthropicCreate.mock.calls[0]![0].tool_choice).toMatchObject({ name: 'EmitTechDesign' });
+  });
+
+  it('lanza si viene vacío o sin herramienta', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitTechDesign', { design: '  ' }));
+    await expect(generateTechDesign(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('vacío');
+    anthropicCreate.mockResolvedValue(textReply('nope'));
+    await expect(generateTechDesign(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el diseño técnico');
   });
 });
 

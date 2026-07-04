@@ -600,6 +600,68 @@ Alineate con la intención de la HU; no inventes alcance nuevo. Las notas en ${l
   return { notes, mockupPrompt };
 }
 
+const TECH_DESIGN_TOOL_SCHEMA = {
+  type: 'object',
+  properties: {
+    design: {
+      type: 'string',
+      description:
+        'Diseño técnico en markdown para una HU compleja, para el Dev: enfoque de arquitectura, decisiones clave (con alternativas descartadas y por qué), componentes/módulos afectados, contratos/datos, riesgos y mitigaciones, y una DESCOMPOSICIÓN sugerida en pasos/sub-tareas ordenados. Concreto y accionable; no escribas código completo.',
+    },
+  },
+  required: ['design'],
+} as const;
+
+/**
+ * Genera el diseño técnico de UNA HU compleja: enfoque de arquitectura +
+ * decisiones + riesgos + descomposición. Es el rol del Arquitecto/Tech Lead
+ * (agente Dax). Guía de alto nivel ANTES de que el Dev implemente; no escribe
+ * código. Distinto del impl-plan (que es el plan concreto por archivo del Dev).
+ */
+export async function generateTechDesign(
+  story: { title: string; description: string; acceptanceCriteria: string; priority: string },
+  project: { name: string; description: string | null },
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<string> {
+  const model = env().AI_MODEL_DEEP;
+  const system = `Eres Dax, arquitecto/tech lead del equipo. Para UNA historia de usuario compleja, producí un diseño técnico de ALTO NIVEL que guíe al Dev (no escribas la implementación completa).
+Incluí: enfoque de arquitectura, decisiones clave (y alternativas descartadas con el porqué), componentes/módulos y contratos/datos afectados, riesgos + mitigaciones, y una DESCOMPOSICIÓN en pasos/sub-tareas ordenados.
+Alineate con la intención de la HU; no inventes alcance nuevo. Todo en ${langName(lang)}. Devuelve SOLO la herramienta EmitTechDesign.`;
+  const user =
+    `${brief(project.name, project.description)}\n\n` +
+    `## Historia de usuario (compleja)\n` +
+    `Título: ${story.title}\n` +
+    `Descripción: ${story.description || '(vacía)'}\n` +
+    `Prioridad: ${story.priority}\n` +
+    `Criterios de aceptación:\n${story.acceptanceCriteria || '(ninguno)'}`;
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 3000,
+    system,
+    tools: [
+      {
+        name: 'EmitTechDesign',
+        description: 'Emite el diseño técnico (arquitectura + decisiones + riesgos + descomposición).',
+        input_schema: TECH_DESIGN_TOOL_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'EmitTechDesign' },
+    messages: [{ role: 'user', content: user }],
+  });
+  await record('plan.tech_design', model, resp.usage, userId, projectId);
+
+  const toolUse = resp.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitTechDesign',
+  );
+  if (!toolUse) throw new Error('El modelo no devolvió el diseño técnico');
+  const out = (toolUse.input as { design?: string }).design?.trim() ?? '';
+  if (!out) throw new Error('Diseño técnico vacío');
+  return out;
+}
+
 export interface ReestimateItemInput {
   s: number;
   t: number;

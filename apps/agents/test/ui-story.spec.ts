@@ -28,3 +28,18 @@ describe('looksLikeUi', () => {
     expect(looksLikeUi({ title: 'Escribir un review del código de pagos' })).toBe(false);
   });
 });
+
+import { looksComplex } from '../src/ui-story.js';
+
+describe('looksComplex', () => {
+  it('compleja: ≥5 criterios, o URGENT, o HIGH con descripción larga', () => {
+    expect(looksComplex({ acceptanceCriteria: ['a','b','c','d','e'].map((x)=>`- [ ] ${x}`).join('\n') })).toBe(true);
+    expect(looksComplex({ priority: 'URGENT', acceptanceCriteria: '- [ ] uno' })).toBe(true);
+    expect(looksComplex({ priority: 'HIGH', description: 'x'.repeat(500), acceptanceCriteria: '- [ ] uno' })).toBe(true);
+  });
+  it('no compleja: pocos criterios y prioridad normal', () => {
+    expect(looksComplex({ acceptanceCriteria: '- [ ] uno\n- [ ] dos', priority: 'MEDIUM' })).toBe(false);
+    expect(looksComplex({ priority: 'HIGH', description: 'corta', acceptanceCriteria: '- [ ] uno' })).toBe(false);
+    expect(looksComplex({})).toBe(false);
+  });
+});

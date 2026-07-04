@@ -76,7 +76,7 @@ describe('provisionAgentAction', () => {
   });
 
   it('rejects an invalid role / empty model / tiny budget', async () => {
-    expect(await provisionAgentAction('axon', { role: 'ARCHITECT' as never, llmModel: 'm' })).toMatchObject({ ok: false });
+    expect(await provisionAgentAction('axon', { role: 'NOPE_INVALID' as never, llmModel: 'm' })).toMatchObject({ ok: false });
     expect(await provisionAgentAction('axon', { role: 'DEV', llmModel: '  ' })).toMatchObject({ ok: false });
     expect(await provisionAgentAction('axon', { role: 'DEV', llmModel: 'm', tokenBudget: 10 })).toMatchObject({ ok: false });
   });
