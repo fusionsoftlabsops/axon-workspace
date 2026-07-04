@@ -17,6 +17,9 @@ import { createSmRetroHandler } from './roles/sm-retro.js';
 import { createPoHandler } from './roles/po.js';
 import { createDesignHandler } from './roles/design.js';
 import { createReviewerHandler } from './roles/reviewer.js';
+import { createArchitectHandler } from './roles/architect.js';
+import { createMarketingHandler } from './roles/marketing.js';
+import { createReleaseHandler } from './roles/release.js';
 import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
@@ -73,6 +76,24 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
     registered.push('PO');
   } else {
     skipped.push({ role: 'PO', reason: 'sin AGENT_PO_TOKEN' });
+  }
+
+  // ---- ARCHITECT (Dax: diseño técnico de HUs complejas, advisory) ----
+  if (config.tokens.ARCHITECT) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.ARCHITECT);
+    router.register(createArchitectHandler({ api, projectId, projectSlug }));
+    registered.push('ARCHITECT');
+  } else {
+    skipped.push({ role: 'ARCHITECT', reason: 'sin AGENT_ARCHITECT_TOKEN' });
+  }
+
+  // ---- MARKETING (Sol: kit de go-to-market para HUs de marketing, advisory) ----
+  if (config.tokens.MARKETING) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.MARKETING);
+    router.register(createMarketingHandler({ api, projectId, projectSlug }));
+    registered.push('MARKETING');
+  } else {
+    skipped.push({ role: 'MARKETING', reason: 'sin AGENT_MARKETING_TOKEN' });
   }
 
   // ---- DESIGN (Aria: diseña las HUs de UI antes del Dev) ----
@@ -154,6 +175,15 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
       }),
     );
     registered.push('REVIEWER');
+  }
+
+  // ---- RELEASE (Marco: verifica readiness del PR en DONE, advisory) ----
+  if (config.tokens.RELEASE) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.RELEASE);
+    router.register(createReleaseHandler({ api, projectId, projectSlug, gitToken: config.GITHUB_TOKEN }));
+    registered.push('RELEASE');
+  } else {
+    skipped.push({ role: 'RELEASE', reason: 'sin AGENT_RELEASE_TOKEN' });
   }
 
   return { registered, skipped, staleSweep };

@@ -37,6 +37,8 @@ import {
   estimateTaskForSeniority,
   refineStoryForReadiness,
   generateDesignSpec,
+  generateTechDesign,
+  generateMarketingKit,
   genSystem,
 } from './planner';
 import type { PlanTask } from './plan-schema';
@@ -294,6 +296,43 @@ describe('generateDesignSpec (Aria)', () => {
     await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('incompleto');
     anthropicCreate.mockResolvedValue(textReply('nope'));
     await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el spec de diseño');
+  });
+});
+
+describe('generateTechDesign (Arquitecto)', () => {
+  const STORY = { title: 'HU compleja', description: 'd', acceptanceCriteria: '- [ ] c', priority: 'HIGH' };
+
+  it('devuelve el diseño técnico desde EmitTechDesign', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitTechDesign', { design: '## Arquitectura\n- decisión' }));
+    const out = await generateTechDesign(STORY, PROJECT, 'es', 'u', 'p');
+    expect(out).toContain('Arquitectura');
+    expect(anthropicCreate.mock.calls[0]![0].tool_choice).toMatchObject({ name: 'EmitTechDesign' });
+  });
+
+  it('lanza si viene vacío o sin herramienta', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitTechDesign', { design: '  ' }));
+    await expect(generateTechDesign(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('vacío');
+    anthropicCreate.mockResolvedValue(textReply('nope'));
+    await expect(generateTechDesign(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el diseño técnico');
+  });
+});
+
+describe('generateMarketingKit (Branding)', () => {
+  const STORY = { title: 'Landing de lanzamiento', description: 'd', acceptanceCriteria: '- [ ] c' };
+
+  it('devuelve kit + assetPrompt desde EmitMarketing', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitMarketing', { kit: '# Headline', assetPrompt: 'a hero' }));
+    const out = await generateMarketingKit(STORY, PROJECT, 'es', 'u', 'p');
+    expect(out).toEqual({ kit: '# Headline', assetPrompt: 'a hero' });
+    expect(anthropicCreate.mock.calls[0]![0].tool_choice).toMatchObject({ name: 'EmitMarketing' });
+  });
+
+  it('sintetiza assetPrompt si falta; lanza si falta el kit', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitMarketing', { kit: '# H' }));
+    const out = await generateMarketingKit(STORY, PROJECT, 'es', 'u', 'p');
+    expect(out.assetPrompt).toContain('Axon');
+    anthropicCreate.mockResolvedValue(toolReply('EmitMarketing', { assetPrompt: 'x' }));
+    await expect(generateMarketingKit(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('vacío');
   });
 });
 
