@@ -20,6 +20,11 @@ export function createHealthServer(state: HealthState, port: number): Server {
       res.end(JSON.stringify({ ok: true, ...state }));
       return;
     }
+    if (req.url === '/pong') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ pong: true }));
+      return;
+    }
     res.writeHead(404, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: 'not found' }));
   });
