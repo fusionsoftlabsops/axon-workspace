@@ -23,6 +23,7 @@ import { registerBrainTools } from './tools/brain.js';
 import { registerStoryTools } from './tools/stories.js';
 import { registerSkillTools } from './tools/skills.js';
 import { registerTeamTools } from './tools/team.js';
+import { registerSupervisorTools } from './tools/supervisor.js';
 
 async function main() {
   const baseUrl = process.env.ADMIN_API_BASE_URL;
@@ -41,6 +42,7 @@ async function main() {
 
   registerTaskTools(registry, api);
   registerTeamTools(registry, api);
+  registerSupervisorTools(registry, api);
   registerCommitTools(registry, api);
   registerBugTools(registry, api);
   registerBrainTools(registry, api);

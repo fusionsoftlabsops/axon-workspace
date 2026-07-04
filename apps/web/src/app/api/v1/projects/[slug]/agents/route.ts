@@ -87,3 +87,59 @@ export async function POST(
     { status: 201 },
   );
 }
+
+const patchBody = z.object({
+  role: z.enum(ROLES),
+  enabled: z.boolean(),
+});
+
+/**
+ * Enciende/apaga el agente de un rol vía API (kill-switch del supervisor de
+ * consola). Mismo guardarraíl que la provisión: solo OWNER/ADMIN del proyecto
+ * (los agentes son MEMBER → un agente no puede apagar a otro).
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  const { slug } = await params;
+  const authd = await requireApiToken(req, ['tasks:write']);
+  if (authd instanceof NextResponse) return authd;
+  if (!tokenAllowsProject(authd, slug)) {
+    return NextResponse.json({ error: 'token not scoped to this project' }, { status: 403 });
+  }
+  const project = await prisma.project.findUnique({
+    where: { slug },
+    select: { id: true, members: { where: { userId: authd.userId }, select: { role: true } } },
+  });
+  if (!project || project.members.length === 0) {
+    return NextResponse.json({ error: 'project not found' }, { status: 404 });
+  }
+  const memberRole = project.members[0]!.role;
+  if (memberRole !== 'OWNER' && memberRole !== 'ADMIN') {
+    return NextResponse.json({ error: 'only project owners/admins can toggle agents' }, { status: 403 });
+  }
+
+  const parsed = patchBody.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'invalid body', issues: parsed.error.issues }, { status: 400 });
+  }
+
+  const agent = await prisma.agent.findUnique({
+    where: { projectId_role: { projectId: project.id, role: parsed.data.role as AgentRole } },
+    select: { id: true },
+  });
+  if (!agent) return NextResponse.json({ error: `project has no ${parsed.data.role} agent` }, { status: 404 });
+
+  await prisma.agent.update({ where: { id: agent.id }, data: { enabled: parsed.data.enabled } });
+  await audit({
+    actorId: authd.userId,
+    action: 'agent.update',
+    resourceType: 'agent',
+    resourceId: agent.id,
+    projectId: project.id,
+    payload: { via: 'api', role: parsed.data.role, enabled: parsed.data.enabled },
+  });
+
+  return NextResponse.json({ ok: true, role: parsed.data.role, enabled: parsed.data.enabled });
+}

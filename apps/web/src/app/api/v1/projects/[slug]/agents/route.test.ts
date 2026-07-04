@@ -5,6 +5,7 @@ const h = vi.hoisted(() => ({
   requireApiToken: vi.fn(),
   projectFindUnique: vi.fn(),
   agentUpdate: vi.fn(),
+  agentFindUnique: vi.fn(),
   audit: vi.fn(),
   provisionAgent: vi.fn(),
 }));
@@ -14,12 +15,12 @@ vi.mock('@/lib/api-auth', () => ({
     a.projectSlugs.length === 0 || a.projectSlugs.includes(s),
 }));
 vi.mock('@/lib/db', () => ({
-  prisma: { project: { findUnique: h.projectFindUnique }, agent: { update: h.agentUpdate } },
+  prisma: { project: { findUnique: h.projectFindUnique }, agent: { update: h.agentUpdate, findUnique: h.agentFindUnique } },
 }));
 vi.mock('@/lib/audit', () => ({ audit: h.audit }));
 vi.mock('@/lib/agents/provision', () => ({ provisionAgent: h.provisionAgent }));
 
-import { POST } from './route';
+import { POST, PATCH } from './route';
 
 const ctx = { params: Promise.resolve({ slug: 'proj' }) };
 const authd = { userId: 'u1', tokenId: 't1', scopes: [], projectSlugs: [] as string[] };
@@ -66,5 +67,31 @@ describe('POST agents (provisión vía API)', () => {
   it('409 si el rol ya existe (provisionAgent lanza)', async () => {
     h.provisionAgent.mockRejectedValue(new Error('El proyecto ya tiene un agente SM'));
     expect((await POST(req({ role: 'SM' }), ctx)).status).toBe(409);
+  });
+});
+
+
+describe('PATCH agents (kill-switch por rol)', () => {
+  function preq(body: unknown) {
+    return new NextRequest('http://localhost/x', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+  it('403 para MEMBER (un agente no apaga a otro)', async () => {
+    h.projectFindUnique.mockResolvedValue({ id: 'p1', members: [{ role: 'MEMBER' }] });
+    expect((await PATCH(preq({ role: 'DEV', enabled: false }), ctx)).status).toBe(403);
+  });
+  it('404 si el rol no está aprovisionado', async () => {
+    h.agentFindUnique.mockResolvedValue(null);
+    expect((await PATCH(preq({ role: 'RELEASE', enabled: true }), ctx)).status).toBe(404);
+  });
+  it('200 apaga el agente y audita', async () => {
+    h.agentFindUnique.mockResolvedValue({ id: 'ag-dev' });
+    const res = await PATCH(preq({ role: 'DEV', enabled: false }), ctx);
+    expect(res.status).toBe(200);
+    expect(h.agentUpdate).toHaveBeenCalledWith({ where: { id: 'ag-dev' }, data: { enabled: false } });
+    expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.update' }));
   });
 });
