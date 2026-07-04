@@ -43,3 +43,18 @@ describe('looksComplex', () => {
     expect(looksComplex({})).toBe(false);
   });
 });
+
+import { looksLikeMarketing } from '../src/ui-story.js';
+
+describe('looksLikeMarketing', () => {
+  it('detecta HUs de go-to-market', () => {
+    expect(looksLikeMarketing({ title: 'Landing de lanzamiento' })).toBe(true);
+    expect(looksLikeMarketing({ title: 'Optimizar SEO del blog' })).toBe(true);
+    expect(looksLikeMarketing({ title: 'X', category: 'marketing' })).toBe(true);
+    expect(looksLikeMarketing({ title: 'Copy de la campaña de social' })).toBe(true);
+  });
+  it('NO marca backend/UI como marketing', () => {
+    expect(looksLikeMarketing({ title: 'Agregar índice a la tabla' })).toBe(false);
+    expect(looksLikeMarketing({ title: 'Rediseñar el botón del tablero' })).toBe(false);
+  });
+});

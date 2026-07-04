@@ -24,7 +24,7 @@ export interface AgentView {
   createdAt: string;
 }
 
-const ROLES: AgentRole[] = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER'];
+const ROLES: AgentRole[] = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING'];
 
 async function guard(slug: string) {
   const ctx = await assertProjectMember(slug);

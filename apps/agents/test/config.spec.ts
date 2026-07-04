@@ -27,10 +27,11 @@ describe('loadConfig', () => {
       AGENT_DESIGN_TOKEN: 'ad_pk_design',
       AGENT_REVIEWER_TOKEN: 'ad_pk_reviewer',
       AGENT_ARCHITECT_TOKEN: 'ad_pk_arch',
+      AGENT_MARKETING_TOKEN: 'ad_pk_mkt',
       PORT: '4000',
     });
     expect(c.REDIS_URL).toBeUndefined();
-    expect(c.tokens).toEqual({ SM: 'ad_pk_sm', DEV: undefined, QA: 'ad_pk_qa', DESIGN: 'ad_pk_design', REVIEWER: 'ad_pk_reviewer', ARCHITECT: 'ad_pk_arch' });
+    expect(c.tokens).toEqual({ SM: 'ad_pk_sm', DEV: undefined, QA: 'ad_pk_qa', DESIGN: 'ad_pk_design', REVIEWER: 'ad_pk_reviewer', ARCHITECT: 'ad_pk_arch', MARKETING: 'ad_pk_mkt' });
     expect(c.PORT).toBe(4000);
   });
 

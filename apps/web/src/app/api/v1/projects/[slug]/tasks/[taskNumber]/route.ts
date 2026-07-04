@@ -77,6 +77,8 @@ export async function GET(
     designSpecAt: task.designSpecAt?.toISOString() ?? null,
     techDesign: task.techDesign ?? null,
     techDesignAt: task.techDesignAt?.toISOString() ?? null,
+    marketingKit: task.marketingKit ?? null,
+    marketingKitAt: task.marketingKitAt?.toISOString() ?? null,
     subtasks: task.subtasks.map((s) => ({
       number: s.taskNumber,
       title: s.title,
@@ -98,7 +100,7 @@ const patchBody = z
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
     // Asignar la HU al AGENTE de un rol del proyecto (el server resuelve su
     // userId — el llamador no necesita conocer identidades internas).
-    assignToAgentRole: z.enum(['SM', 'DEV', 'QA', 'PO', 'DESIGN', 'REVIEWER', 'ARCHITECT']).optional(),
+    assignToAgentRole: z.enum(['SM', 'DEV', 'QA', 'PO', 'DESIGN', 'REVIEWER', 'ARCHITECT', 'MARKETING']).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'at least one field is required',

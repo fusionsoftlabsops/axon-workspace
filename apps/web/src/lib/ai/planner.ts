@@ -662,6 +662,81 @@ Alineate con la intención de la HU; no inventes alcance nuevo. Todo en ${langNa
   return out;
 }
 
+const MARKETING_TOOL_SCHEMA = {
+  type: 'object',
+  properties: {
+    kit: {
+      type: 'string',
+      description:
+        'Kit de marketing en markdown: headline + subhead, 3-5 value props, CTA, meta título SEO (≤60 chars) + meta descripción (≤155 chars), 2-3 posts sociales cortos, y sugerencias de nombre/tagline si aplica. Persuasivo pero honesto; sin promesas vacías.',
+    },
+    assetPrompt: {
+      type: 'string',
+      description:
+        'Prompt en INGLÉS para gpt-image-1: un asset visual de marca/hero para la landing (estilo limpio, moderno, coherente con el producto). Describe estilo, colores, composición. Sin texto lorem ipsum.',
+    },
+  },
+  required: ['kit', 'assetPrompt'],
+} as const;
+
+export interface MarketingKit {
+  kit: string;
+  assetPrompt: string;
+}
+
+/**
+ * Genera el kit de go-to-market de UNA HU de marketing: copy de landing + SEO +
+ * social + un prompt de asset de marca para gpt-image-1. Es el rol de Branding
+ * (agente Sol). No escribe código; produce material de lanzamiento.
+ */
+export async function generateMarketingKit(
+  story: { title: string; description: string; acceptanceCriteria: string },
+  project: { name: string; description: string | null },
+  lang: Lang,
+  userId: string,
+  projectId: string,
+): Promise<MarketingKit> {
+  const model = env().AI_MODEL_DEEP;
+  const system = `Eres Sol, especialista de branding/SEO/marketing del equipo. Para UNA historia de usuario de go-to-market, producí material de lanzamiento.
+- kit: markdown con headline+subhead, 3-5 value props, CTA, meta título SEO (≤60) + meta descripción (≤155), 2-3 posts sociales cortos, y nombre/tagline si aplica. Persuasivo pero honesto, sin promesas vacías.
+- assetPrompt: en INGLÉS, para un generador de imágenes, un asset de marca/hero de la landing (estilo limpio y moderno, coherente con el producto).
+Alineate con el producto real; no inventes features. El kit en ${langName(lang)}. Devuelve SOLO la herramienta EmitMarketing.`;
+  const user =
+    `${brief(project.name, project.description)}\n\n` +
+    `## Historia de usuario (marketing)\n` +
+    `Título: ${story.title}\n` +
+    `Descripción: ${story.description || '(vacía)'}\n` +
+    `Criterios:\n${story.acceptanceCriteria || '(ninguno)'}`;
+
+  const resp = await client().messages.create({
+    model,
+    max_tokens: 3000,
+    system,
+    tools: [
+      {
+        name: 'EmitMarketing',
+        description: 'Emite el kit de marketing (copy + SEO + social) y el prompt del asset de marca.',
+        input_schema: MARKETING_TOOL_SCHEMA as unknown as Anthropic.Messages.Tool.InputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'EmitMarketing' },
+    messages: [{ role: 'user', content: user }],
+  });
+  await record('plan.marketing', model, resp.usage, userId, projectId);
+
+  const toolUse = resp.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'EmitMarketing',
+  );
+  if (!toolUse) throw new Error('El modelo no devolvió el kit de marketing');
+  const out = toolUse.input as { kit?: string; assetPrompt?: string };
+  const kit = (out.kit ?? '').trim();
+  if (!kit) throw new Error('Kit de marketing vacío');
+  const assetPrompt =
+    (out.assetPrompt ?? '').trim() ||
+    `Clean modern brand hero image for "${project.name}". ${story.title}. Minimal, professional.`.slice(0, 900);
+  return { kit, assetPrompt };
+}
+
 export interface ReestimateItemInput {
   s: number;
   t: number;

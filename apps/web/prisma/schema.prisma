@@ -517,6 +517,11 @@ model Task {
   // sugerida. El Dev lo usa como guía de alto nivel. Opcional/retro-compatible.
   techDesign         String?  @db.Text
   techDesignAt       DateTime?
+  // Kit de marketing (markdown, generado por el agente Branding/Sol) para HUs de
+  // go-to-market: copy de landing, SEO, social + referencia a un asset de marca.
+  // Opcional/retro-compatible.
+  marketingKit       String?  @db.Text
+  marketingKitAt     DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -743,6 +748,7 @@ enum AgentRole {
   DESIGN
   REVIEWER
   ARCHITECT
+  MARKETING
 }
 
 enum AgentRunStatus {

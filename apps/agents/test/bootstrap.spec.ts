@@ -10,6 +10,7 @@ const FULL_ENV = {
   AGENT_SM_TOKEN: 'ad_pk_sm',
   AGENT_PO_TOKEN: 'ad_pk_po',
   AGENT_ARCHITECT_TOKEN: 'ad_pk_arch',
+  AGENT_MARKETING_TOKEN: 'ad_pk_mkt',
   AGENT_DESIGN_TOKEN: 'ad_pk_design',
   AGENT_DEV_TOKEN: 'ad_pk_dev',
   AGENT_QA_TOKEN: 'ad_pk_qa',
@@ -24,9 +25,9 @@ describe('buildTeam', () => {
   it('con config completa registra los handlers/sweep del equipo (incl. PO)', () => {
     const router = new EventRouter();
     const team = buildTeam(loadConfig(FULL_ENV), router);
-    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'DESIGN', 'DEV(+strong)', 'QA', 'REVIEWER']);
+    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV(+strong)', 'QA', 'REVIEWER']);
     expect(team.skipped).toEqual([]);
-    expect(router.size).toBe(8); // assign+retro+po+architect+design+dev+qa+reviewer (el sweep no es handler)
+    expect(router.size).toBe(9); // assign+retro+po+architect+marketing+design+dev+qa+reviewer
     expect(team.staleSweep).not.toBeNull();
   });
 
@@ -50,7 +51,7 @@ describe('buildTeam', () => {
     );
     // PO, Arquitecto y Diseño son deterministas (no necesitan Claude) → siguen activos.
     // Reviewer necesita Claude → queda fuera sin ANTHROPIC_API_KEY.
-    expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'DESIGN']);
+    expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN']);
     expect(team.skipped).toEqual(
       expect.arrayContaining([
         { role: 'SM:retro', reason: 'sin ANTHROPIC_API_KEY' },
@@ -68,6 +69,6 @@ describe('buildTeam', () => {
       router,
     );
     expect(team.registered).toEqual([]);
-    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER']);
+    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV', 'QA', 'REVIEWER']);
   });
 });

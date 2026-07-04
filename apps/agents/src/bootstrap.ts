@@ -18,6 +18,7 @@ import { createPoHandler } from './roles/po.js';
 import { createDesignHandler } from './roles/design.js';
 import { createReviewerHandler } from './roles/reviewer.js';
 import { createArchitectHandler } from './roles/architect.js';
+import { createMarketingHandler } from './roles/marketing.js';
 import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
@@ -83,6 +84,15 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
     registered.push('ARCHITECT');
   } else {
     skipped.push({ role: 'ARCHITECT', reason: 'sin AGENT_ARCHITECT_TOKEN' });
+  }
+
+  // ---- MARKETING (Sol: kit de go-to-market para HUs de marketing, advisory) ----
+  if (config.tokens.MARKETING) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.MARKETING);
+    router.register(createMarketingHandler({ api, projectId, projectSlug }));
+    registered.push('MARKETING');
+  } else {
+    skipped.push({ role: 'MARKETING', reason: 'sin AGENT_MARKETING_TOKEN' });
   }
 
   // ---- DESIGN (Aria: diseña las HUs de UI antes del Dev) ----
