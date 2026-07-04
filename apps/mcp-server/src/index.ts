@@ -16,14 +16,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ApiClient } from './api-client.js';
 import { ToolRegistry } from './tool-registry.js';
-import { registerTaskTools } from './tools/tasks.js';
-import { registerCommitTools } from './tools/commits.js';
-import { registerBugTools } from './tools/bugs.js';
-import { registerBrainTools } from './tools/brain.js';
-import { registerStoryTools } from './tools/stories.js';
-import { registerSkillTools } from './tools/skills.js';
-import { registerTeamTools } from './tools/team.js';
-import { registerSupervisorTools } from './tools/supervisor.js';
+import { registerAllTools } from './tools/register-all.js';
 
 async function main() {
   const baseUrl = process.env.ADMIN_API_BASE_URL;
@@ -40,14 +33,7 @@ async function main() {
   const api = new ApiClient(baseUrl, token);
   const registry = new ToolRegistry();
 
-  registerTaskTools(registry, api);
-  registerTeamTools(registry, api);
-  registerSupervisorTools(registry, api);
-  registerCommitTools(registry, api);
-  registerBugTools(registry, api);
-  registerBrainTools(registry, api);
-  registerStoryTools(registry, api);
-  registerSkillTools(registry, api);
+  registerAllTools(registry, api);
 
   const server = new Server(
     { name: 'admin-data-project', version: '0.1.0' },

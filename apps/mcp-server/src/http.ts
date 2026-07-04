@@ -24,12 +24,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ApiClient } from './api-client.js';
 import { ToolRegistry } from './tool-registry.js';
-import { registerTaskTools } from './tools/tasks.js';
-import { registerCommitTools } from './tools/commits.js';
-import { registerBugTools } from './tools/bugs.js';
-import { registerBrainTools } from './tools/brain.js';
-import { registerStoryTools } from './tools/stories.js';
-import { registerSkillTools } from './tools/skills.js';
+import { registerAllTools } from './tools/register-all.js';
 
 const BASE_URL = process.env.ADMIN_API_BASE_URL;
 const PORT = Number(process.env.PORT ?? 3040);
@@ -43,12 +38,7 @@ if (!BASE_URL) {
 function buildServer(token: string): Server {
   const api = new ApiClient(BASE_URL!, token);
   const registry = new ToolRegistry();
-  registerTaskTools(registry, api);
-  registerCommitTools(registry, api);
-  registerBugTools(registry, api);
-  registerBrainTools(registry, api);
-  registerStoryTools(registry, api);
-  registerSkillTools(registry, api);
+  registerAllTools(registry, api);
 
   const server = new Server(
     { name: 'admin-data-project', version: '0.1.0' },
