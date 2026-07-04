@@ -171,3 +171,30 @@ describe('createDevHandler.handle', () => {
     expect(narrated.body).toContain('Falló');
   });
 });
+
+describe('createDevHandler — selección de modelo por HU (category routing)', () => {
+  it('HU de UI → usa el modelo fuerte (strongProvider), no el primario', async () => {
+    const primary = provider();
+    const strong = provider();
+    const a = api({ getTask: vi.fn().mockResolvedValue({ title: 'Rediseñar la pantalla de login', description: 'x', comments: [] }) });
+    await createDevHandler({ ...OPTS, api: a, provider: primary, strongProvider: strong, run: runner() }).handle(evt());
+    expect((strong.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect((primary.complete as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+  });
+
+  it('HU de backend → usa el modelo primario (Qwen), no el fuerte', async () => {
+    const primary = provider();
+    const strong = provider();
+    const a = api({ getTask: vi.fn().mockResolvedValue({ title: 'Agregar índice a la tabla de usuarios', description: 'x', comments: [] }) });
+    await createDevHandler({ ...OPTS, api: a, provider: primary, strongProvider: strong, run: runner() }).handle(evt());
+    expect((primary.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect((strong.complete as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+  });
+
+  it('sin strongProvider configurado → siempre el primario, aun en HU de UI', async () => {
+    const primary = provider();
+    const a = api({ getTask: vi.fn().mockResolvedValue({ title: 'Rediseñar la pantalla', description: 'x', comments: [] }) });
+    await createDevHandler({ ...OPTS, api: a, provider: primary, run: runner() }).handle(evt());
+    expect((primary.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+  });
+});
