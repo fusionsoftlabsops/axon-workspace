@@ -62,6 +62,8 @@ describe('generateTaskImplPlan', () => {
     // Sin repoPath → no intenta leer repo.
     expect(h.repoReaderFor).not.toHaveBeenCalled();
     expect(h.generateImplementationPlan).toHaveBeenCalled();
+    // El plan es para el agente autónomo (último arg 'agent'), no la guía humana+MCP.
+    expect(h.generateImplementationPlan.mock.calls[0]!.at(-1)).toBe('agent');
     expect(h.taskUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'task-24' }, data: expect.objectContaining({ implPlan: '# Plan técnico' }) }),
     );
