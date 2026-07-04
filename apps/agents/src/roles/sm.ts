@@ -63,10 +63,16 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
         state?: string;
         title?: string;
         assignee?: { id: string } | null;
+        reporter?: { id: string } | null;
       };
       const stateName = (story.state ?? '').toLowerCase();
       if (!stateName.startsWith('prepara')) return; // ya la movió alguien
-      if (story.assignee) return; // ya tiene dueño humano — no pisar
+      // Respetar SOLO una delegación humana DELIBERADA (asignada a alguien
+      // distinto del creador). La AUTO-asignación al crear —assignee === reporter,
+      // que hacen tanto create_task (MCP) como el quick-add del tablero— NO cuenta
+      // como dueño: la HU debe fluir al equipo agéntico. (Antes cualquier assignee
+      // la bloqueaba, así que las HUs recién creadas nunca llegaban al SM.)
+      if (story.assignee && story.assignee.id !== story.reporter?.id) return;
 
       // Contexto inicial del cerebro (best-effort: sin cerebro igual se asigna).
       let contextNote = '';
