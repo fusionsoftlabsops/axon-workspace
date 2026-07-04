@@ -16,3 +16,4 @@ export { RuleDivider } from './RuleDivider';
 
 // Magazine-only primitives (Masthead, DropCap, PullQuote, Marginalia) were
 // retired from the chrome — import them from '@/components/editorial' instead.
+export { Markdown } from './Markdown';

@@ -157,11 +157,31 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           console.error('[agents] no se pudo generar el plan de implementación:', err instanceof Error ? err.message : err);
         }
 
+        // Adquisición de contexto: memoria del proyecto (cerebro compartido +
+        // personal) inyectada al goal — el Dev arranca sabiendo los gotchas y
+        // patrones del equipo sin quemar turnos en recall_brain.
+        let brainNote = '';
+        try {
+          const recall = (await opts.api.recallBrain(opts.projectSlug, story.title, 4)) as {
+            memories?: Array<{ title?: string; body?: string }>;
+          };
+          const mems = recall.memories ?? [];
+          if (mems.length > 0) {
+            brainNote =
+              `## Memoria del proyecto (gotchas/patrones del equipo — tenelos en cuenta)\n` +
+              mems.map((m) => `- **${m.title ?? 'memoria'}**: ${(m.body ?? '').replace(/\s+/g, ' ').slice(0, 240)}`).join('\n') +
+              '\n\n';
+          }
+        } catch {
+          /* la memoria es opcional */
+        }
+
         const designSpec = (story.designSpec ?? '').trim();
         const techDesign = (story.techDesign ?? '').trim();
         const goal =
           `Implementá la HU #${n} «${story.title ?? ''}».\n\n` +
           `Descripción / criterios:\n${story.description ?? '(ver get_story)'}\n\n` +
+          brainNote +
           (techDesign
             ? `## Diseño técnico (guía de arquitectura de Dax — respetá el enfoque y la descomposición)\n${techDesign}\n\n`
             : '') +
@@ -240,6 +260,21 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
             `${result.iterations} iteraciones). Pasa a Verificación — QA, te toca.`,
           { kind: 'HANDOFF', storyNumber: n },
         );
+
+        // Aprendizaje personal del Dev: qué se implementó y cómo (cerebro LOCAL).
+        // Alimenta las próximas corridas vía la inyección de memoria del goal.
+        try {
+          await opts.api.captureMemory(opts.projectSlug, {
+            type: 'NOTE',
+            title: `Dev HU #${n}: ${story.title ?? ''}`.slice(0, 120),
+            body: `${result.finalText}`.slice(0, 2000),
+            tags: ['dev', 'implementacion'],
+            scope: 'LOCAL',
+            sourceTaskNumber: n,
+          });
+        } catch {
+          /* best-effort */
+        }
       } catch (err) {
         // Fallo duro del pipeline (git/PR/clone): comentar SIEMPRE para que el
         // fallo sea visible en el tablero, nunca mudo.

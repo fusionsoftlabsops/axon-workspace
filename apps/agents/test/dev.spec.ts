@@ -198,3 +198,21 @@ describe('createDevHandler — selección de modelo por HU (category routing)', 
     expect((primary.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
   });
 });
+
+describe('createDevHandler — aprendizaje y contexto', () => {
+  it('inyecta la memoria del proyecto (recall) al goal del Dev', async () => {
+    const prov = provider();
+    const a = api({ recallBrain: vi.fn().mockResolvedValue({ memories: [{ title: 'gotcha-pnpm', body: 'usar pnpm, no npm' }] }) });
+    await createDevHandler({ ...OPTS, api: a, provider: prov, run: runner() }).handle(evt());
+    const goal = JSON.stringify((prov.complete as ReturnType<typeof vi.fn>).mock.calls[0]![0]);
+    expect(goal).toContain('Memoria del proyecto');
+    expect(goal).toContain('gotcha-pnpm');
+  });
+
+  it('tras el PR captura la implementación al cerebro PERSONAL (LOCAL)', async () => {
+    const a = api({ captureMemory: vi.fn().mockResolvedValue({ id: 'm1' }) });
+    await createDevHandler({ ...OPTS, api: a, provider: provider(), run: runner() }).handle(evt());
+    const caps = (a.captureMemory as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
+    expect(caps.some((c: { scope: string; tags: string[] }) => c.scope === 'LOCAL' && c.tags.includes('dev'))).toBe(true);
+  });
+});

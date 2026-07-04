@@ -1,0 +1,74 @@
+/* Markdown enriquecido — tipografía compacta y consistente con la app. */
+.md {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  word-break: break-word;
+
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+
+  h1, h2, h3, h4 {
+    margin: 0.9em 0 0.35em;
+    line-height: 1.25;
+  }
+  h1 { font-size: 1.15rem; }
+  h2 { font-size: 1.05rem; }
+  h3 { font-size: 0.95rem; }
+  h4 { font-size: 0.88rem; text-transform: uppercase; opacity: 0.75; }
+
+  p { margin: 0.4em 0; }
+  ul, ol { margin: 0.4em 0; padding-left: 1.3em; }
+  li { margin: 0.15em 0; }
+  li > input[type='checkbox'] { margin-right: 0.4em; }
+
+  code {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.82em;
+    background: rgba(127, 127, 127, 0.14);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+  pre {
+    background: rgba(127, 127, 127, 0.1);
+    border: 1px solid rgba(127, 127, 127, 0.22);
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+    overflow-x: auto;
+    margin: 0.5em 0;
+
+    code { background: none; padding: 0; font-size: 0.8rem; }
+  }
+
+  table {
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    font-size: 0.84rem;
+    display: block;
+    overflow-x: auto;
+  }
+  th, td {
+    border: 1px solid rgba(127, 127, 127, 0.28);
+    padding: 0.25rem 0.55rem;
+    text-align: left;
+  }
+  th { background: rgba(127, 127, 127, 0.1); }
+
+  blockquote {
+    margin: 0.5em 0;
+    padding: 0.15em 0.8em;
+    border-left: 3px solid rgba(127, 127, 127, 0.4);
+    opacity: 0.85;
+  }
+
+  img { max-width: 100%; border-radius: 8px; }
+  hr { border: none; border-top: 1px solid rgba(127, 127, 127, 0.25); margin: 0.7em 0; }
+  a { text-decoration: underline; }
+}
+
+/* Burbjas de chat: aún más apretado. */
+.compact {
+  font-size: 0.86rem;
+
+  h1, h2, h3 { font-size: 0.95rem; margin: 0.5em 0 0.25em; }
+  pre { padding: 0.45rem 0.6rem; }
+}

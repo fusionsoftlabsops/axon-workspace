@@ -161,3 +161,30 @@ describe('createQaHandler — review acotado', () => {
     expect(dump).toContain('DECISIVO'); // loop acotado (no re-lee todo el repo)
   });
 });
+
+describe('createQaHandler — git_diff + aprendizaje', () => {
+  it('expone la tool git_diff al loop (primer tool del set)', async () => {
+    const prov = provider('{"decision":"approve","comment":"ok"}');
+    const a = api();
+    await createQaHandler({ ...OPTS, api: a, provider: prov }).handle(evt());
+    const call = (prov.complete as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { tools?: Array<{ name: string }> };
+    expect(call.tools?.map((t) => t.name)).toContain('git_diff');
+    expect(call.tools?.some((t) => t.name === 'write_file')).toBe(false); // sigue read-only
+  });
+
+  it('reject captura GOTCHA al cerebro COMPARTIDO y NOTE al personal', async () => {
+    const a = api({ captureMemory: vi.fn().mockResolvedValue({ id: 'm1' }) });
+    await createQaHandler({ ...OPTS, api: a, provider: provider('{"decision":"reject","comment":"falta el test X"}') }).handle(evt());
+    const caps = (a.captureMemory as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
+    expect(caps.some((c: { scope: string }) => c.scope === 'LOCAL')).toBe(true);
+    expect(caps.some((c: { scope: string; type: string }) => c.scope === 'PROJECT' && c.type === 'GOTCHA')).toBe(true);
+  });
+
+  it('approve captura solo la NOTE personal (sin GOTCHA grupal)', async () => {
+    const a = api({ captureMemory: vi.fn().mockResolvedValue({ id: 'm1' }) });
+    await createQaHandler({ ...OPTS, api: a, provider: provider('{"decision":"approve","comment":"ok"}') }).handle(evt());
+    const caps = (a.captureMemory as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
+    expect(caps).toHaveLength(1);
+    expect(caps[0]).toMatchObject({ scope: 'LOCAL' });
+  });
+});

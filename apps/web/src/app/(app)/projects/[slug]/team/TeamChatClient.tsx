@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, Markdown } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import { postTeamChatAction } from '@/lib/actions/team-chat';
 import type { TeamMessageView } from '@/lib/agents/team-chat';
@@ -103,7 +103,7 @@ export function TeamChatClient({
               {m.storyNumber && <span className={styles.storyRef}>HU #{m.storyNumber}</span>}
               <span className={styles.time}>{new Date(m.createdAt).toLocaleTimeString()}</span>
             </div>
-            <div className={styles.body}>{m.body}</div>
+            <div className={styles.body}><Markdown compact>{m.body}</Markdown></div>
           </div>
         ))}
         <div ref={endRef} />

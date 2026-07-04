@@ -18,6 +18,7 @@ import { runTrackedLoop } from '../runtime/tracked.js';
 import { contextTools } from '../tools/context.js';
 import { repoTools } from '../tools/repo.js';
 import { GitWorkspace, type CommandRunner } from '../git/workspace.js';
+import { gitDiffTool } from './qa.js';
 import { narrate } from './narrate.js';
 
 export interface ReviewerOptions {
@@ -38,7 +39,7 @@ con los patrones del repo, seguridad (inputs, secretos, inyección), manejo de e
 y cobertura de tests. Señalá deuda técnica y riesgos concretos; reconocé lo que está bien.
 
 Sé DECISIVO — turnos y tokens limitados. Método:
-1. El handoff del dev NOMBRA los archivos tocados. Leé DIRECTO esos con read_file (no listes/busques por todo el repo).
+1. Si tenés la tool git_diff, EMPEZÁ por ella: te da el cambio exacto en una llamada. Solo leé un archivo completo si el diff no alcanza.
 2. Máximo ~5 lecturas; no re-leas. Después, emití el review.
 3. NO evalúes criterios de aceptación (eso es del QA); enfocate en la calidad del código.
 Terminá con SOLO un JSON (sin más tool calls):
@@ -113,7 +114,7 @@ export function createReviewerHandler(opts: ReviewerOptions): RoleHandler {
           payload: { via: 'reviewer', storyNumber: n },
           provider: opts.provider,
           system: REVIEWER_SYSTEM,
-          tools: [...readOnlyRepoTools(ws.dir), ...contextTools(opts.api, opts.projectSlug)],
+          tools: [gitDiffTool(ws, repo.defaultBranch ?? 'main'), ...readOnlyRepoTools(ws.dir), ...contextTools(opts.api, opts.projectSlug)],
           maxIterations: opts.maxIterations ?? 12,
           maxDurationMs: opts.maxDurationMs,
         });
