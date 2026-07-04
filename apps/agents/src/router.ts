@@ -30,6 +30,11 @@ export class EventRouter {
     this.handlers.push(handler);
   }
 
+  /** Reemplaza TODO el set de handlers (para el refresco del worker multi-tenant). */
+  replaceAll(handlers: RoleHandler[]): void {
+    this.handlers = [...handlers];
+  }
+
   get size(): number {
     return this.handlers.length;
   }

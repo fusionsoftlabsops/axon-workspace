@@ -12,6 +12,7 @@
 import type { AgentRole, Prisma, PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { generateApiToken } from '@/lib/api-auth';
+import { sealAgentToken } from '@/lib/agents/runtime-tokens';
 
 type Tx = PrismaClient | Prisma.TransactionClient;
 
@@ -138,7 +139,56 @@ export async function provisionAgent(opts: {
     return { agentId: agent.id, userId: user.id, tokenId: apiToken.id };
   });
 
+  // Sella el plaintext en reposo para que el worker multi-tenant pueda actuar
+  // como este agente (el ApiToken solo guarda el hash).
+  await sealAgentToken(opts.projectId, opts.role, token.plain);
+
   return { ...created, tokenPlain: token.plain, tokenPrefix: token.prefix };
+}
+
+/**
+ * Rota el token de un agente existente: acuña uno nuevo, actualiza el hash del
+ * ApiToken y re-sella el plaintext. Sirve para MIGRAR agentes cuyo plaintext ya
+ * no existe (ej. los provisionados antes del store de runtime), sin romper su
+ * identidad (mismo usuario de servicio, misma fila Agent).
+ */
+export async function rotateAgentToken(opts: {
+  projectId: string;
+  projectSlug: string;
+  role: AgentRole;
+}): Promise<{ tokenPlain: string; tokenPrefix: string }> {
+  const agent = await prisma.agent.findUnique({
+    where: { projectId_role: { projectId: opts.projectId, role: opts.role } },
+    select: { id: true, userId: true, apiTokenId: true },
+  });
+  if (!agent) throw new Error(`El proyecto no tiene un agente ${opts.role} para rotar`);
+
+  const token = generateApiToken();
+
+  await prisma.$transaction(async (tx) => {
+    if (agent.apiTokenId) {
+      await tx.apiToken.update({
+        where: { id: agent.apiTokenId },
+        data: { tokenHash: token.hash, prefix: token.prefix, revokedAt: null },
+      });
+    } else {
+      const apiToken = await tx.apiToken.create({
+        data: {
+          userId: agent.userId,
+          name: `agent:${opts.role.toLowerCase()}:${opts.projectSlug}`,
+          tokenHash: token.hash,
+          prefix: token.prefix,
+          scopes: [...AGENT_TOKEN_SCOPES],
+          projectSlugs: [opts.projectSlug],
+        },
+        select: { id: true },
+      });
+      await tx.agent.update({ where: { id: agent.id }, data: { apiTokenId: apiToken.id } });
+    }
+  });
+
+  await sealAgentToken(opts.projectId, opts.role, token.plain);
+  return { tokenPlain: token.plain, tokenPrefix: token.prefix };
 }
 
 /**

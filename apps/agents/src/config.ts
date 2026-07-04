@@ -25,9 +25,19 @@ const schema = z.object({
   AGENT_ARCHITECT_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_MARKETING_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_RELEASE_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  // Proyecto que este worker atiende (v1: un proyecto por instancia).
+  // Proyecto que este worker atiende (modo LEGACY single-project: un proyecto
+  // por instancia, tokens de rol por env). Si en cambio se define
+  // AGENT_RUNTIME_TOKEN, el worker corre en modo MULTI-TENANT y atiende a todos.
   AGENT_PROJECT_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_PROJECT_SLUG: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Modo MULTI-TENANT: token de servicio (scope agents:runtime) con el que el
+  // worker obtiene los equipos de TODOS los proyectos vía /internal/agent-runtime.
+  AGENT_RUNTIME_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // Cada cuánto re-consulta el worker el runtime (toma proyectos/agentes nuevos).
+  AGENT_RUNTIME_REFRESH_SEC: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(15).max(600).default(45),
+  ),
   // Modelo Qwen propio (vLLM OpenAI-compatible) para el rol Dev.
   FUSION_MODEL_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
   FUSION_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),

@@ -30,7 +30,12 @@ export type ApiScope =
   | 'stories:write'
   | 'repo:read'
   | 'skills:read'
-  | 'skills:write';
+  | 'skills:write'
+  // Scope privilegiado del worker multi-tenant: le permite leer los tokens de
+  // agente (desellados) de TODOS los proyectos vía /internal/agent-runtime.
+  // NUNCA se otorga a un agente ni a un usuario normal — solo al token de
+  // servicio del worker (AGENT_RUNTIME_TOKEN).
+  | 'agents:runtime';
 
 export interface DefaultWorkflowState {
   name: string;
