@@ -17,6 +17,7 @@ const schema = z.object({
   // Tokens de miembro por rol (acuñados con provisionAgentAction). Un rol sin
   // token queda inactivo aunque el worker esté encendido.
   AGENT_SM_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  AGENT_PO_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_DEV_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   AGENT_QA_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // Proyecto que este worker atiende (v1: un proyecto por instancia).
@@ -54,7 +55,7 @@ const schema = z.object({
 
 export type AgentsConfig = z.infer<typeof schema> & {
   enabled: boolean;
-  tokens: { SM?: string; DEV?: string; QA?: string };
+  tokens: { SM?: string; PO?: string; DEV?: string; QA?: string };
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentsConfig {
@@ -69,6 +70,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentsConfig {
     enabled: v === '1' || v === 'true' || v === 'on',
     tokens: {
       SM: parsed.data.AGENT_SM_TOKEN,
+      PO: parsed.data.AGENT_PO_TOKEN,
       DEV: parsed.data.AGENT_DEV_TOKEN,
       QA: parsed.data.AGENT_QA_TOKEN,
     },

@@ -25,6 +25,7 @@ export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
   SM: 'Agente Scrum Master',
   DEV: 'Agente Dev',
   QA: 'Agente QA',
+  PO: 'Agente Product Owner',
 };
 
 /** Scopes mínimos para operar el tablero — sin projects:write ni skills:write. */

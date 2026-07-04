@@ -6,7 +6,7 @@
  */
 import type { DomainEventV1 } from './events.js';
 
-export type AgentRoleName = 'SM' | 'DEV' | 'QA';
+export type AgentRoleName = 'SM' | 'DEV' | 'QA' | 'PO';
 
 export interface RoleHandler {
   role: AgentRoleName;

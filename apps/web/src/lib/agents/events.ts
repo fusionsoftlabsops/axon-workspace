@@ -29,7 +29,11 @@ export interface StoryStateRef {
   category?: string;
 }
 
-export type DomainEventType = 'story.created' | 'story.state_changed' | 'story.commented';
+export type DomainEventType =
+  | 'story.created'
+  | 'story.state_changed'
+  | 'story.commented'
+  | 'story.refined'; // el PO terminó de refinar la HU (criterios/DoR listos) → el SM puede asignar
 
 export interface DomainEventV1 {
   v: 1;

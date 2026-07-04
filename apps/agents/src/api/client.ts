@@ -6,7 +6,7 @@
 
 export interface AgentMe {
   id: string;
-  role: 'SM' | 'DEV' | 'QA';
+  role: 'SM' | 'DEV' | 'QA' | 'PO';
   userId: string;
   llmModel: string;
   credentialRef: string | null;
@@ -113,7 +113,7 @@ export class AxonApi {
       title?: string;
       description?: string;
       priority?: string;
-      assignToAgentRole?: 'SM' | 'DEV' | 'QA';
+      assignToAgentRole?: 'SM' | 'DEV' | 'QA' | 'PO';
     },
   ): Promise<{ ok: boolean }> {
     return this.request('PATCH', `/projects/${slug}/tasks/${taskNumber}`, input);
@@ -133,6 +133,17 @@ export class AxonApi {
    */
   generateImplPlan(slug: string, taskNumber: number): Promise<{ ok: boolean; implPlan: string }> {
     return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/impl-plan`, { lang: 'es' });
+  }
+
+  /**
+   * Refina la HU (descripción + criterios de aceptación + prioridad) con IA y la
+   * marca lista (dispara `story.refined` → el SM la asigna). Lo usa el Product Owner.
+   */
+  refineTask(
+    slug: string,
+    taskNumber: number,
+  ): Promise<{ ok: boolean; refinement: { description: string; acceptanceCriteria: string; priority: string } }> {
+    return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/refine`, { lang: 'es' });
   }
 
   qaDecision(
