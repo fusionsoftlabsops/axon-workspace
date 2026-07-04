@@ -72,6 +72,9 @@ vi.mock('@/lib/actions/tasks', () => ({
 // BoardShortcuts has its own dedicated test; mock it here so this file does not
 // load a partially-covered instance of the module (which v8 merges down to).
 vi.mock('./Shortcuts', () => ({ BoardShortcuts: () => null }));
+// El drawer importa un server action (impl-plan) con deps server-only; se
+// stubea aquí — su comportamiento se cubre en TaskDrawer.test.tsx.
+vi.mock('./TaskDrawer', () => ({ TaskDrawer: () => null }));
 
 import { BoardClient, type StateView, type MemberView } from './BoardClient';
 import type { TaskView } from './TaskCard';

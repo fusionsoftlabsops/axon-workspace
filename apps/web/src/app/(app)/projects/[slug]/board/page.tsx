@@ -109,6 +109,7 @@ export default async function BoardPage({
         dueDate: t.dueDate?.toISOString() ?? null,
         category: t.category,
         estimate: t.estimate,
+        hasImplPlan: !!t.implPlanAt,
       }))}
       />
     </>

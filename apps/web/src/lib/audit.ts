@@ -28,6 +28,7 @@ export type AuditAction =
   | 'task.delete'
   | 'task.qa_review'
   | 'task.qa_decision'
+  | 'task.impl_plan'
   | 'task.self_approval_blocked'
   | 'agent.provision'
   | 'agent.update'

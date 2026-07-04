@@ -22,6 +22,7 @@ import { Column } from './Column';
 import { TaskCard, type TaskView } from './TaskCard';
 import { NewTaskInline } from './NewTaskInline';
 import { BoardShortcuts } from './Shortcuts';
+import { TaskDrawer } from './TaskDrawer';
 import styles from './board.module.scss';
 
 export interface StateView {
@@ -231,6 +232,9 @@ export function BoardClient({ projectSlug, canWrite, currentUserId, states, memb
           <TaskCard task={activeTask} projectSlug={projectSlug} canWrite={false} isOverlay />
         ) : null}
       </DragOverlay>
+
+      {/* Detalle de HU (abierto con ?task=): muestra el plan de implementación. */}
+      <TaskDrawer slug={projectSlug} canWrite={canWrite} />
     </DndContext>
   );
 }

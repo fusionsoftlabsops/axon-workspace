@@ -69,6 +69,10 @@ export async function GET(
     assignee: task.assignee,
     reporter: task.reporter,
     dueDate: task.dueDate?.toISOString() ?? null,
+    acceptanceCriteria: task.acceptanceCriteria ?? '',
+    category: task.category ?? null,
+    implPlan: task.implPlan ?? null,
+    implPlanAt: task.implPlanAt?.toISOString() ?? null,
     subtasks: task.subtasks.map((s) => ({
       number: s.taskNumber,
       title: s.title,

@@ -501,6 +501,11 @@ model Task {
   // (generadas por IA / editadas). Ambos opcionales y retro-compatibles.
   qaHandoff          Json?
   qaTests            Json?
+  // Plan de implementación (markdown, generado por IA): contexto técnico de la HU
+  // que el agente Dev genera al tomarla y usa para implementar mejor. Visible en el
+  // detalle de la HU. Opcional y retro-compatible.
+  implPlan           String?  @db.Text
+  implPlanAt         DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

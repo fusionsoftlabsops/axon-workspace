@@ -71,6 +71,15 @@ describe('AxonApi', () => {
     expect(fetchMock.mock.calls[2]![0]).toContain('/context/code');
   });
 
+  it('generateImplPlan pega al endpoint impl-plan de la HU', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true, implPlan: '# Plan' }, 201));
+    const res = await api.generateImplPlan('axon', 24);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/projects/axon/tasks/24/impl-plan');
+    expect(init.method).toBe('POST');
+    expect(res.implPlan).toBe('# Plan');
+  });
+
   it('postTeamChat manda al hilo del equipo con kind/storyNumber opcionales', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ message: { id: 'm1' } }, 201));
     await api.postTeamChat('axon', { body: 'Tomo la HU #24', kind: 'HANDOFF', storyNumber: 24 });
