@@ -282,8 +282,15 @@ describe('generateDesignSpec (Aria)', () => {
     expect(arg.messages[0].content).toContain('Pantalla de login');
   });
 
-  it('lanza si el spec viene incompleto o sin herramienta', async () => {
-    anthropicCreate.mockResolvedValue(toolReply('EmitDesign', { notes: 'solo notas' }));
+  it('sintetiza el mockupPrompt si el modelo lo omite (no falla el spec)', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitDesign', { notes: '## Layout' }));
+    const out = await generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p');
+    expect(out.notes).toBe('## Layout');
+    expect(out.mockupPrompt).toContain('Pantalla de login'); // derivado del título
+  });
+
+  it('lanza si faltan las notas o no hay herramienta', async () => {
+    anthropicCreate.mockResolvedValue(toolReply('EmitDesign', { mockupPrompt: 'x' }));
     await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('incompleto');
     anthropicCreate.mockResolvedValue(textReply('nope'));
     await expect(generateDesignSpec(STORY, PROJECT, 'es', 'u', 'p')).rejects.toThrow('no devolvió el spec de diseño');
