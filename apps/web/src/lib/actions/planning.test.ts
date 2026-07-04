@@ -71,6 +71,7 @@ const {
 
 vi.mock('next/cache', () => ({ revalidatePath: revalidateMock }));
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
+vi.mock('@/lib/agents/events', () => ({ publishDomainEvent: vi.fn() }));
 vi.mock('@/lib/auth/membership', () => ({ assertProjectMember: assertMock }));
 vi.mock('@/lib/i18n/server', () => ({ getServerLang: langMock }));
 vi.mock('@/lib/ai/planner', () => plannerMock);
@@ -772,6 +773,18 @@ describe('publishPlanAction', () => {
     expect(txMock.sprint.create).toHaveBeenCalled();
     expect(txMock.task.create).toHaveBeenCalled();
     expect(res).toEqual({ ok: true, data: { tasks: 1, sprints: 1 } });
+  });
+
+  it('al publicar emite story.created por cada HU (arranca el equipo agéntico)', async () => {
+    const { publishDomainEvent } = await import('@/lib/agents/events');
+    prismaMock.workflow.findFirst.mockResolvedValue({ states: [{ id: 'st1', name: 'Preparación', category: 'TODO' }] });
+    txMock.projectTaskCounter.update.mockResolvedValue({ next: 5 });
+    txMock.sprint.create.mockResolvedValue({ id: 'sp1' });
+    txMock.task.create.mockResolvedValue({ id: 't1', taskNumber: 4 });
+    await publishPlanAction('slug');
+    expect(publishDomainEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'story.created', storyId: 't1', storyNumber: 4, projectId: 'p1' }),
+    );
   });
 
   it('auto-seeds the brain from the plan after publishing', async () => {
