@@ -11,9 +11,9 @@ beforeEach(() => {
 });
 
 describe('supervisor tools (orquestación desde consola)', () => {
-  it('registra las 4 tools', () => {
+  it('registra las 6 tools', () => {
     expect([...tools.keys()].sort()).toEqual(
-      ['assign_task', 'list_agent_runs', 'retrigger_task', 'set_agent_enabled'].sort(),
+      ['assign_task', 'get_pr_diff', 'list_agent_runs', 'list_prs', 'retrigger_task', 'set_agent_enabled'].sort(),
     );
   });
 
@@ -50,5 +50,21 @@ describe('supervisor tools (orquestación desde consola)', () => {
     const res = await tools.get('set_agent_enabled')!.handler({ projectSlug: 'axon', role: 'DEV', enabled: false });
     expect(api.patch).toHaveBeenCalledWith('/projects/axon/agents', { role: 'DEV', enabled: false });
     expect(parseText(res)).toMatchObject({ enabled: false });
+  });
+
+  it('list_prs consulta con state (default open)', async () => {
+    api.get.mockResolvedValue({ state: 'all', prs: [{ number: 52, storyNumber: 28 }] });
+    await tools.get('list_prs')!.handler({ projectSlug: 'axon', state: 'all' });
+    expect(api.get).toHaveBeenCalledWith('/projects/axon/prs?state=all');
+    await tools.get('list_prs')!.handler({ projectSlug: 'axon' });
+    expect(api.get).toHaveBeenCalledWith('/projects/axon/prs?state=open');
+  });
+
+  it('get_pr_diff pega al endpoint del diff (con repo opcional)', async () => {
+    api.get.mockResolvedValue({ number: 52, diff: 'diff --git ...' });
+    await tools.get('get_pr_diff')!.handler({ projectSlug: 'axon', prNumber: 52 });
+    expect(api.get).toHaveBeenCalledWith('/projects/axon/prs/52/diff');
+    await tools.get('get_pr_diff')!.handler({ projectSlug: 'axon', prNumber: 52, repo: 'axon-workspace' });
+    expect(api.get).toHaveBeenCalledWith('/projects/axon/prs/52/diff?repo=axon-workspace');
   });
 });

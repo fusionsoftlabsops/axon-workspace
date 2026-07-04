@@ -10,7 +10,8 @@
  */
 import type { ImplRepoFile } from '@/lib/ai/planner';
 
-const GH_API = 'https://api.github.com';
+export const GITHUB_API = 'https://api.github.com';
+const GH_API = GITHUB_API;
 const GH_HEADERS = (token: string) => ({
   authorization: `Bearer ${token}`,
   accept: 'application/vnd.github+json',
@@ -39,10 +40,99 @@ function isCodePath(p: string): boolean {
   return CODE_EXT.has(ext);
 }
 
-async function ghJson(url: string, token: string, timeoutMs = 20_000): Promise<unknown> {
+export async function githubJson(url: string, token: string, timeoutMs = 20_000): Promise<unknown> {
   const res = await fetch(url, { headers: GH_HEADERS(token), signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new Error(`github ${res.status}`);
   return res.json();
+}
+
+/** Fetch de texto crudo (p.ej. el diff de un PR con Accept github.diff). */
+export async function githubText(url: string, token: string, accept: string, timeoutMs = 30_000): Promise<string> {
+  const res = await fetch(url, {
+    headers: { ...GH_HEADERS(token), accept },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`github ${res.status}`);
+  return res.text();
+}
+
+export interface GithubTreeEntry {
+  path: string;
+  type: 'blob' | 'tree';
+  size?: number;
+}
+
+/** Árbol COMPLETO del repo (blobs + dirs) vía git trees API. */
+export async function githubRepoTree(fullName: string, branch: string, token: string): Promise<GithubTreeEntry[]> {
+  const resp = (await githubJson(
+    `${GH_API}/repos/${fullName}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+    token,
+  )) as { tree?: Array<{ path: string; type: string; size?: number }> };
+  return (resp.tree ?? []).filter((t): t is GithubTreeEntry => t.type === 'blob' || t.type === 'tree');
+}
+
+/** Contenido de UN archivo vía contents API (base64→utf8, truncado a maxBytes). */
+export async function githubFileContent(
+  fullName: string,
+  branch: string,
+  filePath: string,
+  token: string,
+  maxBytes = 200_000,
+): Promise<{ content: string; bytes: number; truncated: boolean }> {
+  const c = (await githubJson(
+    `${GH_API}/repos/${fullName}/contents/${filePath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(branch)}`,
+    token,
+  )) as { content?: string; encoding?: string; size?: number };
+  if (c.encoding !== 'base64' || !c.content) throw new Error('archivo no disponible (¿binario o directorio?)');
+  let content = Buffer.from(c.content, 'base64').toString('utf8');
+  const bytes = Buffer.byteLength(content, 'utf8');
+  const truncated = bytes > maxBytes;
+  if (truncated) content = content.slice(0, maxBytes);
+  return { content, bytes, truncated };
+}
+
+/** Nodo con la MISMA forma que RepoReader.tree() para el fallback GitHub. */
+export interface GithubTreeNode {
+  name: string;
+  path: string;
+  kind: 'dir' | 'file';
+  size?: number;
+  children?: GithubTreeNode[];
+}
+
+/** Arma el árbol jerárquico (root/depth) desde las entradas planas de GitHub. */
+export function githubTreeNodes(entries: GithubTreeEntry[], root = '.', maxDepth = 2): GithubTreeNode[] {
+  const prefix = root === '.' || root === '' ? '' : root.replace(/\/+$/, '') + '/';
+  const depthOf = (rel: string) => rel.split('/').length;
+  const byParent = new Map<string, GithubTreeNode[]>();
+  for (const e of entries) {
+    if (prefix && !e.path.startsWith(prefix)) continue;
+    const rel = prefix ? e.path.slice(prefix.length) : e.path;
+    if (!rel || depthOf(rel) > maxDepth) continue;
+    const segs = rel.split('/');
+    const parent = segs.slice(0, -1).join('/');
+    const node: GithubTreeNode = {
+      name: segs[segs.length - 1]!,
+      path: e.path,
+      kind: e.type === 'tree' ? 'dir' : 'file',
+      ...(e.size !== undefined ? { size: e.size } : {}),
+    };
+    const list = byParent.get(parent) ?? [];
+    list.push(node);
+    byParent.set(parent, list);
+  }
+  const attach = (parentRel: string, nodes: GithubTreeNode[]): GithubTreeNode[] => {
+    nodes.sort((a, b) => (a.kind !== b.kind ? (a.kind === 'dir' ? -1 : 1) : a.name.localeCompare(b.name)));
+    for (const n of nodes) {
+      if (n.kind === 'dir') {
+        const rel = parentRel ? `${parentRel}/${n.name}` : n.name;
+        const kids = byParent.get(rel);
+        if (kids) n.children = attach(rel, kids);
+      }
+    }
+    return nodes;
+  };
+  return attach('', byParent.get('') ?? []);
 }
 
 /** Outline indentado desde una lista de paths POSIX (dirs + archivos). */
@@ -76,7 +166,7 @@ export async function githubGrounding(opts: {
 }): Promise<{ outline: string; files: ImplRepoFile[] }> {
   let treeResp: { tree?: Array<{ path: string; type: string; size?: number }> };
   try {
-    treeResp = (await ghJson(
+    treeResp = (await githubJson(
       `${GH_API}/repos/${opts.fullName}/git/trees/${encodeURIComponent(opts.branch)}?recursive=1`,
       opts.token,
     )) as typeof treeResp;
@@ -110,7 +200,7 @@ export async function githubGrounding(opts: {
   for (const path of candidates) {
     if (usedBytes >= MAX_TOTAL) break;
     try {
-      const c = (await ghJson(
+      const c = (await githubJson(
         `${GH_API}/repos/${opts.fullName}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(opts.branch)}`,
         opts.token,
       )) as { content?: string; encoding?: string };
