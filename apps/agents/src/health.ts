@@ -17,7 +17,7 @@ export function createHealthServer(state: HealthState, port: number): Server {
   const server = createServer((req, res) => {
     if (req.url === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, ...state }));
+      res.end(JSON.stringify({ ok: true, service: 'axon-agents', ...state }));
       return;
     }
     if (req.url === '/pong') {
