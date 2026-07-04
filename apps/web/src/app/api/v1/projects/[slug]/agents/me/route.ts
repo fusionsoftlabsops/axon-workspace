@@ -18,7 +18,7 @@ export async function GET(
     return NextResponse.json({ error: 'token not scoped to this project' }, { status: 403 });
   }
 
-  const project = await prisma.project.findUnique({ where: { slug }, select: { id: true } });
+  const project = await prisma.project.findUnique({ where: { slug }, select: { id: true, devExecutor: true } });
   if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 });
 
   const agent = await prisma.agent.findFirst({
@@ -37,5 +37,6 @@ export async function GET(
   if (!agent) {
     return NextResponse.json({ error: 'caller is not an agent of this project' }, { status: 404 });
   }
-  return NextResponse.json(agent);
+  // devExecutor viaja con el perfil: el SM enruta la asignación según el modo.
+  return NextResponse.json({ ...agent, devExecutor: project.devExecutor });
 }

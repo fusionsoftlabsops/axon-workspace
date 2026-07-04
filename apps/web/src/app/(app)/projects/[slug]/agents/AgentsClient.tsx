@@ -5,6 +5,7 @@ import { Badge, Button } from '@/components/ui';
 import { useI18n } from '@/lib/i18n/i18n';
 import {
   applyTeamPresetAction,
+  setDevExecutorAction,
   provisionAgentAction,
   setAgentEnabledAction,
   updateAgentAction,
@@ -37,6 +38,7 @@ export function AgentsClient({
   initialRuns,
   initialStats = null,
   initialPreset = null,
+  initialDevExecutor = 'KAI',
 }: {
   slug: string;
   canManage: boolean;
@@ -44,6 +46,7 @@ export function AgentsClient({
   initialRuns: AgentRunView[];
   initialStats?: AgentStatsView | null;
   initialPreset?: string | null;
+  initialDevExecutor?: string;
 }) {
   const { t } = useI18n();
   const [agents, setAgents] = useState<AgentView[]>(initialAgents);
@@ -54,6 +57,16 @@ export function AgentsClient({
   // Preset activo + tokens acuñados en bloque al aplicar un preset.
   const [activePreset, setActivePreset] = useState<string | null>(initialPreset);
   const [presetMinted, setPresetMinted] = useState<Array<{ role: string; token: string }>>([]);
+  const [devExecutor, setDevExecutor] = useState<string>(initialDevExecutor);
+
+  async function changeExecutor(mode: 'KAI' | 'CONSOLE' | 'HYBRID') {
+    setBusy(`exec:${mode}`);
+    setError(null);
+    const res = await setDevExecutorAction(slug, mode);
+    setBusy(null);
+    if (!res.ok) setError(res.error);
+    else setDevExecutor(mode);
+  }
 
   async function applyPreset(preset: TeamPreset) {
     setBusy(`preset:${preset}`);
@@ -121,6 +134,42 @@ export function AgentsClient({
           </Button>
         </div>
       )}
+
+      <section data-testid="dev-executor">
+        <h3 className={styles.sectionTitle}>{t('Ejecutor de desarrollo', 'Development executor')}</h3>
+        <p className={styles.hint}>
+          {t(
+            'Quién implementa las HUs: el agente Kai, tu consola (Claude Code conectada por MCP, usando tu suscripción), o híbrido (triviales→Kai, UI/complejas→tu consola).',
+            'Who implements stories: the Kai agent, your console (Claude Code over MCP, on your subscription), or hybrid (trivial→Kai, UI/complex→your console).',
+          )}
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {([
+            ['KAI', '🤖 Kai (agente)', '🤖 Kai (agent)'],
+            ['CONSOLE', '💻 Mi consola (Claude Code)', '💻 My console (Claude Code)'],
+            ['HYBRID', '⚡ Híbrido', '⚡ Hybrid'],
+          ] as const).map(([mode, es, en]) => (
+            <Button
+              key={mode}
+              size="sm"
+              variant={devExecutor === mode ? 'primary' : 'secondary'}
+              disabled={!canManage || busy === `exec:${mode}` || devExecutor === mode}
+              data-testid={`executor-${mode}`}
+              onClick={() => void changeExecutor(mode)}
+            >
+              {busy === `exec:${mode}` ? t('Guardando…', 'Saving…') : t(es, en)}
+            </Button>
+          ))}
+        </div>
+        {devExecutor !== 'KAI' && (
+          <p className={styles.hint} style={{ marginTop: '0.4rem' }}>
+            {t(
+              'Desde tu consola: get_team_chat (novedades/rechazos de QA) · list_dev_queue (tu cola) · generate_impl_plan (plan grounded) · submit_qa_review (entregar a QA) · post_team_chat (avisar al equipo).',
+              'From your console: get_team_chat (updates/QA rejections) · list_dev_queue (your queue) · generate_impl_plan (grounded plan) · submit_qa_review (hand to QA) · post_team_chat (tell the team).',
+            )}
+          </p>
+        )}
+      </section>
 
       <section data-testid="team-presets">
         <h3 className={styles.sectionTitle}>{t('Configuración del equipo', 'Team configuration')}</h3>

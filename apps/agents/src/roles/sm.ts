@@ -10,7 +10,7 @@
 import type { AxonApi } from '../api/client.js';
 import type { DomainEventV1 } from '../events.js';
 import type { RoleHandler } from '../router.js';
-import { looksLikeUi } from '../ui-story.js';
+import { looksLikeUi, looksComplex } from '../ui-story.js';
 import { narrate } from './narrate.js';
 
 export interface SmAssignOptions {
@@ -37,20 +37,23 @@ function excerpt(text: string, max = 240): string {
 }
 
 export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
-  let meCache: { enabled: boolean; at: number } | null = null;
+  let meCache: { enabled: boolean; devExecutor: string; at: number } | null = null;
   const meCacheMs = opts.meCacheMs ?? 60_000;
 
-  async function smEnabled(): Promise<boolean> {
+  async function smMe(): Promise<{ enabled: boolean; devExecutor: string }> {
     const now = Date.now();
-    if (meCache && now - meCache.at < meCacheMs) return meCache.enabled;
+    if (meCache && now - meCache.at < meCacheMs) return meCache;
     try {
-      const me = await opts.api.getMe(opts.projectSlug);
-      meCache = { enabled: me.enabled, at: now };
-      return me.enabled;
+      const m = await opts.api.getMe(opts.projectSlug);
+      meCache = { enabled: m.enabled, devExecutor: (m.devExecutor ?? 'KAI').toUpperCase(), at: now };
     } catch {
-      meCache = { enabled: false, at: now };
-      return false;
+      meCache = { enabled: false, devExecutor: 'KAI', at: now };
     }
+    return meCache;
+  }
+
+  async function smEnabled(): Promise<boolean> {
+    return (await smMe()).enabled;
   }
 
   return {
@@ -114,6 +117,38 @@ export function createSmAssignHandler(opts: SmAssignOptions): RoleHandler {
         }
       } catch {
         /* el recall es opcional */
+      }
+
+      // Enrutamiento por ejecutor de desarrollo del proyecto:
+      //   KAI     → agente Dev (comportamiento clásico).
+      //   CONSOLE → el humano trabaja desde su consola (Claude Code + MCP): la HU
+      //             se asigna al OWNER y se avisa en el chat del equipo.
+      //   HYBRID  → UI/complejas a la consola, triviales al agente Dev.
+      const { devExecutor } = await smMe();
+      const toConsole =
+        devExecutor === 'CONSOLE' ||
+        (devExecutor === 'HYBRID' && (looksLikeUi(story) || looksComplex(story)));
+
+      if (toConsole) {
+        await opts.api.patchTask(opts.projectSlug, event.storyNumber!, {
+          toState: opts.developmentState ?? 'Desarrollo',
+          assignToOwner: true,
+        });
+        await opts.api.comment(
+          opts.projectSlug,
+          event.storyNumber!,
+          `💻 **SM**: HU lista para TU CONSOLA (ejecutor: ${devExecutor}) y movida a ${opts.developmentState ?? 'Desarrollo'}. ` +
+            'Desde Claude Code: list_dev_queue para verla, generate_impl_plan para el plan, y submit_qa_review al terminar.' +
+            contextNote,
+        );
+        await narrate(
+          opts.api,
+          opts.projectSlug,
+          `La HU #${event.storyNumber} «${story.title ?? ''}» quedó en tu cola de consola (${devExecutor}). ` +
+            `Cuando la termines, entregala a QA con submit_qa_review.`,
+          { kind: 'HANDOFF', storyNumber: event.storyNumber! },
+        );
+        return;
       }
 
       await opts.api.patchTask(opts.projectSlug, event.storyNumber!, {

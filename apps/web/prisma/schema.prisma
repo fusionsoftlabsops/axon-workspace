@@ -238,6 +238,9 @@ model Project {
   // Preset de equipo agéntico activo (ECO | BALANCED | MAX) — informativo; la
   // config real vive en cada Agent (modelo/presupuesto/enabled).
   teamPreset  String?
+  // Ejecutor de desarrollo: KAI (agente) | CONSOLE (tu consola vía MCP) |
+  // HYBRID (triviales→Kai, UI/complejas→consola). El SM enruta según esto.
+  devExecutor String  @default("KAI")
 
   // Repositorio asociado (lectura desde el filesystem del server)
   repoPath           String?

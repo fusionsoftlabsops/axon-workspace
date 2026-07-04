@@ -205,3 +205,39 @@ describe('createSmAssignHandler.handle', () => {
     expect(a.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Doing', assignToAgentRole: 'DEV' });
   });
 });
+
+describe('createSmAssignHandler — ejecutor de desarrollo (modo híbrido consola)', () => {
+  it('CONSOLE: asigna la HU al OWNER (no al agente Dev) y avisa la cola de consola', async () => {
+    const a = api({
+      getMe: vi.fn().mockResolvedValue({ enabled: true, role: 'SM', devExecutor: 'CONSOLE' }),
+      getTask: vi.fn().mockResolvedValue({ state: 'Preparación', title: 'HU', assignee: null, acceptanceCriteria: '- [ ] x' }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: a }).handle(evt());
+    expect(a.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToOwner: true });
+    expect((a.comment as ReturnType<typeof vi.fn>).mock.calls[0]![2]).toContain('TU CONSOLA');
+  });
+
+  it('HYBRID: la HU de UI va a la consola; la trivial de backend va a Kai', async () => {
+    const ui = api({
+      getMe: vi.fn().mockResolvedValue({ enabled: true, role: 'SM', devExecutor: 'HYBRID' }),
+      getTask: vi.fn().mockResolvedValue({ state: 'Preparación', title: 'Rediseñar la pantalla de login', assignee: null, acceptanceCriteria: '- [ ] x' }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: ui }).handle(evt());
+    expect(ui.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToOwner: true });
+
+    const backend = api({
+      getMe: vi.fn().mockResolvedValue({ enabled: true, role: 'SM', devExecutor: 'HYBRID' }),
+      getTask: vi.fn().mockResolvedValue({ state: 'Preparación', title: 'Agregar índice a la tabla', assignee: null, acceptanceCriteria: '- [ ] x' }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: backend }).handle(evt());
+    expect(backend.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
+  });
+
+  it('KAI (default, sin devExecutor): comportamiento clásico intacto', async () => {
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({ state: 'Preparación', title: 'HU', assignee: null, acceptanceCriteria: '- [ ] x' }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: a }).handle(evt());
+    expect(a.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
+  });
+});

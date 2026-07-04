@@ -365,3 +365,24 @@ export async function applyTeamPresetAction(
   revalidatePath(`/projects/${slug}/agents`);
   return { ok: true, data: { agents: await loadAgents(ctx.projectId), minted } };
 }
+
+/** Setea el ejecutor de desarrollo del proyecto (KAI | CONSOLE | HYBRID). */
+export async function setDevExecutorAction(
+  slug: string,
+  mode: 'KAI' | 'CONSOLE' | 'HYBRID',
+): Promise<ActionResult<{ devExecutor: string }>> {
+  if (!['KAI', 'CONSOLE', 'HYBRID'].includes(mode)) return { ok: false, error: 'Modo inválido' };
+  const ctx = await guard(slug);
+  if (!ctx.ok) return ctx;
+  await prisma.project.update({ where: { id: ctx.projectId }, data: { devExecutor: mode } });
+  await audit({
+    actorId: ctx.userId,
+    action: 'agent.update',
+    resourceType: 'project',
+    resourceId: ctx.projectId,
+    projectId: ctx.projectId,
+    payload: { via: 'dev-executor', mode },
+  });
+  revalidatePath(`/projects/${slug}/agents`);
+  return { ok: true, data: { devExecutor: mode } };
+}
