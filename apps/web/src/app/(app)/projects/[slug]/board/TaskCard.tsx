@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Priority } from '@prisma/client';
 import { useI18n } from '@/lib/i18n/i18n';
+import { priorityMeta } from '@/lib/priority';
 import styles from './board.module.scss';
 
 export interface TaskView {
@@ -23,18 +24,11 @@ export interface TaskView {
   hasImplPlan?: boolean;
 }
 
-const PRIORITY_LABEL: Record<Priority, string> = {
-  LOW: 'baja',
-  MEDIUM: 'media',
-  HIGH: 'alta',
-  URGENT: 'urgente',
-};
-
-const PRIORITY_COLOR: Record<Priority, string> = {
-  LOW: '#9ca3af',
-  MEDIUM: '#6b7280',
-  HIGH: '#f59e0b',
-  URGENT: '#ef4444',
+const PRIORITY_LABEL_I18N: Record<Priority, [string, string]> = {
+  LOW: ['Baja', 'Low'],
+  MEDIUM: ['Media', 'Medium'],
+  HIGH: ['Alta', 'High'],
+  URGENT: ['Urgente', 'Urgent'],
 };
 
 export function TaskCard({
@@ -73,6 +67,11 @@ export function TaskCard({
         : null;
   const showQuick = !isOverlay && canWrite && !!onQuickMove && !!inProgressStateId && !!quickLabel;
 
+  const meta = priorityMeta(task.priority);
+  const [labelEs, labelEn] = PRIORITY_LABEL_I18N[meta.level];
+  const priorityLabel = t(labelEs, labelEn);
+  const priorityTitle = t(`Prioridad: ${priorityLabel}`, `Priority: ${priorityLabel}`);
+
   const content = (
     <article
       ref={setNodeRef}
@@ -87,10 +86,15 @@ export function TaskCard({
       <div className={styles.cardHeader}>
         <span className={styles.taskNum}>#{task.taskNumber}</span>
         <span
-          className={styles.priority}
-          style={{ background: PRIORITY_COLOR[task.priority] }}
-          title={`Prioridad: ${PRIORITY_LABEL[task.priority]}`}
-        />
+          className={styles.priorityBadge}
+          data-priority={meta.level}
+          style={{ color: meta.color, borderColor: meta.color }}
+          role="img"
+          aria-label={priorityTitle}
+          title={priorityTitle}
+        >
+          {meta.icon}
+        </span>
       </div>
       <h4 className={styles.cardTitle}>{task.title}</h4>
       <div className={styles.cardFooter}>

@@ -156,6 +156,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: t.$space-xs;
   margin-bottom: t.$space-xs;
 }
 
@@ -166,10 +167,21 @@
   font-weight: 500;
 }
 
-.priority {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+// Priority indicator badge — icon-first, color-second (colorblind-safe).
+// Fixed size across all cards; never displaces the title (margin-left: auto).
+.priorityBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid currentColor;
+  border-radius: t.$radius-full;
+  font-size: 12px;
+  line-height: 1;
+  background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
 .cardTitle {

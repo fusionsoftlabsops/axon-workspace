@@ -125,4 +125,38 @@ describe('TaskCard', () => {
       screen.queryByRole('button', { name: /Reopen|Unblock/ }),
     ).not.toBeInTheDocument();
   });
+
+  describe('priority badge', () => {
+    it('renders a single priority indicator with an aria-label including the level', () => {
+      render(<TaskCard task={makeTask({ priority: 'HIGH' })} projectSlug="demo" canWrite />);
+      const badges = screen.getAllByRole('img');
+      expect(badges).toHaveLength(1);
+      expect(badges[0]).toHaveAttribute('aria-label', expect.stringContaining('High'));
+      expect(badges[0]).toHaveAttribute('title', expect.stringContaining('High'));
+    });
+
+    it.each([
+      ['LOW', 'Low', '▽'],
+      ['MEDIUM', 'Medium', '='],
+      ['HIGH', 'High', '△'],
+      ['URGENT', 'Urgent', '⚑'],
+    ] as const)('shows the correct icon and label for %s', (priority, label, icon) => {
+      render(<TaskCard task={makeTask({ priority })} projectSlug="demo" canWrite />);
+      const badge = screen.getByRole('img');
+      expect(badge).toHaveTextContent(icon);
+      expect(badge).toHaveAttribute('aria-label', expect.stringContaining(label));
+    });
+
+    it('falls back to the neutral (MEDIUM) state for an unknown priority value without throwing', () => {
+      render(
+        <TaskCard
+          task={makeTask({ priority: 'BOGUS' as any })}
+          projectSlug="demo"
+          canWrite
+        />,
+      );
+      const badge = screen.getByRole('img');
+      expect(badge).toHaveAttribute('aria-label', expect.stringContaining('Medium'));
+    });
+  });
 });
