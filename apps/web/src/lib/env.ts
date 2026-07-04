@@ -28,6 +28,11 @@ const schema = z.object({
     (v) => (v === '' ? undefined : v),
     z.string().startsWith('sk-ant-').optional(),
   ),
+  // OpenAI (gpt-image-1) para generación de imágenes de UI/UX (mockups + assets).
+  // Opcional: sin ella, la generación de imágenes devuelve un error claro y el
+  // resto de la app no se ve afectada.
+  OPENAI_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  OPENAI_IMAGE_MODEL: z.string().default('gpt-image-1'),
   // SMTP for outbound email (e.g. invitation links). All optional — if unset,
   // email sending is skipped and the app falls back to the copyable link.
   // Works with any SMTP provider (Hostinger, Resend's smtp.resend.com, etc.).

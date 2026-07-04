@@ -7,6 +7,7 @@ import type { FileCategory, MemberRole } from '@prisma/client';
 import { Button, EmptyState } from '@/components/ui';
 import { CATEGORY_ORDER, CATEGORY_LABEL, categorize, formatBytes, MAX_FILE_BYTES } from '@/lib/files';
 import { setFileContextAction, generateFileContextAction, type ContextStatus } from '@/lib/actions/files';
+import { generateProjectImageAction } from '@/lib/actions/image';
 import { useI18n } from '@/lib/i18n/i18n';
 import styles from './files.module.scss';
 
@@ -89,6 +90,26 @@ export function FilesClient({
 
   const canWrite = role !== 'VIEWER';
   const canManage = role === 'OWNER' || role === 'ADMIN';
+
+  // Generación de imágenes (gpt-image-1): mockups de UI + assets → van al store.
+  const [imgPrompt, setImgPrompt] = useState('');
+  const [imgBusy, setImgBusy] = useState(false);
+
+  async function genImage() {
+    const prompt = imgPrompt.trim();
+    if (!prompt || imgBusy) return;
+    setImgBusy(true);
+    setError(null);
+    const res = await generateProjectImageAction(slug, prompt);
+    setImgBusy(false);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setImgPrompt('');
+    flashSuccess(t('Imagen generada y guardada en Archivos', 'Image generated and saved to Files'));
+    router.refresh();
+  }
 
   const isContext = (f: FileView) => f.isContext;
   const isImage = (f: FileView) => f.category === 'IMAGE';
@@ -281,6 +302,47 @@ export function FilesClient({
           </div>
           <Button variant="primary" disabled={busy} onClick={() => inputRef.current?.click()}>
             {busy ? t('Subiendo…', 'Uploading…') : t('Seleccionar archivos', 'Choose files')}
+          </Button>
+        </div>
+      )}
+
+      {/* Generación de imágenes con IA (gpt-image-1): mockups de UI + assets. */}
+      {canWrite && (
+        <div className={styles.uploader} data-testid="image-gen">
+          <span aria-hidden className={styles.uploaderGlyph}>🎨</span>
+          <div className={styles.uploaderCopy} style={{ flex: 1 }}>
+            <p className={styles.uploaderText}>
+              {t('Generar imagen con IA', 'Generate image with AI')}
+            </p>
+            <textarea
+              value={imgPrompt}
+              onChange={(e) => setImgPrompt(e.target.value)}
+              rows={2}
+              placeholder={t(
+                'Describí un mockup de pantalla o un asset (ícono, ilustración, hero)…',
+                'Describe a screen mockup or an asset (icon, illustration, hero)…',
+              )}
+              style={{
+                width: '100%',
+                marginTop: 4,
+                padding: '0.4rem 0.6rem',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                background: 'transparent',
+                color: 'inherit',
+                font: 'inherit',
+                resize: 'vertical',
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void genImage();
+                }
+              }}
+            />
+          </div>
+          <Button variant="secondary" disabled={imgBusy || !imgPrompt.trim()} onClick={() => void genImage()}>
+            {imgBusy ? t('Generando… (puede tardar)', 'Generating… (may take a while)') : t('Generar', 'Generate')}
           </Button>
         </div>
       )}
