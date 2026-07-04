@@ -15,6 +15,7 @@ import { createAnthropicProvider } from './runtime/providers/anthropic.js';
 import { createSmAssignHandler } from './roles/sm.js';
 import { createSmRetroHandler } from './roles/sm-retro.js';
 import { createPoHandler } from './roles/po.js';
+import { createDesignHandler } from './roles/design.js';
 import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
@@ -43,12 +44,14 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
     : null;
 
   const poEnabled = !!config.tokens.PO;
+  const designEnabled = !!config.tokens.DESIGN;
 
   // ---- SM ----
   if (config.tokens.SM) {
     const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.SM);
     // Con PO activo, el SM asigna solo HUs refinadas (gate de Definition of Ready).
-    router.register(createSmAssignHandler({ api, projectId, projectSlug, poEnabled }));
+    // Con Diseño activo, las HUs de UI esperan su spec de diseño (gate de diseño).
+    router.register(createSmAssignHandler({ api, projectId, projectSlug, poEnabled, designEnabled }));
     registered.push('SM:assign');
     if (anthropic) {
       router.register(createSmRetroHandler({ api, projectId, projectSlug, provider: anthropic }));
@@ -69,6 +72,15 @@ export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring
     registered.push('PO');
   } else {
     skipped.push({ role: 'PO', reason: 'sin AGENT_PO_TOKEN' });
+  }
+
+  // ---- DESIGN (Aria: diseña las HUs de UI antes del Dev) ----
+  if (config.tokens.DESIGN) {
+    const api = new AxonApi(config.AXON_API_BASE_URL, config.tokens.DESIGN);
+    router.register(createDesignHandler({ api, projectId, projectSlug }));
+    registered.push('DESIGN');
+  } else {
+    skipped.push({ role: 'DESIGN', reason: 'sin AGENT_DESIGN_TOKEN' });
   }
 
   // ---- DEV (Qwen) ----

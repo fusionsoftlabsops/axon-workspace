@@ -123,6 +123,50 @@ describe('createSmAssignHandler.handle', () => {
     expect(a.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
   });
 
+  it('con Diseño activo, DIFIERE una HU de UI sin designSpec y asigna cuando ya está diseñada', async () => {
+    // HU de UI refinada pero sin diseño → el SM espera a Aria (no asigna).
+    const sinDiseno = api({
+      getTask: vi.fn().mockResolvedValue({
+        state: 'Preparación',
+        title: 'Rediseñar la pantalla de login',
+        assignee: null,
+        acceptanceCriteria: '- [ ] x',
+        designSpec: '',
+      }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: sinDiseno, designEnabled: true }).handle(evt());
+    expect(sinDiseno.patchTask).not.toHaveBeenCalled();
+
+    // Ya diseñada (Aria terminó) → asigna. Dispara vía story.designed.
+    const disenada = api({
+      getTask: vi.fn().mockResolvedValue({
+        state: 'Preparación',
+        title: 'Rediseñar la pantalla de login',
+        assignee: null,
+        acceptanceCriteria: '- [ ] x',
+        designSpec: '## Diseño (Aria)\nnotas…',
+      }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: disenada, designEnabled: true }).handle(
+      evt({ type: 'story.designed' as never }),
+    );
+    expect(disenada.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
+  });
+
+  it('con Diseño activo, una HU de backend se asigna directo (no espera diseño)', async () => {
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({
+        state: 'Preparación',
+        title: 'Agregar índice a la tabla de usuarios',
+        assignee: null,
+        acceptanceCriteria: '- [ ] x',
+        designSpec: '',
+      }),
+    });
+    await createSmAssignHandler({ ...OPTS, api: a, designEnabled: true }).handle(evt());
+    expect(a.patchTask).toHaveBeenCalledWith('axon', 22, { toState: 'Desarrollo', assignToAgentRole: 'DEV' });
+  });
+
   it('reclama una HU AUTO-asignada al crear (assignee === reporter) — create_task / quick-add', async () => {
     // create_task (MCP) y el quick-add del tablero asignan la HU al creador;
     // eso NO es un dueño real, así que el SM la levanta igual y se la pasa al Dev.

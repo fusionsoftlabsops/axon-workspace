@@ -26,6 +26,7 @@ export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
   DEV: 'Agente Dev',
   QA: 'Agente QA',
   PO: 'Agente Product Owner',
+  DESIGN: 'Agente Diseño',
 };
 
 /** Scopes mínimos para operar el tablero — sin projects:write ni skills:write. */

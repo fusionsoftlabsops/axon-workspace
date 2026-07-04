@@ -6,7 +6,7 @@
 
 export interface AgentMe {
   id: string;
-  role: 'SM' | 'DEV' | 'QA' | 'PO';
+  role: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN';
   userId: string;
   llmModel: string;
   credentialRef: string | null;
@@ -113,7 +113,7 @@ export class AxonApi {
       title?: string;
       description?: string;
       priority?: string;
-      assignToAgentRole?: 'SM' | 'DEV' | 'QA' | 'PO';
+      assignToAgentRole?: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN';
     },
   ): Promise<{ ok: boolean }> {
     return this.request('PATCH', `/projects/${slug}/tasks/${taskNumber}`, input);
@@ -144,6 +144,17 @@ export class AxonApi {
     taskNumber: number,
   ): Promise<{ ok: boolean; refinement: { description: string; acceptanceCriteria: string; priority: string } }> {
     return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/refine`, { lang: 'es' });
+  }
+
+  /**
+   * Genera el spec de diseño de una HU de UI (notas + mockup gpt-image-1) y lo
+   * persiste (dispara `story.designed` → el SM la asigna). Lo usa el agente Diseño.
+   */
+  designTask(
+    slug: string,
+    taskNumber: number,
+  ): Promise<{ ok: boolean; design: { notes: string; mockupFileId: string | null } }> {
+    return this.request('POST', `/projects/${slug}/tasks/${taskNumber}/design`, { lang: 'es' });
   }
 
   qaDecision(
