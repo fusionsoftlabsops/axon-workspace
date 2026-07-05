@@ -97,7 +97,19 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
         category?: string | null;
         designSpec?: string | null;
         techDesign?: string | null;
+        comments?: Array<{ author?: string; body?: string }>;
       };
+
+      // Feedback de revisión: si la HU ya fue implementada y RECHAZADA, el Dev
+      // DEBE ver el último rechazo de QA/Reviewer para corregir el punto exacto.
+      // Sin esto re-implementaba a ciegas y oscilaba sin converger (loop QA↔Dev).
+      const comments = story.comments ?? [];
+      const lastQa = [...comments].reverse().find((c) => (c.author ?? '').includes('QA'));
+      const lastReviewer = [...comments].reverse().find((c) => (c.author ?? '').includes('Review'));
+      const revisionFeedback = [lastQa, lastReviewer]
+        .filter((c): c is { author?: string; body?: string } => !!c?.body)
+        .map((c) => `### ${c.author}\n${c.body}`)
+        .join('\n\n');
 
       // Selección de modelo por HU: las de UI/complejas van al modelo fuerte
       // (Claude), donde Qwen no converge; el resto al primario (Qwen, barato).
@@ -183,6 +195,14 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
         const techDesign = (story.techDesign ?? '').trim();
         const goal =
           `Implementá la HU #${n} «${story.title ?? ''}».\n\n` +
+          (revisionFeedback
+            ? `## ⚠️ REVISIÓN SOLICITADA — corregí, no rehagas\n` +
+              `Esta HU YA fue implementada y RECHAZADA en revisión. Tu tarea es CORREGIR el PR existente ` +
+              `aplicando EXACTAMENTE lo que piden QA/Reviewer abajo. Aplicá el fix puntual que indican ` +
+              `(si sugieren una línea/constante/símbolo concreto, agregalo TAL CUAL); NO rediseñes desde ` +
+              `cero, NO re-litigues el enfoque, NO repitas la implementación que ya rechazaron. Cumplí ` +
+              `los criterios de aceptación al pie de la letra.\n\n${revisionFeedback}\n\n`
+            : '') +
           `Descripción / criterios:\n${story.description ?? '(ver get_story)'}\n\n` +
           brainNote +
           (techDesign
