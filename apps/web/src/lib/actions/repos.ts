@@ -152,23 +152,12 @@ export async function linkExistingRepoAction(
 ): Promise<ActionResult<ReposSection>> {
   const g = await guard(slug);
   if (!g.ok) return g;
-  const name = input.name.trim();
-  const url = input.url.trim();
-  if (!name) return { ok: false, error: 'Nombre de repo requerido' };
-  if (!url) return { ok: false, error: 'URL requerida' };
-  const fullName = parseRepoFullName(url);
-
-  await prisma.projectRepo.upsert({
-    where: { projectId_name: { projectId: g.projectId, name } },
-    create: {
-      projectId: g.projectId,
-      name,
-      kind: input.kind || 'other',
-      url,
-      githubFullName: fullName,
-    },
-    update: { url, githubFullName: fullName, kind: input.kind || undefined },
-  });
+  try {
+    const { linkProjectRepo } = await import('@/lib/repo/link');
+    await linkProjectRepo(g.projectId, input);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'No se pudo vincular el repo' };
+  }
   revalidatePath(`/projects/${slug}/plan`);
   return { ok: true, data: await loadSection(g.projectId) };
 }
