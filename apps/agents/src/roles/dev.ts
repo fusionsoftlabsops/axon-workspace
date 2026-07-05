@@ -197,17 +197,44 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           `El repo ya está clonado en tu workspace (rama ${branch}). Explorá, implementá y al final ` +
           `respondé SOLO el resumen markdown del cambio.`;
 
-        const result = await runTrackedLoop(goal, {
-          api: opts.api,
-          projectSlug: opts.projectSlug,
-          storyId: event.storyId,
-          payload: { via: 'dev', storyNumber: n, branch, model: useStrong ? 'strong' : 'primary' },
-          provider,
-          system: DEV_SYSTEM,
-          tools: [...repoTools(ws.dir), ...contextTools(opts.api, opts.projectSlug)],
-          maxIterations: opts.maxIterations ?? 40,
-          maxDurationMs: opts.maxDurationMs,
-        });
+        const devTools = [...repoTools(ws.dir), ...contextTools(opts.api, opts.projectSlug)];
+        const runDev = (p: LlmProvider, strong: boolean) =>
+          runTrackedLoop(goal, {
+            api: opts.api,
+            projectSlug: opts.projectSlug,
+            storyId: event.storyId,
+            payload: { via: 'dev', storyNumber: n, branch, model: strong ? 'strong' : 'primary' },
+            provider: p,
+            system: DEV_SYSTEM,
+            tools: devTools,
+            maxIterations: opts.maxIterations ?? 40,
+            maxDurationMs: opts.maxDurationMs,
+          });
+
+        let result = await runDev(provider, useStrong);
+
+        // Auto-escalación transversal (aplica a ECO/BALANCED/DEFAULT): si el
+        // primario (Qwen) NO convergió —budget_exceeded o truncated— y hay un
+        // modelo fuerte (Claude) que todavía no usamos, reintentamos la HU UNA
+        // vez con el fuerte. Qwen sigue siendo el primario barato; solo caemos a
+        // Claude cuando de verdad no cierra, así ningún proyecto se atasca.
+        const qwenDidNotConverge =
+          result.status !== 'SUCCEEDED' &&
+          (result.stopped === 'budget_exceeded' || result.stopped === 'truncated');
+        if (qwenDidNotConverge && !useStrong && opts.strongProvider) {
+          await opts.api.comment(
+            opts.projectSlug,
+            n,
+            `🤖 **Dev**: el modelo primario no convergió (${result.stopped}). Reintento con el modelo fuerte (Claude).`,
+          );
+          await narrate(
+            opts.api,
+            opts.projectSlug,
+            `Qwen no cerró la HU #${n} (${result.stopped}); reintento con el modelo fuerte.`,
+            { kind: 'STATUS', storyNumber: n },
+          );
+          result = await runDev(opts.strongProvider, true);
+        }
 
         if (result.status !== 'SUCCEEDED') {
           await opts.api.comment(
