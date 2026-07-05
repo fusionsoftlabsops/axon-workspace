@@ -4,10 +4,9 @@
  * toma en su próximo refresco. Requieren token OWNER/ADMIN del proyecto.
  */
 import { z } from 'zod';
+import { ROLES } from '../roles.js';
 import type { ApiClient } from '../api-client.js';
 import type { ToolRegistry } from '../tool-registry.js';
-
-const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
 
 const defaultTeamSchema = z.object({ projectSlug: z.string() });
 const presetSchema = z.object({

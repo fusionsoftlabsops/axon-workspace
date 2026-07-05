@@ -22,17 +22,12 @@ export function agentEmail(role: AgentRole): string {
   return `agent-${role.toLowerCase()}@${AGENT_EMAIL_DOMAIN}`;
 }
 
-export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
-  SM: 'Agente Scrum Master',
-  DEV: 'Agente Dev',
-  QA: 'Agente QA',
-  PO: 'Agente Product Owner',
-  DESIGN: 'Agente Diseño',
-  REVIEWER: 'Agente Code Reviewer',
-  ARCHITECT: 'Agente Arquitecto',
-  MARKETING: 'Agente Branding',
-  RELEASE: 'Agente Release',
-};
+import { ROLE_META } from '@admin/shared';
+
+/** Nombre del usuario de servicio por rol (de la fuente única de roles). */
+export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = Object.fromEntries(
+  (Object.keys(ROLE_META) as AgentRole[]).map((r) => [r, ROLE_META[r].serviceName]),
+) as Record<AgentRole, string>;
 
 /** Scopes mínimos para operar el tablero — sin projects:write ni skills:write. */
 export const AGENT_TOKEN_SCOPES = [

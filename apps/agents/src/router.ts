@@ -5,9 +5,10 @@
  * demás ni tumba la suscripción.
  */
 import type { DomainEventV1 } from './events.js';
+// El set de roles vive en ./roles.ts (guardado contra el SoT de @admin/shared).
+import type { AgentRoleName } from './roles.js';
 
-export type AgentRoleName =
-  | 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN' | 'REVIEWER' | 'ARCHITECT' | 'MARKETING' | 'RELEASE';
+export type { AgentRoleName };
 
 export interface RoleHandler {
   role: AgentRoleName;
