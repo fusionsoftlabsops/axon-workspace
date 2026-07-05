@@ -7,6 +7,7 @@ import { audit } from '@/lib/audit';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { provisionAgent } from '@/lib/agents/provision';
 import { agentDisplayName, DEFAULT_AGENT_NAMES } from '@/lib/agents/team-chat';
+import { ROLES, DEFAULT_ROLE_MODEL } from '@/lib/agents/roles';
 import type { ActionResult } from './projects';
 
 export interface AgentView {
@@ -24,7 +25,7 @@ export interface AgentView {
   createdAt: string;
 }
 
-const ROLES: AgentRole[] = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'];
+// ROLES y AXON_DEFAULT_MODEL provienen ahora de la fuente única (import arriba).
 
 async function guard(slug: string) {
   const ctx = await assertProjectMember(slug);
@@ -496,22 +497,6 @@ export async function verifyAgentsAction(slug: string): Promise<ActionResult<Ver
   return { ok: true, data: { worker: { reachable, subscribed }, refired, skippedRunning } };
 }
 
-/**
- * Modelos por defecto del equipo "estilo axon": todos los roles en Sonnet 5,
- * salvo el Dev en Qwen (mismo mapa que DEFAULT_MODEL de la UI de Agentes).
- */
-const AXON_DEFAULT_MODEL: Record<AgentRole, string> = {
-  SM: 'claude-sonnet-5',
-  PO: 'claude-sonnet-5',
-  ARCHITECT: 'claude-sonnet-5',
-  DESIGN: 'claude-sonnet-5',
-  DEV: 'qwen3-coder-next',
-  QA: 'claude-sonnet-5',
-  REVIEWER: 'claude-sonnet-5',
-  MARKETING: 'claude-sonnet-5',
-  RELEASE: 'claude-sonnet-5',
-};
-
 export interface ProvisionTeamResult {
   provisioned: number;
   enabled: number;
@@ -545,7 +530,7 @@ export async function provisionDefaultTeam(
     });
     if (!existing) {
       try {
-        await provisionAgent({ projectId, projectSlug: slug, role, llmModel: AXON_DEFAULT_MODEL[role] });
+        await provisionAgent({ projectId, projectSlug: slug, role, llmModel: DEFAULT_ROLE_MODEL[role] });
         await prisma.agent.update({
           where: { projectId_role: { projectId, role } },
           data: { enabled: true },

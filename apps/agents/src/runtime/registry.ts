@@ -5,7 +5,8 @@
  * proyectos/agentes nuevos (auto-provisión) sin reiniciar.
  */
 import type { AgentsConfig } from '../config.js';
-import type { EventRouter, AgentRoleName } from '../router.js';
+import type { EventRouter } from '../router.js';
+import { AGENT_ROLE_SET, type AgentRoleName } from '../roles.js';
 import { buildProjectTeam, type RuntimeProject, type RuntimeAgent } from '../bootstrap.js';
 
 interface RuntimeResponse {
@@ -16,9 +17,6 @@ interface RuntimeResponse {
   }>;
 }
 
-const ROLE_SET: ReadonlySet<string> = new Set([
-  'SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE',
-]);
 
 async function fetchRuntime(config: AgentsConfig): Promise<RuntimeProject[]> {
   const url = `${config.AXON_API_BASE_URL}/internal/agent-runtime`;
@@ -32,7 +30,7 @@ async function fetchRuntime(config: AgentsConfig): Promise<RuntimeProject[]> {
     projectId: p.projectId,
     projectSlug: p.slug,
     agents: (p.agents ?? [])
-      .filter((a) => ROLE_SET.has(a.role))
+      .filter((a) => AGENT_ROLE_SET.has(a.role))
       .map(
         (a): RuntimeAgent => ({
           role: a.role as AgentRoleName,

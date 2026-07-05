@@ -5,8 +5,9 @@ import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { audit } from '@/lib/audit';
 import { provisionAgent } from '@/lib/agents/provision';
+import { AGENT_ROLES } from '@admin/shared';
 
-const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
+const ROLES = AGENT_ROLES;
 
 const postBody = z.object({
   role: z.enum(ROLES),

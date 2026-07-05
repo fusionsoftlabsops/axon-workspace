@@ -7,10 +7,10 @@
  *  - set_agent_enabled: kill-switch por rol (requiere OWNER/ADMIN).
  */
 import { z } from 'zod';
+import { ROLES } from '../roles.js';
 import type { ApiClient } from '../api-client.js';
 import type { ToolRegistry } from '../tool-registry.js';
 
-const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
 
 const runsSchema = z.object({
   projectSlug: z.string(),

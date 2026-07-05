@@ -7,6 +7,7 @@
  * el canal Redis del proyecto (mismo bus realtime del chat del plan).
  */
 import type { AgentRole, TeamMessageKind } from '@prisma/client';
+import { ROLE_META } from '@admin/shared';
 import { prisma } from '@/lib/db';
 import { publish } from '@/lib/realtime';
 
@@ -15,18 +16,11 @@ export function teamChannel(projectId: string): string {
   return `team:${projectId}`;
 }
 
-/** Nombres propios por defecto del equipo (editables en la pestaña Agentes). */
-export const DEFAULT_AGENT_NAMES: Record<AgentRole, string> = {
-  SM: 'Nova',
-  DEV: 'Kai',
-  QA: 'Vera',
-  PO: 'Iris',
-  DESIGN: 'Aria',
-  REVIEWER: 'Ren',
-  ARCHITECT: 'Dax',
-  MARKETING: 'Sol',
-  RELEASE: 'Marco',
-};
+/** Nombres propios por defecto del equipo (de la fuente única; editables en la
+ *  pestaña Agentes). */
+export const DEFAULT_AGENT_NAMES: Record<AgentRole, string> = Object.fromEntries(
+  (Object.keys(ROLE_META) as AgentRole[]).map((r) => [r, ROLE_META[r].persona]),
+) as Record<AgentRole, string>;
 
 export function agentDisplayName(role: AgentRole, displayName?: string | null): string {
   return `${displayName?.trim() || DEFAULT_AGENT_NAMES[role]} · ${role}`;

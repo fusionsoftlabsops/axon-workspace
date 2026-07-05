@@ -16,22 +16,13 @@ import {
   type AgentView,
 } from '@/lib/actions/agents';
 import { TEAM_PRESETS, PRESET_IDS, type TeamPreset } from '@/lib/agents/presets';
+import { AGENT_ROLES, DEFAULT_ROLE_MODEL, type AgentRoleName } from '@admin/shared';
 import styles from './agents.module.scss';
 
-const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
-type Role = (typeof ROLES)[number];
+const ROLES = AGENT_ROLES;
+type Role = AgentRoleName;
 
-const DEFAULT_MODEL: Record<Role, string> = {
-  SM: 'claude-sonnet-5',
-  PO: 'claude-sonnet-5',
-  ARCHITECT: 'claude-sonnet-5',
-  DESIGN: 'claude-sonnet-5',
-  DEV: 'qwen3-coder-next',
-  QA: 'claude-sonnet-5',
-  REVIEWER: 'claude-sonnet-5',
-  MARKETING: 'claude-sonnet-5',
-  RELEASE: 'claude-sonnet-5',
-};
+const DEFAULT_MODEL = DEFAULT_ROLE_MODEL;
 
 export function AgentsClient({
   slug,
@@ -244,7 +235,7 @@ export function AgentsClient({
               </tr>
             </thead>
             <tbody>
-              {(['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const).map((role) => (
+              {ROLES.map((role) => (
                 <tr key={role}>
                   <td>{role}</td>
                   {PRESET_IDS.map((id) => {

@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schemas": "./src/schemas/index.ts",
-    "./types": "./src/types/index.ts"
+    "./types": "./src/types/index.ts",
+    "./roles": "./src/roles.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
