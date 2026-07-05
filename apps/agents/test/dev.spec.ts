@@ -232,6 +232,33 @@ describe('createDevHandler — aprendizaje y contexto', () => {
     expect(goal).toContain('gotcha-pnpm');
   });
 
+  it('HU rechazada → inyecta el último rechazo de QA/Reviewer al goal (corregí, no rehagas)', async () => {
+    const prov = provider();
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({
+        title: 'Agregar flags',
+        description: 'x',
+        comments: [
+          { author: 'Agente Dev', body: 'entrego el PR' },
+          { author: 'Agente QA', body: 'RECHAZO: falta la constante ENABLE_X a nivel de módulo' },
+          { author: 'Agente Code Reviewer', body: 'blocker: agregá ENABLE_X = get_settings().x' },
+        ],
+      }),
+    });
+    await createDevHandler({ ...OPTS, api: a, provider: prov, run: runner() }).handle(evt());
+    const goal = JSON.stringify((prov.complete as ReturnType<typeof vi.fn>).mock.calls[0]![0]);
+    expect(goal).toContain('REVISIÓN SOLICITADA');
+    expect(goal).toContain('ENABLE_X'); // el punto exacto que QA/Reviewer pidieron
+  });
+
+  it('HU sin rechazos previos → NO agrega bloque de revisión', async () => {
+    const prov = provider();
+    const a = api({ getTask: vi.fn().mockResolvedValue({ title: 'X', description: 'x', comments: [] }) });
+    await createDevHandler({ ...OPTS, api: a, provider: prov, run: runner() }).handle(evt());
+    const goal = JSON.stringify((prov.complete as ReturnType<typeof vi.fn>).mock.calls[0]![0]);
+    expect(goal).not.toContain('REVISIÓN SOLICITADA');
+  });
+
   it('tras el PR captura la implementación al cerebro PERSONAL (LOCAL)', async () => {
     const a = api({ captureMemory: vi.fn().mockResolvedValue({ id: 'm1' }) });
     await createDevHandler({ ...OPTS, api: a, provider: provider(), run: runner() }).handle(evt());
