@@ -79,8 +79,10 @@ export function createAnthropicProvider(opts: AnthropicProviderOptions): LlmProv
           // Cap de salida por respuesta. 4096 era demasiado bajo para un agente
           // de CÓDIGO (Claude genera razonamiento + tool-calls largos → se
           // truncaba con stopReason='length' y el loop abortaba como FAILED,
-          // ver runtime.ts). 16k da margen holgado (Sonnet 5 admite hasta 64k).
-          max_tokens: input.maxOutputTokens ?? 16384,
+          // ver runtime.ts). 16k tampoco alcanzaba en HUs pesadas (el Dev escribe
+          // archivos/diffs grandes en una respuesta → truncated). 32k da margen
+          // amplio sin acercarse al tope de Sonnet 5 (64k).
+          max_tokens: input.maxOutputTokens ?? 32768,
           system: input.system,
           messages: toAnthropicMessages(input.messages),
           ...(input.tools.length
