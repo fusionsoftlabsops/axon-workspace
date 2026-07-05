@@ -16,6 +16,7 @@ import { registerTeamTools } from './team.js';
 import { registerSupervisorTools } from './supervisor.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerProvisioningTools } from './provisioning.js';
+import { registerRepoTools } from './repos.js';
 
 export function registerAllTools(registry: ToolRegistry, api: ApiClient): void {
   registerTaskTools(registry, api);
@@ -28,4 +29,5 @@ export function registerAllTools(registry: ToolRegistry, api: ApiClient): void {
   registerSupervisorTools(registry, api);
   registerPortfolioTools(registry, api);
   registerProvisioningTools(registry, api);
+  registerRepoTools(registry, api);
 }
