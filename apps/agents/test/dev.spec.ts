@@ -191,6 +191,29 @@ describe('createDevHandler — selección de modelo por HU (category routing)', 
     expect((strong.complete as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
   });
 
+  it('primario (Qwen) NO converge (budget) → auto-escala al modelo fuerte y cierra la HU', async () => {
+    const usageProvider = (prompt: number, completion: number): LlmProvider => ({
+      complete: vi.fn().mockResolvedValue({
+        content: 'Resumen: implementado',
+        toolCalls: [],
+        usage: { promptTokens: prompt, completionTokens: completion },
+        stopReason: 'stop',
+      }),
+    });
+    const primary = usageProvider(200, 50); // 250 > budget → budget_exceeded
+    const strong = usageProvider(10, 5); //   15 < budget → converge
+    const a = api({
+      openRun: vi.fn().mockResolvedValue({ id: 'r', tokenBudget: 100 }),
+      getMe: vi.fn().mockResolvedValue({ enabled: true, userId: 'u-dev', role: 'DEV', llmModel: 'qwen3-coder-next' }),
+      getTask: vi.fn().mockResolvedValue({ title: 'Agregar flag a settings.py', description: 'x', comments: [] }),
+    });
+    await createDevHandler({ ...OPTS, api: a, provider: primary, strongProvider: strong, run: runner() }).handle(evt());
+    // Qwen intentó y no cerró → escaló a Claude, que sí cerró (entrega a QA).
+    expect((primary.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect((strong.complete as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect(a.submitQaReview).toHaveBeenCalled();
+  });
+
   it('sin strongProvider configurado → siempre el primario, aun en HU de UI', async () => {
     const primary = provider();
     const a = api({ getTask: vi.fn().mockResolvedValue({ title: 'Rediseñar la pantalla', description: 'x', comments: [] }) });
