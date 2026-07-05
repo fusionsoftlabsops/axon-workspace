@@ -5,7 +5,7 @@
  * porque el worker corre `node dist` y shared se distribuye como fuente TS (el
  * import de tipo se borra al compilar).
  */
-import type { AgentRoleName as SharedRole } from '@admin/shared';
+import type { AgentRoleName as SharedRole } from '@admin/shared/roles';
 
 export const AGENT_ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
 

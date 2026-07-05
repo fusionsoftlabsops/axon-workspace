@@ -5,7 +5,7 @@
  * (No importamos el VALOR de shared porque este app corre `node dist` y shared
  * se distribuye como fuente TS; el import de tipo se borra al compilar.)
  */
-import type { AgentRoleName } from '@admin/shared';
+import type { AgentRoleName } from '@admin/shared/roles';
 
 export const ROLES = ['SM', 'PO', 'ARCHITECT', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'MARKETING', 'RELEASE'] as const;
 
