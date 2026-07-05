@@ -515,6 +515,8 @@ const AXON_DEFAULT_MODEL: Record<AgentRole, string> = {
 export interface ProvisionTeamResult {
   provisioned: number;
   enabled: number;
+  /** Agentes preexistentes cuyo token se rotó+selló para el worker multi-tenant. */
+  resealed: number;
   agents: AgentView[];
 }
 
@@ -528,8 +530,14 @@ export async function provisionDefaultTeam(
   projectId: string,
   slug: string,
 ): Promise<ProvisionTeamResult> {
+  const { rotateAgentToken } = await import('@/lib/agents/provision');
+  // Roles que ya tienen su token sellado en el store de runtime.
+  const sealedRoles = new Set(
+    (await prisma.agentRuntimeToken.findMany({ where: { projectId }, select: { role: true } })).map((r) => r.role),
+  );
   let provisioned = 0;
   let enabled = 0;
+  let resealed = 0;
   for (const role of ROLES) {
     const existing = await prisma.agent.findUnique({
       where: { projectId_role: { projectId, role } },
@@ -547,10 +555,22 @@ export async function provisionDefaultTeam(
       } catch {
         /* carrera / ya existe: seguir */
       }
-    } else if (!existing.enabled) {
-      await prisma.agent.update({ where: { id: existing.id }, data: { enabled: true } });
-      enabled += 1;
+    } else {
+      if (!existing.enabled) {
+        await prisma.agent.update({ where: { id: existing.id }, data: { enabled: true } });
+        enabled += 1;
+      }
+      // Auto-sanación: un agente preexistente sin token sellado (ej. los de axon,
+      // provisionados antes del store) se rota+sella para que el worker lo sirva.
+      if (!sealedRoles.has(role)) {
+        try {
+          await rotateAgentToken({ projectId, projectSlug: slug, role });
+          resealed += 1;
+        } catch {
+          /* best-effort */
+        }
+      }
     }
   }
-  return { provisioned, enabled, agents: await loadAgents(projectId) };
+  return { provisioned, enabled, resealed, agents: await loadAgents(projectId) };
 }
