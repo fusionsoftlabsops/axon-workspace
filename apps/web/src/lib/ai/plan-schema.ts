@@ -70,10 +70,20 @@ export const suggestedRepoSchema = z.object({
   defaultBranch: z.string().default('main'),
 });
 
+export const recommendedPresetSchema = z
+  .object({
+    preset: z.enum(['ECO', 'BALANCED', 'MAX']).default('BALANCED'),
+    reason: z.string().default(''),
+  })
+  .nullable()
+  .default(null);
+
 export const generatedPlanSchema = z.object({
   improvedIdea: z.string().default(''),
   sprints: z.array(planSprintSchema).default([]),
   suggestedRepos: z.array(suggestedRepoSchema).default([]),
+  // Config de equipo recomendada para lo que se va a construir (ECO/BALANCED/MAX).
+  recommendedPreset: recommendedPresetSchema,
 });
 export type GeneratedPlan = z.infer<typeof generatedPlanSchema>;
 
@@ -177,6 +187,20 @@ export const PLAN_TOOL_SCHEMA = {
         },
         required: ['name', 'kind', 'reason'],
       },
+    },
+    recommendedPreset: {
+      type: 'object',
+      description:
+        'Configuración de equipo recomendada según la COMPLEJIDAD de lo que se construye. ' +
+        'ECO: landing/portfolio/blog/MVP simple. BALANCED: SaaS con auth/dashboard, e-commerce chico, ' +
+        'reservas, panel admin, API+web estándar. MAX: inventario multi-sucursal, microservicios con ' +
+        'colas/eventos, ERP/CRM, fintech con pagos/auditoría, multi-tenant de alta concurrencia. ' +
+        'Ante la duda entre dos, elegí el MAYOR (degradar deja el desarrollo sin poder avanzar).',
+      properties: {
+        preset: { type: 'string', enum: ['ECO', 'BALANCED', 'MAX'] },
+        reason: { type: 'string', description: 'Por qué este tier para ESTE proyecto (1-2 frases).' },
+      },
+      required: ['preset', 'reason'],
     },
   },
   required: ['improvedIdea', 'sprints', 'suggestedRepos'],

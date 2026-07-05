@@ -158,6 +158,7 @@ Llama a la herramienta EmitPlan con:
 - sprints: ordenados; cada uno con name, goal y tasks.
 - Cada task: title; description; acceptanceCriteria (checklist markdown o Dado/Cuando/Entonces); estimate (rango "junior–senior"); estimateBySeniority ({junior, semiSenior, senior}); category (infra|backend|frontend|design|qa|devops|docs|other); recommendedRoles (perfiles); priority (LOW|MEDIUM|HIGH|URGENT); kind (TASK|STORY|EPIC|BUG|SPIKE); repo (nombre del repo objetivo, uno de suggestedRepos).
 - suggestedRepos: los repos/aplicativos del proyecto (backend, frontend, infra, etc.) con name, kind, stack y reason. Un proyecto puede tener VARIOS.
+- recommendedPreset: la configuración de equipo adecuada a la COMPLEJIDAD de lo que se construye, con reason. ECO = landing/portfolio/blog/microsite/MVP simple. BALANCED = SaaS con auth/dashboard/suscripciones, e-commerce chico, reservas con calendario, panel admin con reportes, API REST + web estándar. MAX = inventario/ventas multi-sucursal, microservicios con colas y eventos, ERP/CRM interdependiente, fintech con pagos/conciliación/auditoría, plataforma multi-tenant de alta concurrencia. Si dudás entre dos tiers, elegí el MAYOR: degradar deja el desarrollo sin poder avanzar.
 ${estimateGuidance()}
 Reglas: realista y específico al dominio; **asigna a CADA HU su repo objetivo en \`repo\`** (uno de los name de suggestedRepos, según su área/categoría); usa los adjuntos (imágenes/documentos/enlaces) como contexto; todo el texto del plan en ${langName(lang)}.${brownfieldRule} Llama SOLO a la herramienta.`;
 }

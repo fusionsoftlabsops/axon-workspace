@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { TEAM_PRESETS, PRESET_IDS, isTeamPreset } from './presets';
+import {
+  TEAM_PRESETS,
+  PRESET_IDS,
+  isTeamPreset,
+  PRESET_RANK,
+  presetMeetsFloor,
+  presetBudget,
+} from './presets';
 
 describe('TEAM_PRESETS', () => {
   it('define los 3 presets con los 9 roles cada uno', () => {
@@ -27,5 +34,34 @@ describe('TEAM_PRESETS', () => {
   it('isTeamPreset valida', () => {
     expect(isTeamPreset('ECO')).toBe(true);
     expect(isTeamPreset('NOPE')).toBe(false);
+  });
+});
+
+describe('anti-downgrade (presetMeetsFloor)', () => {
+  it('rank ECO < BALANCED < MAX', () => {
+    expect(PRESET_RANK.ECO).toBeLessThan(PRESET_RANK.BALANCED);
+    expect(PRESET_RANK.BALANCED).toBeLessThan(PRESET_RANK.MAX);
+  });
+  it('sin floor, cualquier preset vale', () => {
+    expect(presetMeetsFloor('ECO', null)).toBe(true);
+    expect(presetMeetsFloor('ECO', undefined)).toBe(true);
+    expect(presetMeetsFloor('ECO', 'NOPE')).toBe(true);
+  });
+  it('con floor BALANCED: ECO no, BALANCED sí, MAX sí', () => {
+    expect(presetMeetsFloor('ECO', 'BALANCED')).toBe(false);
+    expect(presetMeetsFloor('BALANCED', 'BALANCED')).toBe(true);
+    expect(presetMeetsFloor('MAX', 'BALANCED')).toBe(true);
+  });
+});
+
+describe('presetBudget', () => {
+  it('resume Dev + total + agentes habilitados por preset', () => {
+    const eco = presetBudget('ECO');
+    expect(eco.dev).toBe(200_000);
+    expect(eco.agents).toBe(6); // ECO apaga Arquitecto/Reviewer/Release
+    const max = presetBudget('MAX');
+    expect(max.dev).toBe(1_000_000);
+    expect(max.agents).toBe(9);
+    expect(max.totalEnabled).toBeGreaterThan(eco.totalEnabled);
   });
 });

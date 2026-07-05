@@ -127,3 +127,36 @@ export const PRESET_IDS: TeamPreset[] = ['ECO', 'BALANCED', 'MAX'];
 export function isTeamPreset(v: string): v is TeamPreset {
   return v === 'ECO' || v === 'BALANCED' || v === 'MAX';
 }
+
+/** Orden de capacidad: no se puede bajar por debajo del recomendado. */
+export const PRESET_RANK: Record<TeamPreset, number> = { ECO: 0, BALANCED: 1, MAX: 2 };
+
+/**
+ * ¿El preset `chosen` cumple el PISO `floor` (el recomendado)? Sin floor, todo
+ * vale. Con floor, no se puede elegir un tier de menor capacidad — sabemos que
+ * degradar deja al desarrollo sin poder avanzar.
+ */
+export function presetMeetsFloor(chosen: TeamPreset, floor: string | null | undefined): boolean {
+  if (!floor || !isTeamPreset(floor)) return true;
+  return PRESET_RANK[chosen] >= PRESET_RANK[floor];
+}
+
+export interface PresetBudget {
+  /** Presupuesto de tokens del Dev por corrida (el headline). */
+  dev: number;
+  /** Suma del tokenBudget de los roles habilitados. */
+  totalEnabled: number;
+  /** Cantidad de roles habilitados. */
+  agents: number;
+}
+
+/** Resumen de presupuesto de tokens de un preset (para informar al usuario). */
+export function presetBudget(preset: TeamPreset): PresetBudget {
+  const def = TEAM_PRESETS[preset];
+  const enabled = (Object.values(def.roles) as PresetRoleConfig[]).filter((r) => r.enabled);
+  return {
+    dev: def.roles.DEV.tokenBudget,
+    totalEnabled: enabled.reduce((s, r) => s + r.tokenBudget, 0),
+    agents: enabled.length,
+  };
+}

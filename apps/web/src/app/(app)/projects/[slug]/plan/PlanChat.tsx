@@ -24,6 +24,7 @@ import { PlanRepos } from './PlanRepos';
 import { PlanContext, type ContextFile } from './PlanContext';
 import { ChatColors } from './ChatColors';
 import { PlanProgress } from './PlanProgress';
+import { TEAM_PRESETS, presetBudget, isTeamPreset } from '@/lib/agents/presets';
 import styles from './plan.module.scss';
 
 export function PlanChat({
@@ -575,6 +576,32 @@ export function PlanChat({
                 <div className={styles.refinedIdea}>
                   <h3 className={styles.refinedIdeaTitle}>{t('Idea afinada', 'Refined idea')}</h3>
                   <p className={styles.idea}>{generated.improvedIdea}</p>
+                </div>
+              )}
+              {generated.recommendedPreset?.preset && isTeamPreset(generated.recommendedPreset.preset) && (
+                <div className={styles.refinedIdea} data-testid="recommended-preset">
+                  <h3 className={styles.refinedIdeaTitle}>
+                    ⚙️ {t('Configuración recomendada', 'Recommended configuration')}:{' '}
+                    {t(
+                      TEAM_PRESETS[generated.recommendedPreset.preset].name[0],
+                      TEAM_PRESETS[generated.recommendedPreset.preset].name[1],
+                    )}
+                  </h3>
+                  {generated.recommendedPreset.reason && (
+                    <p className={styles.idea}>{generated.recommendedPreset.reason}</p>
+                  )}
+                  <p className={styles.idea} style={{ opacity: 0.75 }}>
+                    {t('Presupuesto:', 'Budget:')} {TEAM_PRESETS[generated.recommendedPreset.preset].costHint} ·{' '}
+                    {t(
+                      `Dev ${Math.round(presetBudget(generated.recommendedPreset.preset).dev / 1000)}k/corrida`,
+                      `Dev ${Math.round(presetBudget(generated.recommendedPreset.preset).dev / 1000)}k/run`,
+                    )}
+                    {'. '}
+                    {t(
+                      'Al publicar se aplica sola (modo automático); podés cambiarla o subirla desde Agentes, nunca bajar de la recomendada.',
+                      'On publish it is applied automatically; you can change or raise it from Agents, never below the recommended tier.',
+                    )}
+                  </p>
                 </div>
               )}
               <p className={styles.estimateNote}>
