@@ -5,7 +5,7 @@ const { prismaMock, assertMock, auditMock, provisionMock, revalidateMock } = vi.
     agent: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
     agentRun: { findMany: vi.fn() },
     auditLog: { count: vi.fn() },
-    project: { update: vi.fn() },
+    project: { update: vi.fn(), findUnique: vi.fn() },
   },
   assertMock: vi.fn(),
   auditMock: vi.fn(),
@@ -49,6 +49,7 @@ const AGENT_ROW = {
 beforeEach(() => {
   vi.clearAllMocks();
   assertMock.mockResolvedValue(OWNER);
+  prismaMock.project.findUnique.mockResolvedValue({ recommendedPreset: null });
   prismaMock.agent.findMany.mockResolvedValue([AGENT_ROW]);
   provisionMock.mockResolvedValue({ agentId: 'ag1', userId: 'au1', tokenId: 't1', tokenPlain: 'ad_pk_PLAIN', tokenPrefix: 'ad_pk_PLAIN'.slice(0, 12) });
 });
@@ -246,6 +247,21 @@ describe('applyTeamPresetAction', () => {
     assertMock.mockResolvedValue({ ok: true, userId: 'u1', projectId: 'p1', role: 'MEMBER' });
     expect(await applyTeamPresetAction('axon', 'ECO')).toMatchObject({ ok: false });
   });
+
+  it('anti-downgrade: con recomendada BALANCED, no deja aplicar ECO', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ recommendedPreset: 'BALANCED' });
+    const res = await applyTeamPresetAction('axon', 'ECO');
+    expect(res.ok).toBe(false);
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('anti-downgrade: con recomendada BALANCED, SÍ deja subir a MAX', async () => {
+    prismaMock.project.findUnique.mockResolvedValue({ recommendedPreset: 'BALANCED' });
+    prismaMock.agent.update.mockResolvedValue({});
+    prismaMock.project.update.mockResolvedValue({});
+    const res = await applyTeamPresetAction('axon', 'MAX');
+    expect(res.ok).toBe(true);
+  });
 });
 
 
@@ -261,7 +277,10 @@ describe('verifyAgentsAction', () => {
       ]),
     };
     prismaMock.agentRun.findMany.mockResolvedValue([{ storyId: 't2' }]); // t2 en vuelo
-    (prismaMock as Record<string, any>).project = { update: vi.fn() };
+    (prismaMock as Record<string, any>).project = {
+      update: vi.fn(),
+      findUnique: vi.fn().mockResolvedValue({ recommendedPreset: null }),
+    };
     const res = await verifyAgentsAction('axon');
     expect(res.ok).toBe(true);
     if (res.ok) {

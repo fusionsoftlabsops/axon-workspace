@@ -15,7 +15,15 @@ import {
   type AgentStatsView,
   type AgentView,
 } from '@/lib/actions/agents';
-import { TEAM_PRESETS, PRESET_IDS, type TeamPreset } from '@/lib/agents/presets';
+import {
+  TEAM_PRESETS,
+  PRESET_IDS,
+  PRESET_RANK,
+  presetBudget,
+  presetMeetsFloor,
+  isTeamPreset,
+  type TeamPreset,
+} from '@/lib/agents/presets';
 import { AGENT_ROLES, DEFAULT_ROLE_MODEL, type AgentRoleName } from '@admin/shared';
 import styles from './agents.module.scss';
 
@@ -31,6 +39,7 @@ export function AgentsClient({
   initialRuns,
   initialStats = null,
   initialPreset = null,
+  initialRecommendedPreset = null,
   initialDevExecutor = 'KAI',
 }: {
   slug: string;
@@ -39,6 +48,7 @@ export function AgentsClient({
   initialRuns: AgentRunView[];
   initialStats?: AgentStatsView | null;
   initialPreset?: string | null;
+  initialRecommendedPreset?: string | null;
   initialDevExecutor?: string;
 }) {
   const { t } = useI18n();
@@ -72,7 +82,27 @@ export function AgentsClient({
     else setDevExecutor(mode);
   }
 
+  const fmtK = (n: number) => `${Math.round(n / 1000)}k`;
+
   async function applyPreset(preset: TeamPreset) {
+    // Anti-downgrade: no se puede bajar del recomendado (el servidor también lo
+    // rechaza; acá evitamos el intento).
+    if (!presetMeetsFloor(preset, initialRecommendedPreset)) {
+      setError(t(`No podés bajar a esta config: el proyecto necesita al menos la recomendada.`, `Cannot downgrade: the project needs at least the recommended tier.`));
+      return;
+    }
+    // Confirmar al SUBIR de tier: más capacidad = más presupuesto de tokens.
+    const currentRank = activePreset && (activePreset in PRESET_RANK) ? PRESET_RANK[activePreset as TeamPreset] : -1;
+    if (PRESET_RANK[preset] > currentRank) {
+      const b = presetBudget(preset);
+      const ok = window.confirm(
+        t(
+          `Esta configuración es más capaz y usa MÁS presupuesto de tokens (Dev ${fmtK(b.dev)}/corrida, ~${fmtK(b.totalEnabled)} total en ${b.agents} agentes). ¿Aplicar?`,
+          `This configuration is more capable and uses MORE token budget (Dev ${fmtK(b.dev)}/run, ~${fmtK(b.totalEnabled)} across ${b.agents} agents). Apply?`,
+        ),
+      );
+      if (!ok) return;
+    }
     setBusy(`preset:${preset}`);
     setError(null);
     const res = await applyTeamPresetAction(slug, preset);
@@ -218,10 +248,27 @@ export function AgentsClient({
 
       <section data-testid="team-presets">
         <h3 className={styles.sectionTitle}>{t('Configuración del equipo', 'Team configuration')}</h3>
+        <p className={styles.hint} data-testid="current-preset">
+          {activePreset && isTeamPreset(activePreset) ? (
+            <>
+              <strong>{t('Configuración actual:', 'Current configuration:')}</strong>{' '}
+              {t(TEAM_PRESETS[activePreset].name[0], TEAM_PRESETS[activePreset].name[1])}
+            </>
+          ) : (
+            <span style={{ opacity: 0.7 }}>{t('Sin configuración aplicada aún.', 'No configuration applied yet.')}</span>
+          )}
+          {initialRecommendedPreset && isTeamPreset(initialRecommendedPreset) && (
+            <>
+              {' · '}
+              <strong>{t('Recomendada (piso):', 'Recommended (floor):')}</strong>{' '}
+              {t(TEAM_PRESETS[initialRecommendedPreset].name[0], TEAM_PRESETS[initialRecommendedPreset].name[1])}
+            </>
+          )}
+        </p>
         <p className={styles.hint}>
           {t(
-            'Elegí una configuración según el esfuerzo del proyecto: setea modelos, presupuestos y qué agentes participan, con un click.',
-            'Pick a configuration for the project effort: it sets models, budgets and which agents participate, in one click.',
+            'Cada configuración setea modelos, presupuesto de tokens y qué agentes participan. No se puede bajar de la recomendada (el desarrollo no avanzaría).',
+            'Each configuration sets models, token budget and which agents participate. You cannot go below the recommended tier (development would stall).',
           )}
         </p>
         <div style={{ overflowX: 'auto', margin: '0.6rem 0' }}>
@@ -268,13 +315,27 @@ export function AgentsClient({
           {PRESET_IDS.map((id) => {
             const def = TEAM_PRESETS[id];
             const isActive = activePreset === id;
+            const budget = presetBudget(id);
+            const belowFloor = !presetMeetsFloor(id, initialRecommendedPreset);
+            const isRecommended = initialRecommendedPreset === id;
             return (
-              <div key={id} className={styles.card} data-testid={`preset-${id}`}>
+              <div
+                key={id}
+                className={styles.card}
+                data-testid={`preset-${id}`}
+                style={belowFloor ? { opacity: 0.55 } : undefined}
+              >
                 <div className={styles.cardTop}>
                   <span className={styles.name}>{t(def.name[0], def.name[1])}</span>
                   {isActive && <Badge tone="ok">{t('activa', 'active')}</Badge>}
+                  {isRecommended && !isActive && <Badge tone="accent">{t('recomendada', 'recommended')}</Badge>}
                 </div>
                 <p className={styles.hint}>{t(def.tagline[0], def.tagline[1])}</p>
+                <p className={styles.hint} data-testid={`preset-budget-${id}`}>
+                  <strong>{t('Presupuesto:', 'Budget:')}</strong> {def.costHint} ·{' '}
+                  {t(`Dev ${fmtK(budget.dev)}/corrida`, `Dev ${fmtK(budget.dev)}/run`)} ·{' '}
+                  {t(`~${fmtK(budget.totalEnabled)} en ${budget.agents} agentes`, `~${fmtK(budget.totalEnabled)} across ${budget.agents} agents`)}
+                </p>
                 <p className={styles.hint}>
                   <strong>{t('Ideal para:', 'Ideal for:')}</strong>
                 </p>
@@ -283,11 +344,19 @@ export function AgentsClient({
                     <li key={i}>{t(ex[0], ex[1])}</li>
                   ))}
                 </ul>
+                {belowFloor && (
+                  <p className={styles.hint} style={{ color: 'var(--warn, #b45309)' }} data-testid={`preset-blocked-${id}`}>
+                    {t(
+                      `Bloqueada: tu proyecto necesita al menos la configuración recomendada para poder desarrollarse.`,
+                      `Blocked: your project needs at least the recommended configuration to be developable.`,
+                    )}
+                  </p>
+                )}
                 {canManage && (
                   <Button
                     size="sm"
                     variant={isActive ? 'secondary' : 'primary'}
-                    disabled={busy === `preset:${id}` || isActive}
+                    disabled={busy === `preset:${id}` || isActive || belowFloor}
                     data-testid={`apply-preset-${id}`}
                     onClick={() => void applyPreset(id)}
                   >
@@ -295,7 +364,9 @@ export function AgentsClient({
                       ? t('Aplicando…', 'Applying…')
                       : isActive
                         ? t('Configuración activa', 'Active configuration')
-                        : t('Usar esta configuración', 'Use this configuration')}
+                        : belowFloor
+                          ? t('No disponible', 'Unavailable')
+                          : t('Usar esta configuración', 'Use this configuration')}
                   </Button>
                 )}
               </div>

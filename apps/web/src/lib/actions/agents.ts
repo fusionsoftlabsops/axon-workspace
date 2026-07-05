@@ -315,7 +315,18 @@ export async function applyTeamPreset(
   slug: string,
   preset: import('@/lib/agents/presets').TeamPreset,
 ): Promise<{ agents: AgentView[]; minted: Array<{ role: AgentRole; token: string }>; provisioned: number }> {
-  const { TEAM_PRESETS } = await import('@/lib/agents/presets');
+  const { TEAM_PRESETS, presetMeetsFloor } = await import('@/lib/agents/presets');
+  // Guard anti-downgrade: no se puede aplicar un tier por debajo del recomendado
+  // (sabemos que degradar deja al desarrollo sin poder avanzar).
+  const proj = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { recommendedPreset: true },
+  });
+  if (!presetMeetsFloor(preset, proj?.recommendedPreset)) {
+    throw new Error(
+      `No se puede bajar a ${preset}: este proyecto necesita al menos ${proj?.recommendedPreset} para poder desarrollarse.`,
+    );
+  }
   const def = TEAM_PRESETS[preset];
   const existing = await prisma.agent.findMany({
     where: { projectId },

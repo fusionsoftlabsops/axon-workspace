@@ -241,6 +241,11 @@ model Project {
   // Ejecutor de desarrollo: KAI (agente) | CONSOLE (tu consola vía MCP) |
   // HYBRID (triviales→Kai, UI/complejas→consola). El SM enruta según esto.
   devExecutor String  @default("KAI")
+  // Preset recomendado por la planeación (ECO|BALANCED|MAX) según lo que se va a
+  // construir. Actúa como PISO: no se puede aplicar un tier de menor capacidad.
+  recommendedPreset String?
+  // Modo automático: al publicar el board se aplica solo la config recomendada.
+  autoApplyPreset   Boolean @default(true)
 
   // Repositorio asociado (lectura desde el filesystem del server)
   repoPath           String?

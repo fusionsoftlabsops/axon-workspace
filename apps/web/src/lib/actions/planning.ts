@@ -775,6 +775,13 @@ async function runPlanGeneration(
         heartbeatAt: new Date(),
       },
     });
+    // El preset recomendado se guarda en el Project como PISO (no se puede bajar
+    // de ahí) y para mostrarlo en la vista de Agentes. Best-effort.
+    if (plan.recommendedPreset?.preset) {
+      await prisma.project
+        .update({ where: { id: projectId }, data: { recommendedPreset: plan.recommendedPreset.preset } })
+        .catch(() => {});
+    }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[planning] generation failed:', err);
@@ -1111,7 +1118,10 @@ export async function generateImplPlanAction(
   return { ok: true, data: { filename, markdown, fileId } };
 }
 
-export async function publishPlanAction(slug: string): Promise<ActionResult<{ tasks: number; sprints: number }>> {
+export async function publishPlanAction(
+  slug: string,
+  opts?: { preset?: import('@/lib/agents/presets').TeamPreset },
+): Promise<ActionResult<{ tasks: number; sprints: number; appliedPreset?: string }>> {
   const ctx = await assertProjectMember(slug);
   if (!ctx.ok) return ctx;
   if (ctx.role === 'VIEWER') return { ok: false, error: 'Sin permisos' };
@@ -1206,6 +1216,27 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
     await tx.projectPlan.update({ where: { id: plan.id }, data: { status: 'PUBLISHED' } });
   });
 
+  // Modo automático: aplicar la configuración de equipo recomendada (o el override
+  // elegido, respetando el piso) ANTES de disparar el trabajo, para que los agentes
+  // arranquen con los modelos correctos. Best-effort — un fallo no rompe la publicación.
+  let appliedPreset: string | undefined;
+  try {
+    const { isTeamPreset } = await import('@/lib/agents/presets');
+    const proj = await prisma.project.findUnique({
+      where: { id: ctx.projectId },
+      select: { autoApplyPreset: true },
+    });
+    const chosen = opts?.preset ?? (gen.recommendedPreset?.preset as string | undefined);
+    if (proj?.autoApplyPreset && chosen && isTeamPreset(chosen)) {
+      const { applyTeamPreset } = await import('./agents');
+      await applyTeamPreset(ctx.projectId, slug, chosen);
+      appliedPreset = chosen;
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[planning] auto-apply preset failed:', err);
+  }
+
   // Arranque del equipo agéntico: emitir story.created por cada HU publicada,
   // DESPUÉS del commit (los agentes reaccionan al instante: PO refina → Aria/Dax
   // → SM asigna → Dev…). Antes las HUs del plan quedaban mudas hasta el sweep.
@@ -1233,5 +1264,6 @@ export async function publishPlanAction(slug: string): Promise<ActionResult<{ ta
   revalidatePath(`/projects/${slug}/roadmap`);
   revalidatePath(`/projects/${slug}/plan`);
   revalidatePath(`/projects/${slug}/brain`);
-  return { ok: true, data: { tasks: totalTasks, sprints: gen.sprints.length } };
+  revalidatePath(`/projects/${slug}/agents`);
+  return { ok: true, data: { tasks: totalTasks, sprints: gen.sprints.length, appliedPreset } };
 }
