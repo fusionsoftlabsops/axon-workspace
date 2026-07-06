@@ -84,7 +84,6 @@ export async function provisionAgent(opts: {
   projectSlug: string;
   role: AgentRole;
   llmModel: string;
-  credentialRef?: string | null;
   tokenBudget?: number;
 }): Promise<ProvisionedAgent> {
   const existing = await prisma.agent.findUnique({
@@ -125,7 +124,6 @@ export async function provisionAgent(opts: {
         userId: user.id,
         apiTokenId: apiToken.id,
         llmModel: opts.llmModel,
-        credentialRef: opts.credentialRef ?? null,
         ...(opts.tokenBudget ? { tokenBudget: opts.tokenBudget } : {}),
       },
       select: { id: true },

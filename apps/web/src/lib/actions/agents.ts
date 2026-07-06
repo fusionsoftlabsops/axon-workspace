@@ -18,7 +18,6 @@ export interface AgentView {
   /** "{name} · {ROL}", listo para encabezados/chat. */
   displayName: string;
   llmModel: string;
-  credentialRef: string | null;
   tokenBudget: number;
   enabled: boolean;
   tokenPrefix: string | null;
@@ -48,7 +47,6 @@ async function loadAgents(projectId: string): Promise<AgentView[]> {
     name: a.displayName?.trim() || DEFAULT_AGENT_NAMES[a.role],
     displayName: agentDisplayName(a.role, a.displayName),
     llmModel: a.llmModel,
-    credentialRef: a.credentialRef,
     tokenBudget: a.tokenBudget,
     enabled: a.enabled,
     tokenPrefix: a.apiToken?.prefix ?? null,
@@ -69,7 +67,7 @@ export async function listAgentsAction(slug: string): Promise<ActionResult<Agent
  */
 export async function provisionAgentAction(
   slug: string,
-  input: { role: AgentRole; llmModel: string; credentialRef?: string | null; tokenBudget?: number },
+  input: { role: AgentRole; llmModel: string; tokenBudget?: number },
 ): Promise<ActionResult<{ agents: AgentView[]; tokenPlain: string }>> {
   const ctx = await guard(slug);
   if (!ctx.ok) return ctx;
@@ -86,7 +84,6 @@ export async function provisionAgentAction(
       projectSlug: slug,
       role: input.role,
       llmModel,
-      credentialRef: input.credentialRef ?? null,
       tokenBudget: input.tokenBudget,
     });
     await audit({

@@ -10,7 +10,6 @@ export interface AgentMe {
   role: AgentRoleName;
   userId: string;
   llmModel: string;
-  credentialRef: string | null;
   enabled: boolean;
   /** Ejecutor de desarrollo del proyecto: KAI | CONSOLE | HYBRID. */
   devExecutor?: string;

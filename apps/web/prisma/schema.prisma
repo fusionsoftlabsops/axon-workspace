@@ -787,7 +787,7 @@ model Agent {
   apiTokenId    String?  @unique
   displayName   String?  // nombre propio del agente en el equipo (ej. "Nova")
   llmModel      String   // p.ej. "qwen3-coder-next" | "claude-sonnet-4-6"
-  credentialRef String?  // 'server' | id de LlmCredential | null (Qwen vía env del worker)
+  credentialRef String?  // DEPRECADO/inerte: nada lo consume; la selección de provider es por llmModel. Candidata a drop en una migración futura.
   tokenBudget   Int      @default(200000) // presupuesto de tokens por corrida (corte duro)
   enabled       Boolean  @default(false)  // opt-in por proyecto: nace apagado
   createdAt     DateTime @default(now())
