@@ -99,6 +99,13 @@ const patchBody = z
     title: z.string().min(1).max(200).optional(),
     description: z.string().max(20_000).optional(),
     priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+    // Artefactos generativos (persist-only, sin IA): los escribe el runtime LOCAL
+    // cuando las personas PO/Arquitecto/Diseño/Marketing corren en el Claude Code
+    // del usuario. En CLOUD los generan los endpoints /refine, /tech-design, etc.
+    acceptanceCriteria: z.string().max(40_000).optional(),
+    techDesign: z.string().max(80_000).optional(),
+    designSpec: z.string().max(80_000).optional(),
+    marketingKit: z.string().max(80_000).optional(),
     // Asignar la HU al AGENTE de un rol del proyecto (el server resuelve su
     // userId — el llamador no necesita conocer identidades internas).
     assignToAgentRole: z.enum(['SM', 'DEV', 'QA', 'PO', 'DESIGN', 'REVIEWER', 'ARCHITECT', 'MARKETING', 'RELEASE']).optional(),
@@ -209,6 +216,10 @@ export async function PATCH(
         ...(body.description !== undefined ? { description: body.description } : {}),
         ...(body.priority ? { priority: body.priority } : {}),
         ...(assigneeId ? { assigneeId } : {}),
+        ...(body.acceptanceCriteria !== undefined ? { acceptanceCriteria: body.acceptanceCriteria } : {}),
+        ...(body.techDesign !== undefined ? { techDesign: body.techDesign, techDesignAt: new Date() } : {}),
+        ...(body.designSpec !== undefined ? { designSpec: body.designSpec, designSpecAt: new Date() } : {}),
+        ...(body.marketingKit !== undefined ? { marketingKit: body.marketingKit, marketingKitAt: new Date() } : {}),
       },
     });
     if (newStateId && newStateId !== task.state.id) {

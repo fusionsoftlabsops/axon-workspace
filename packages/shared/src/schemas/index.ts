@@ -66,6 +66,8 @@ export const createProjectSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Solo minúsculas, números y guiones'),
   name: z.string().min(1).max(120),
   description: z.string().max(2000).optional(),
+  // Dónde corren los agentes: CLOUD (worker 24/7) | LOCAL (tu Claude Code).
+  runtime: z.enum(['CLOUD', 'LOCAL']).default('CLOUD'),
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 

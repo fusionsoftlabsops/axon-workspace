@@ -19,8 +19,11 @@ export async function GET(req: NextRequest) {
   const authd = await requireApiToken(req, ['agents:runtime']);
   if (authd instanceof NextResponse) return authd;
 
-  // Todos los tokens de runtime + el estado (enabled/llmModel) de su Agent.
+  // Tokens de runtime + estado del Agent, SOLO de proyectos con runtime CLOUD.
+  // Los proyectos LOCAL corren sus 9 agentes en el Claude Code del usuario, así
+  // que el worker de nube los ignora por completo (no aparecen en su registry).
   const rows = await prisma.agentRuntimeToken.findMany({
+    where: { project: { agentRuntime: 'CLOUD' } },
     include: {
       project: { select: { id: true, slug: true } },
     },

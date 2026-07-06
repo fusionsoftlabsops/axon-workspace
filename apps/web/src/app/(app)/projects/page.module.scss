@@ -229,3 +229,38 @@
   font-style: italic;
   margin: 0;
 }
+
+.runtimeChoice {
+  display: grid;
+  gap: 0.5rem;
+  border: none;
+  padding: 0;
+  margin: 0.25rem 0;
+
+  legend {
+    font-size: 0.85rem;
+    opacity: 0.75;
+    margin-bottom: 0.25rem;
+  }
+
+  label {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: 'radio title' 'radio hint';
+    gap: 0 0.5rem;
+    align-items: start;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border, rgba(128, 128, 128, 0.3));
+    border-radius: 0.5rem;
+    cursor: pointer;
+
+    input { grid-area: radio; margin-top: 0.2rem; }
+    &[data-selected='true'] {
+      border-color: var(--accent, #6366f1);
+      background: color-mix(in srgb, var(--accent, #6366f1) 8%, transparent);
+    }
+  }
+}
+
+.runtimeTitle { grid-area: title; font-weight: 600; }
+.runtimeHint { grid-area: hint; font-size: 0.8rem; opacity: 0.7; }

@@ -52,6 +52,7 @@ describe('NewProjectForm', () => {
       slug: 'mycustomslug',
       name: 'Project Name',
       description: 'a desc',
+      runtime: 'CLOUD',
     });
     expect(h.push).toHaveBeenCalledWith('/projects/mycustomslug/plan');
     expect(h.refresh).toHaveBeenCalled();
@@ -71,6 +72,7 @@ describe('NewProjectForm', () => {
       slug: 'edge-case-name',
       name: 'Edge Case Name',
       description: undefined,
+      runtime: 'CLOUD',
     });
     expect(h.push).toHaveBeenCalledWith('/projects/edge-case-name/plan');
   });
@@ -90,5 +92,18 @@ describe('NewProjectForm', () => {
   it('disables the submit button while the name is empty', () => {
     render(<NewProjectForm />);
     expect(screen.getByRole('button', { name: 'Create project' })).toBeDisabled();
+  });
+
+  it('pasa runtime LOCAL cuando se elige el runtime local', async () => {
+    h.createProjectAction.mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<NewProjectForm />);
+
+    await user.type(screen.getByPlaceholderText('Project name'), 'Local Proj');
+    await user.click(screen.getByLabelText(/Local · your Claude Code/));
+    await user.click(screen.getByRole('button', { name: 'Create project' }));
+
+    await waitFor(() => expect(h.createProjectAction).toHaveBeenCalled());
+    expect(h.createProjectAction).toHaveBeenCalledWith(expect.objectContaining({ runtime: 'LOCAL' }));
   });
 });

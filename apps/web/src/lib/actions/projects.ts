@@ -52,6 +52,7 @@ export async function createProjectAction(
           slug: data.slug,
           name: data.name,
           description: data.description,
+          agentRuntime: data.runtime,
           ownerId: session.user.id,
           members: { create: { userId: session.user.id, role: 'OWNER' } },
           taskCounter: { create: { next: 1 } },

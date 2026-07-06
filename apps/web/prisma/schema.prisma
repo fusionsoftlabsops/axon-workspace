@@ -246,6 +246,10 @@ model Project {
   recommendedPreset String?
   // Modo automático: al publicar el board se aplica solo la config recomendada.
   autoApplyPreset   Boolean @default(true)
+  // Runtime de los agentes: CLOUD (worker axon-agents 24/7) | LOCAL (los 9 roles
+  // corren en el Claude Code del usuario vía MCP). En LOCAL el worker de nube
+  // ignora el proyecto por completo (ver /internal/agent-runtime).
+  agentRuntime      String  @default("CLOUD")
 
   // Repositorio asociado (lectura desde el filesystem del server)
   repoPath           String?
