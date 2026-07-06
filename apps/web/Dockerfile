@@ -1,8 +1,13 @@
 # syntax=docker/dockerfile:1.7
 # Multi-stage build for apps/web (Next.js 15 standalone output).
+#
+# Base Debian (node:22-slim, glibc + OpenSSL 3): el engine de Prisma
+# `debian-openssl-3.0.x` carga de forma confiable. Antes usábamos node:22-alpine
+# y el engine caía en `linux-musl` (necesitaba libssl.so.1.1, ausente en Alpine
+# con OpenSSL 3) → PrismaClientInitializationError → crash-loop. Ver binaryTargets
+# en prisma/schema.prisma (["native","debian-openssl-3.0.x"]).
 
-FROM node:22-alpine AS base
-RUN apk add --no-cache libc6-compat
+FROM node:22-slim AS base
 WORKDIR /app
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
@@ -27,7 +32,7 @@ ENV STANDALONE_BUILD=true
 RUN pnpm --filter=@admin/web build
 
 # ---------- Runtime ----------
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -35,11 +40,14 @@ ENV HOSTNAME=0.0.0.0
 
 # Runtime deps:
 #   wget       → HEALTHCHECK
-#   openssl    → evita warning de Prisma + habilita sslmode=require contra Postgres
+#   openssl    → engine de Prisma (libssl.so.3) + sslmode=require contra Postgres
 #   ca-certs   → TLS para conexiones salientes (S3 backup, Postgres remoto, etc.)
-RUN apk add --no-cache wget openssl ca-certificates
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends wget openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 --ingroup nodejs nextjs
 
 # Prisma CLI global, mismo pin que @prisma/client en apps/web/package.json.
 # Le damos ownership a nextjs porque Prisma a veces escribe engines binarios
