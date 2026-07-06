@@ -18,7 +18,6 @@ const DEV: AgentView = {
   name: 'Kai',
   displayName: 'Kai · DEV',
   llmModel: 'qwen3-coder-next',
-  credentialRef: null,
   tokenBudget: 200000,
   enabled: false,
   tokenPrefix: 'ad_pk_dev123',

@@ -62,7 +62,7 @@ describe('provisionAgent', () => {
   });
 
   it('creates user + membership + scoped token + agent, returning the plain token once', async () => {
-    const out = await provisionAgent({ ...OPTS, credentialRef: 'server', tokenBudget: 50000 });
+    const out = await provisionAgent({ ...OPTS, tokenBudget: 50000 });
     expect(out).toMatchObject({ agentId: 'ag1', userId: 'agent-user', tokenId: 'tok1' });
     expect(out.tokenPlain).toMatch(/^ad_pk_/);
     expect(out.tokenPrefix).toBe(out.tokenPlain.slice(0, 12));
@@ -84,7 +84,6 @@ describe('provisionAgent', () => {
       userId: 'agent-user',
       apiTokenId: 'tok1',
       llmModel: 'qwen3-coder-next',
-      credentialRef: 'server',
       tokenBudget: 50000,
     });
   });

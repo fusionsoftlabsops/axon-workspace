@@ -50,7 +50,7 @@ beforeEach(() => {
 
 describe('GET agents/me', () => {
   it('devuelve la config del agente del token', async () => {
-    h.agentFindFirst.mockResolvedValue({ id: 'ag1', role: 'DEV', llmModel: 'qwen', credentialRef: null, tokenBudget: 5, enabled: true });
+    h.agentFindFirst.mockResolvedValue({ id: 'ag1', role: 'DEV', llmModel: 'qwen', tokenBudget: 5, enabled: true });
     const res = await GET_ME(req(undefined, 'GET'), postCtx);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ role: 'DEV', tokenBudget: 5 });

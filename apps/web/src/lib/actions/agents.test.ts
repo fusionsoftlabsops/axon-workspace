@@ -39,7 +39,6 @@ const AGENT_ROW = {
   role: 'DEV',
   displayName: null,
   llmModel: 'qwen3-coder-next',
-  credentialRef: null,
   tokenBudget: 200000,
   enabled: false,
   apiToken: { prefix: 'ad_pk_abc123' },
@@ -87,7 +86,7 @@ describe('provisionAgentAction', () => {
   });
 
   it('provisions, audits and returns the plain token once', async () => {
-    const res = await provisionAgentAction('axon', { role: 'DEV', llmModel: ' qwen3-coder-next ', credentialRef: null });
+    const res = await provisionAgentAction('axon', { role: 'DEV', llmModel: ' qwen3-coder-next ' });
     expect(provisionMock).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: 'p1', projectSlug: 'axon', role: 'DEV', llmModel: 'qwen3-coder-next' }),
     );

@@ -29,7 +29,6 @@ export async function GET(
       userId: true,
       displayName: true,
       llmModel: true,
-      credentialRef: true,
       tokenBudget: true,
       enabled: true,
     },
