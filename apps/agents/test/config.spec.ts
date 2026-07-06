@@ -7,7 +7,7 @@ describe('loadConfig', () => {
     expect(c.enabled).toBe(false);
     expect(c.PORT).toBe(3060);
     expect(c.AXON_API_BASE_URL).toBe('http://axon-web:3000/api/v1');
-    expect(c.tokens).toEqual({ SM: undefined, DEV: undefined, QA: undefined });
+    expect(c.AGENT_RUNTIME_TOKEN).toBeUndefined();
   });
 
   it.each(['1', 'true', 'on', 'TRUE'])('AGENTS_ENABLED=%s enciende el worker', (v) => {
@@ -18,21 +18,14 @@ describe('loadConfig', () => {
     expect(loadConfig({ AGENTS_ENABLED: 'yes' }).enabled).toBe(false);
   });
 
-  it('normaliza strings vacíos a undefined y mapea tokens por rol', () => {
+  it('normaliza strings vacíos a undefined', () => {
     const c = loadConfig({
       REDIS_URL: '',
-      AGENT_SM_TOKEN: 'ad_pk_sm',
-      AGENT_DEV_TOKEN: '',
-      AGENT_QA_TOKEN: 'ad_pk_qa',
-      AGENT_DESIGN_TOKEN: 'ad_pk_design',
-      AGENT_REVIEWER_TOKEN: 'ad_pk_reviewer',
-      AGENT_ARCHITECT_TOKEN: 'ad_pk_arch',
-      AGENT_MARKETING_TOKEN: 'ad_pk_mkt',
-      AGENT_RELEASE_TOKEN: 'ad_pk_release',
+      AGENT_RUNTIME_TOKEN: '',
       PORT: '4000',
     });
     expect(c.REDIS_URL).toBeUndefined();
-    expect(c.tokens).toEqual({ SM: 'ad_pk_sm', DEV: undefined, QA: 'ad_pk_qa', DESIGN: 'ad_pk_design', REVIEWER: 'ad_pk_reviewer', ARCHITECT: 'ad_pk_arch', MARKETING: 'ad_pk_mkt', RELEASE: 'ad_pk_release' });
+    expect(c.AGENT_RUNTIME_TOKEN).toBeUndefined();
     expect(c.PORT).toBe(4000);
   });
 

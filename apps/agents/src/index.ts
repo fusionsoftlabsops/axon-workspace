@@ -8,13 +8,11 @@
  */
 import { loadConfig } from './config.js';
 import { EventRouter } from './router.js';
-import { buildTeam } from './bootstrap.js';
 import { createRuntimeRegistry } from './runtime/registry.js';
 import { subscribeToDomainEvents, type Subscription } from './subscribe.js';
 import { createHealthServer, type HealthState } from './health.js';
 
 const config = loadConfig();
-const multiTenant = !!config.AGENT_RUNTIME_TOKEN;
 
 const state: HealthState = {
   enabled: config.enabled,
@@ -27,10 +25,10 @@ const state: HealthState = {
 createHealthServer(state, config.PORT);
 
 const router = new EventRouter();
-const registry = multiTenant ? createRuntimeRegistry(config, router) : null;
 
-if (registry) {
-  // MULTI-TENANT: cargar todos los equipos y refrescar en intervalo.
+if (config.AGENT_RUNTIME_TOKEN) {
+  // MULTI-TENANT (único modo): cargar todos los equipos y refrescar en intervalo.
+  const registry = createRuntimeRegistry(config, router);
   const refreshMs = config.AGENT_RUNTIME_REFRESH_SEC * 1000;
   const doRefresh = async (): Promise<void> => {
     try {
@@ -48,18 +46,10 @@ if (registry) {
     console.log(`[agents] sweep de estancadas (todos los proyectos) cada ${config.STALE_SWEEP_MINUTES} min`);
   }
 } else {
-  // LEGACY single-project.
-  const team = buildTeam(config, router);
-  console.log(`[agents] roles registrados: ${team.registered.join(', ') || '(ninguno)'}`);
-  for (const s of team.skipped) console.log(`[agents] omitido ${s.role}: ${s.reason}`);
-
-  if (config.enabled && team.staleSweep && config.STALE_SWEEP_MINUTES > 0) {
-    const everyMs = config.STALE_SWEEP_MINUTES * 60_000;
-    setInterval(() => {
-      void team.staleSweep!.sweepOnce().catch((e) => console.error('[agents] stale sweep:', e));
-    }, everyMs);
-    console.log(`[agents] sweep de estancadas cada ${config.STALE_SWEEP_MINUTES} min`);
-  }
+  // Sin AGENT_RUNTIME_TOKEN no hay forma de armar equipos → modo pasivo/oscuro
+  // (igual patrón que AGENTS_ENABLED off): el worker sirve /health pero el router
+  // queda vacío, así que la suscripción no despacha nada.
+  console.warn('[agents] sin AGENT_RUNTIME_TOKEN — no hay equipos que atender (modo pasivo)');
 }
 
 let subscription: Subscription | null = null;

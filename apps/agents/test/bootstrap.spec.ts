@@ -1,57 +1,68 @@
 import { describe, it, expect } from 'vitest';
-import { buildTeam } from '../src/bootstrap.js';
-import { EventRouter } from '../src/router.js';
+import { buildProjectTeam, type RuntimeAgent, type RuntimeProject } from '../src/bootstrap.js';
 import { loadConfig } from '../src/config.js';
 
 const FULL_ENV = {
   AGENTS_ENABLED: '1',
-  AGENT_PROJECT_ID: 'p1',
-  AGENT_PROJECT_SLUG: 'axon',
-  AGENT_SM_TOKEN: 'ad_pk_sm',
-  AGENT_PO_TOKEN: 'ad_pk_po',
-  AGENT_ARCHITECT_TOKEN: 'ad_pk_arch',
-  AGENT_MARKETING_TOKEN: 'ad_pk_mkt',
-  AGENT_DESIGN_TOKEN: 'ad_pk_design',
-  AGENT_DEV_TOKEN: 'ad_pk_dev',
-  AGENT_QA_TOKEN: 'ad_pk_qa',
-  AGENT_REVIEWER_TOKEN: 'ad_pk_reviewer',
-  AGENT_RELEASE_TOKEN: 'ad_pk_release',
   FUSION_MODEL_URL: 'https://modelo.local/v1',
   FUSION_TOKEN: 'fsn_x',
   ANTHROPIC_API_KEY: 'sk-ant-x',
   GITHUB_TOKEN: 'ghp_x',
 };
 
-describe('buildTeam', () => {
+/** Los 9 agentes habilitados con el modelo que le toca a cada rol. */
+function fullAgents(): RuntimeAgent[] {
+  const claude = (role: RuntimeAgent['role']): RuntimeAgent => ({
+    role,
+    token: `t-${role.toLowerCase()}`,
+    llmModel: 'claude-sonnet-5',
+    enabled: true,
+  });
+  return [
+    claude('SM'),
+    claude('PO'),
+    claude('ARCHITECT'),
+    claude('MARKETING'),
+    claude('DESIGN'),
+    { role: 'DEV', token: 't-dev', llmModel: 'qwen3-coder-next', enabled: true },
+    { role: 'QA', token: 't-qa', llmModel: 'claude-opus-4-8', enabled: true },
+    claude('REVIEWER'),
+    claude('RELEASE'),
+  ];
+}
+
+function project(agents: RuntimeAgent[]): RuntimeProject {
+  return { projectId: 'p1', projectSlug: 'axon', agents };
+}
+
+describe('buildProjectTeam', () => {
   it('con config completa registra los handlers/sweep del equipo (incl. PO)', () => {
-    const router = new EventRouter();
-    const team = buildTeam(loadConfig(FULL_ENV), router);
-    expect(team.registered).toEqual(['SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV(+strong)', 'QA', 'REVIEWER', 'RELEASE']);
+    const team = buildProjectTeam(loadConfig(FULL_ENV), project(fullAgents()));
+    expect(team.registered).toEqual([
+      'SM:assign', 'SM:retro', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV(+strong)', 'QA', 'REVIEWER', 'RELEASE',
+    ]);
     expect(team.skipped).toEqual([]);
-    expect(router.size).toBe(10); // +release (el sweep no es handler)
+    expect(team.handlers).toHaveLength(10); // +release (el sweep no es handler)
     expect(team.staleSweep).not.toBeNull();
   });
 
-  it('sin proyecto configurado no registra nada y lo reporta', () => {
-    const router = new EventRouter();
-    const team = buildTeam(loadConfig({ AGENTS_ENABLED: '1' }), router);
+  it('sin agentes no registra nada y reporta cada rol ausente', () => {
+    const team = buildProjectTeam(loadConfig(FULL_ENV), project([]));
     expect(team.registered).toEqual([]);
-    expect(team.skipped[0]!.reason).toContain('AGENT_PROJECT_ID');
-    expect(router.size).toBe(0);
+    expect(team.handlers).toHaveLength(0);
+    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'RELEASE']);
   });
 
   it('cada rol degrada por separado según lo que falte', () => {
-    const router = new EventRouter();
-    const team = buildTeam(
+    const team = buildProjectTeam(
       loadConfig({
         ...FULL_ENV,
-        ANTHROPIC_API_KEY: '', // sin Claude: SM pierde retro, QA queda fuera
+        ANTHROPIC_API_KEY: '', // sin Claude: SM pierde retro, QA/REVIEWER quedan fuera
         FUSION_MODEL_URL: '', // sin Qwen: DEV queda fuera
       }),
-      router,
+      project(fullAgents()),
     );
-    // PO, Arquitecto y Diseño son deterministas (no necesitan Claude) → siguen activos.
-    // Reviewer necesita Claude → queda fuera sin ANTHROPIC_API_KEY.
+    // PO, Arquitecto, Marketing y Diseño son deterministas (no necesitan Claude) → siguen activos.
     expect(team.registered).toEqual(['SM:assign', 'SM:stale-sweep', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'RELEASE']);
     expect(team.skipped).toEqual(
       expect.arrayContaining([
@@ -63,13 +74,10 @@ describe('buildTeam', () => {
     );
   });
 
-  it('sin tokens de rol, cada rol se omite con motivo claro', () => {
-    const router = new EventRouter();
-    const team = buildTeam(
-      loadConfig({ AGENTS_ENABLED: '1', AGENT_PROJECT_ID: 'p1', AGENT_PROJECT_SLUG: 'axon' }),
-      router,
-    );
-    expect(team.registered).toEqual([]);
-    expect(team.skipped.map((s) => s.role)).toEqual(['SM', 'PO', 'ARCHITECT', 'MARKETING', 'DESIGN', 'DEV', 'QA', 'REVIEWER', 'RELEASE']);
+  it('un agente apagado se ignora (como si estuviera ausente)', () => {
+    const agents = fullAgents().map((a) => (a.role === 'DEV' ? { ...a, enabled: false } : a));
+    const team = buildProjectTeam(loadConfig(FULL_ENV), project(agents));
+    expect(team.registered).not.toContain('DEV(+strong)');
+    expect(team.skipped).toContainEqual({ role: 'DEV', reason: 'agente ausente/apagado' });
   });
 });

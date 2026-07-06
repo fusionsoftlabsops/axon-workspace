@@ -13,7 +13,7 @@ interface RuntimeResponse {
   projects: Array<{
     projectId: string;
     slug: string;
-    agents: Array<{ role: string; enabled: boolean; llmModel: string; tokenBudget?: number; token: string }>;
+    agents: Array<{ role: string; enabled: boolean; llmModel: string; token: string }>;
   }>;
 }
 
@@ -37,7 +37,6 @@ async function fetchRuntime(config: AgentsConfig): Promise<RuntimeProject[]> {
           token: a.token,
           llmModel: a.llmModel,
           enabled: a.enabled,
-          tokenBudget: a.tokenBudget,
         }),
       ),
   }));

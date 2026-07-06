@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   // Estado por (projectId, role) desde Agent (enabled + llmModel).
   const agents = await prisma.agent.findMany({
-    select: { projectId: true, role: true, enabled: true, llmModel: true, tokenBudget: true },
+    select: { projectId: true, role: true, enabled: true, llmModel: true },
   });
   const agentMap = new Map(agents.map((a) => [`${a.projectId}:${a.role}`, a]));
 
@@ -58,7 +58,6 @@ export async function GET(req: NextRequest) {
       role: row.role,
       enabled: meta.enabled,
       llmModel: meta.llmModel,
-      tokenBudget: meta.tokenBudget,
       token,
     });
     byProject.set(row.projectId, entry);
