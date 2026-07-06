@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EventRouter } from '../src/router.js';
 import { createRuntimeRegistry } from '../src/runtime/registry.js';
 import { loadConfig } from '../src/config.js';
@@ -33,22 +33,19 @@ function runtimePayload() {
   };
 }
 
+// fetch inyectado en el registry (DIP): sin tocar el global.
 const fetchMock = vi.fn();
-const realFetch = globalThis.fetch;
+const fetchFn = fetchMock as unknown as typeof fetch;
 
 beforeEach(() => {
   fetchMock.mockReset();
-  globalThis.fetch = fetchMock as unknown as typeof fetch;
-});
-afterEach(() => {
-  globalThis.fetch = realFetch;
 });
 
 describe('runtime registry (multi-tenant)', () => {
   it('trae los equipos, filtra apagados y publica handlers de todos los proyectos', async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => runtimePayload() });
     const router = new EventRouter();
-    const reg = createRuntimeRegistry(loadConfig(BASE_ENV), router);
+    const reg = createRuntimeRegistry(loadConfig(BASE_ENV), router, { fetchFn });
     const r = await reg.refresh();
 
     // llama al endpoint con el bearer del runtime
@@ -66,7 +63,7 @@ describe('runtime registry (multi-tenant)', () => {
 
   it('el refresco reemplaza los handlers (proyecto que desaparece se va)', async () => {
     const router = new EventRouter();
-    const reg = createRuntimeRegistry(loadConfig(BASE_ENV), router);
+    const reg = createRuntimeRegistry(loadConfig(BASE_ENV), router, { fetchFn });
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => runtimePayload() });
     await reg.refresh();
     const first = router.size;
@@ -79,7 +76,7 @@ describe('runtime registry (multi-tenant)', () => {
 
   it('propaga error si el endpoint falla', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
-    const reg = createRuntimeRegistry(loadConfig(BASE_ENV), new EventRouter());
+    const reg = createRuntimeRegistry(loadConfig(BASE_ENV), new EventRouter(), { fetchFn });
     await expect(reg.refresh()).rejects.toThrow('agent-runtime 401');
   });
 });

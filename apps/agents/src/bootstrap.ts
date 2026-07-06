@@ -12,12 +12,10 @@
  * verdad. Los roles advisory (PO/ARCHITECT/DESIGN/MARKETING/RELEASE) disparan
  * generación server-side en axon-web, que ya respeta su modelo.
  */
-import type { AgentsConfig } from './config.js';
 import type { RoleHandler, AgentRoleName } from './router.js';
 import { AxonApi } from './api/client.js';
-import { createOpenAiProvider } from './runtime/providers/openai.js';
-import { createAnthropicProvider } from './runtime/providers/anthropic.js';
-import type { LlmProvider } from './runtime/types.js';
+import type { ProvidersConfig } from './runtime/providers/resolve.js';
+import { resolveAnthropicProvider, resolveDevProviders } from './runtime/providers/resolve.js';
 import { createSmAssignHandler } from './roles/sm.js';
 import { createSmRetroHandler } from './roles/sm-retro.js';
 import { createPoHandler } from './roles/po.js';
@@ -53,15 +51,50 @@ export interface ProjectTeam {
   skipped: Array<{ role: string; reason: string }>;
 }
 
-/** Provider Anthropic para un agente, usando SU modelo (si es claude-*) o el default. */
-function anthropicFor(config: AgentsConfig, llmModel: string): LlmProvider | null {
-  if (!config.ANTHROPIC_API_KEY) return null;
-  const model = llmModel.startsWith('claude-') ? llmModel : config.ANTHROPIC_MODEL;
-  return createAnthropicProvider({ apiKey: config.ANTHROPIC_API_KEY, model });
+/**
+ * Vista angosta de la config que `buildProjectTeam` realmente usa (ISP): así el
+ * caller pasa su `AgentsConfig` completo (lo satisface estructuralmente) sin que
+ * el bootstrap dependa del objeto entero. Extiende `ProvidersConfig` (la parte
+ * de selección de provider) con lo específico del cableado del equipo.
+ */
+export interface TeamDeps extends ProvidersConfig {
+  AXON_API_BASE_URL: string;
+  GITHUB_TOKEN?: string;
+  DEV_MAX_ITERATIONS: number;
+  AGENT_MAX_DURATION_MS: number;
 }
 
+/** Props comunes a todo handler advisory (RELEASE agrega `gitToken`). */
+interface AdvisoryProps {
+  api: AxonApi;
+  projectId: string;
+  projectSlug: string;
+  gitToken?: string;
+}
+
+/**
+ * Tabla declarativa de los roles advisory (sin provider LLM): comparten el
+ * patrón "hay agente habilitado → push del handler con {api, projectId,
+ * projectSlug}; si no → skipped". RELEASE agrega `gitToken` (`needsGitToken`).
+ */
+interface AdvisoryEntry {
+  role: AgentRoleName;
+  create: (props: AdvisoryProps) => RoleHandler;
+  needsGitToken?: boolean;
+}
+
+// PO/ARCHITECT/MARKETING/DESIGN corren tras el SM (medio del pipeline).
+const ADVISORY_CORE: AdvisoryEntry[] = [
+  { role: 'PO', create: createPoHandler },
+  { role: 'ARCHITECT', create: createArchitectHandler },
+  { role: 'MARKETING', create: createMarketingHandler },
+  { role: 'DESIGN', create: createDesignHandler },
+];
+// RELEASE cierra el pipeline (tras REVIEWER) — de ahí que vaya aparte.
+const ADVISORY_RELEASE: AdvisoryEntry = { role: 'RELEASE', create: createReleaseHandler, needsGitToken: true };
+
 /** Construye los handlers de UN proyecto (no los registra; el caller decide). */
-export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject): ProjectTeam {
+export function buildProjectTeam(deps: TeamDeps, project: RuntimeProject): ProjectTeam {
   const handlers: RoleHandler[] = [];
   const registered: string[] = [];
   const skipped: Array<{ role: string; reason: string }> = [];
@@ -71,16 +104,34 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
   const byRole = new Map<AgentRoleName, RuntimeAgent>();
   for (const a of project.agents) if (a.enabled) byRole.set(a.role, a);
 
-  const api = (a: RuntimeAgent) => new AxonApi(config.AXON_API_BASE_URL, a.token);
+  const api = (a: RuntimeAgent) => new AxonApi(deps.AXON_API_BASE_URL, a.token);
   const poEnabled = byRole.has('PO');
   const designEnabled = byRole.has('DESIGN');
+
+  // Registra un rol advisory según la tabla (o lo reporta ausente).
+  const registerAdvisory = (entry: AdvisoryEntry) => {
+    const agent = byRole.get(entry.role);
+    if (!agent) {
+      skipped.push({ role: entry.role, reason: 'agente ausente/apagado' });
+      return;
+    }
+    handlers.push(
+      entry.create({
+        api: api(agent),
+        projectId,
+        projectSlug,
+        ...(entry.needsGitToken ? { gitToken: deps.GITHUB_TOKEN } : {}),
+      }),
+    );
+    registered.push(entry.role);
+  };
 
   // ---- SM ----
   const sm = byRole.get('SM');
   if (sm) {
     handlers.push(createSmAssignHandler({ api: api(sm), projectId, projectSlug, poEnabled, designEnabled }));
     registered.push('SM:assign');
-    const smProvider = anthropicFor(config, sm.llmModel);
+    const smProvider = resolveAnthropicProvider(deps, sm.llmModel);
     if (smProvider) {
       handlers.push(createSmRetroHandler({ api: api(sm), projectId, projectSlug, provider: smProvider }));
       registered.push('SM:retro');
@@ -94,65 +145,31 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
   }
 
   // ---- PO / ARCHITECT / MARKETING / DESIGN (advisory, sin provider) ----
-  const po = byRole.get('PO');
-  if (po) {
-    handlers.push(createPoHandler({ api: api(po), projectId, projectSlug }));
-    registered.push('PO');
-  } else {
-    skipped.push({ role: 'PO', reason: 'agente ausente/apagado' });
-  }
-  const arch = byRole.get('ARCHITECT');
-  if (arch) {
-    handlers.push(createArchitectHandler({ api: api(arch), projectId, projectSlug }));
-    registered.push('ARCHITECT');
-  } else {
-    skipped.push({ role: 'ARCHITECT', reason: 'agente ausente/apagado' });
-  }
-  const mkt = byRole.get('MARKETING');
-  if (mkt) {
-    handlers.push(createMarketingHandler({ api: api(mkt), projectId, projectSlug }));
-    registered.push('MARKETING');
-  } else {
-    skipped.push({ role: 'MARKETING', reason: 'agente ausente/apagado' });
-  }
-  const design = byRole.get('DESIGN');
-  if (design) {
-    handlers.push(createDesignHandler({ api: api(design), projectId, projectSlug }));
-    registered.push('DESIGN');
-  } else {
-    skipped.push({ role: 'DESIGN', reason: 'agente ausente/apagado' });
-  }
+  for (const entry of ADVISORY_CORE) registerAdvisory(entry);
 
   // ---- DEV (Qwen primario + strong Claude para UI/complejas) ----
   const dev = byRole.get('DEV');
   if (!dev) {
     skipped.push({ role: 'DEV', reason: 'agente ausente/apagado' });
-  } else if (!config.FUSION_MODEL_URL || !config.FUSION_TOKEN) {
-    skipped.push({ role: 'DEV', reason: 'sin FUSION_MODEL_URL / FUSION_TOKEN' });
   } else {
-    const qwen = createOpenAiProvider({
-      baseUrl: config.FUSION_MODEL_URL,
-      apiKey: config.FUSION_TOKEN,
-      model: config.QWEN_MODEL,
-    });
-    // El strong usa el modelo del Dev si es claude-*, si no el DEV_STRONG_MODEL.
-    const strongModel = dev.llmModel.startsWith('claude-') ? dev.llmModel : config.DEV_STRONG_MODEL;
-    const strongProvider = config.ANTHROPIC_API_KEY
-      ? createAnthropicProvider({ apiKey: config.ANTHROPIC_API_KEY, model: strongModel })
-      : undefined;
-    handlers.push(
-      createDevHandler({
-        api: api(dev),
-        projectId,
-        projectSlug,
-        provider: qwen,
-        strongProvider,
-        gitToken: config.GITHUB_TOKEN,
-        maxIterations: config.DEV_MAX_ITERATIONS,
-        maxDurationMs: config.AGENT_MAX_DURATION_MS,
-      }),
-    );
-    registered.push(strongProvider ? 'DEV(+strong)' : 'DEV');
+    const providers = resolveDevProviders(deps, dev.llmModel);
+    if (!providers) {
+      skipped.push({ role: 'DEV', reason: 'sin FUSION_MODEL_URL / FUSION_TOKEN' });
+    } else {
+      handlers.push(
+        createDevHandler({
+          api: api(dev),
+          projectId,
+          projectSlug,
+          provider: providers.qwen,
+          strongProvider: providers.strongProvider,
+          gitToken: deps.GITHUB_TOKEN,
+          maxIterations: deps.DEV_MAX_ITERATIONS,
+          maxDurationMs: deps.AGENT_MAX_DURATION_MS,
+        }),
+      );
+      registered.push(providers.strongProvider ? 'DEV(+strong)' : 'DEV');
+    }
   }
 
   // ---- QA (Claude, modelo del agente) ----
@@ -160,7 +177,7 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
   if (!qa) {
     skipped.push({ role: 'QA', reason: 'agente ausente/apagado' });
   } else {
-    const provider = anthropicFor(config, qa.llmModel);
+    const provider = resolveAnthropicProvider(deps, qa.llmModel);
     if (!provider) {
       skipped.push({ role: 'QA', reason: 'sin ANTHROPIC_API_KEY' });
     } else {
@@ -170,8 +187,8 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
           projectId,
           projectSlug,
           provider,
-          gitToken: config.GITHUB_TOKEN,
-          maxDurationMs: config.AGENT_MAX_DURATION_MS,
+          gitToken: deps.GITHUB_TOKEN,
+          maxDurationMs: deps.AGENT_MAX_DURATION_MS,
         }),
       );
       registered.push('QA');
@@ -183,7 +200,7 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
   if (!rev) {
     skipped.push({ role: 'REVIEWER', reason: 'agente ausente/apagado' });
   } else {
-    const provider = anthropicFor(config, rev.llmModel);
+    const provider = resolveAnthropicProvider(deps, rev.llmModel);
     if (!provider) {
       skipped.push({ role: 'REVIEWER', reason: 'sin ANTHROPIC_API_KEY' });
     } else {
@@ -193,8 +210,8 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
           projectId,
           projectSlug,
           provider,
-          gitToken: config.GITHUB_TOKEN,
-          maxDurationMs: config.AGENT_MAX_DURATION_MS,
+          gitToken: deps.GITHUB_TOKEN,
+          maxDurationMs: deps.AGENT_MAX_DURATION_MS,
         }),
       );
       registered.push('REVIEWER');
@@ -202,13 +219,7 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
   }
 
   // ---- RELEASE (Marco: verifica readiness del PR en DONE, advisory) ----
-  const release = byRole.get('RELEASE');
-  if (release) {
-    handlers.push(createReleaseHandler({ api: api(release), projectId, projectSlug, gitToken: config.GITHUB_TOKEN }));
-    registered.push('RELEASE');
-  } else {
-    skipped.push({ role: 'RELEASE', reason: 'agente ausente/apagado' });
-  }
+  registerAdvisory(ADVISORY_RELEASE);
 
   return { projectId, projectSlug, handlers, staleSweep, registered, skipped };
 }
