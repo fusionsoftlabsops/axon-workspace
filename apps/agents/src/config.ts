@@ -33,7 +33,24 @@ const schema = z.object({
   // Modelo fuerte del Dev para HUs de UI/complejas (Claude), donde Qwen no
   // converge. Usa la misma ANTHROPIC_API_KEY. Si no hay key, el Dev usa siempre Qwen.
   DEV_STRONG_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('claude-sonnet-5')),
-  // Token de GitHub para clone/push/PR del Dev y clone de QA (repos privados).
+  // Proveedor git (instance-wide). Default 'github' → comportamiento idéntico al
+  // histórico; 'forgejo' habilita Forgejo/Gitea (p.ej. git.fusion-soft-lab.com).
+  GIT_PROVIDER: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['github', 'forgejo']).default('github'),
+  ),
+  // Base de la API REST del proveedor. GitHub: https://api.github.com;
+  // Forgejo/Gitea: https://<host>/api/v1 (p.ej. https://git.fusion-soft-lab.com/api/v1).
+  GIT_API_BASE_URL: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().url().default('https://api.github.com'),
+  ),
+  // Host git para armar/parsear URLs de repo. GitHub: github.com; Forgejo: el
+  // dominio del servidor (p.ej. git.fusion-soft-lab.com).
+  GIT_HOST: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('github.com')),
+  // PAT del proveedor git configurado (GITHUB_TOKEN por compatibilidad de nombre):
+  // su VALOR es un token de GitHub cuando GIT_PROVIDER=github y un token de Forgejo
+  // cuando GIT_PROVIDER=forgejo. Se usa para clone/push/PR del Dev y clone de QA.
   GITHUB_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // Intervalo del sweep de estancadas del SM (minutos; 0 = apagado).
   STALE_SWEEP_MINUTES: z.preprocess(

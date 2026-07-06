@@ -20,6 +20,7 @@ import { runTrackedLoop } from '../runtime/tracked.js';
 import { contextTools } from '../tools/context.js';
 import { repoTools } from '../tools/repo.js';
 import { GitWorkspace, type CommandRunner } from '../git/workspace.js';
+import type { GitProviderConfig } from '../git/provider.js';
 import { narrate } from './narrate.js';
 
 export interface DevOptions {
@@ -32,8 +33,10 @@ export interface DevOptions {
    *  Si no se pasa, el Dev usa siempre el primario. Selección por HU vía
    *  `looksLikeUi` (misma heurística que Aria/SM). */
   strongProvider?: LlmProvider;
-  /** Token de GitHub para clone/push/PR (repos privados). */
+  /** Token del proveedor git para clone/push/PR (repos privados). */
   gitToken?: string;
+  /** Proveedor git (host/API base/shape). Default GitHub. */
+  gitConfig?: GitProviderConfig;
   /** Runner de comandos inyectable (tests). */
   run?: CommandRunner;
   meCacheMs?: number;
@@ -149,6 +152,7 @@ export function createDevHandler(opts: DevOptions): RoleHandler {
           repoUrl: repo.url,
           branch: repo.defaultBranch,
           gitToken: opts.gitToken,
+          gitConfig: opts.gitConfig,
           run: opts.run,
         });
         await ws.createBranch(branch);

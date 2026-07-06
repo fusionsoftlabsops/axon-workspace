@@ -14,6 +14,7 @@
  */
 import type { RoleHandler, AgentRoleName } from './router.js';
 import { AxonApi } from './api/client.js';
+import type { GitProviderConfig, GitProviderKind } from './git/provider.js';
 import type { ProvidersConfig } from './runtime/providers/resolve.js';
 import { resolveAnthropicProvider, resolveDevProviders } from './runtime/providers/resolve.js';
 import { createSmAssignHandler } from './roles/sm.js';
@@ -60,16 +61,29 @@ export interface ProjectTeam {
 export interface TeamDeps extends ProvidersConfig {
   AXON_API_BASE_URL: string;
   GITHUB_TOKEN?: string;
+  GIT_PROVIDER?: GitProviderKind;
+  GIT_API_BASE_URL?: string;
+  GIT_HOST?: string;
   DEV_MAX_ITERATIONS: number;
   AGENT_MAX_DURATION_MS: number;
 }
 
-/** Props comunes a todo handler advisory (RELEASE agrega `gitToken`). */
+/** Config del proveedor git derivada de `deps` (default GitHub). */
+function gitConfigOf(deps: TeamDeps): GitProviderConfig {
+  return {
+    provider: deps.GIT_PROVIDER ?? 'github',
+    apiBaseUrl: deps.GIT_API_BASE_URL ?? 'https://api.github.com',
+    host: deps.GIT_HOST ?? 'github.com',
+  };
+}
+
+/** Props comunes a todo handler advisory (RELEASE agrega `gitToken`/`gitConfig`). */
 interface AdvisoryProps {
   api: AxonApi;
   projectId: string;
   projectSlug: string;
   gitToken?: string;
+  gitConfig?: GitProviderConfig;
 }
 
 /**
@@ -101,6 +115,7 @@ export function buildProjectTeam(deps: TeamDeps, project: RuntimeProject): Proje
   let staleSweep: ProjectTeam['staleSweep'] = null;
 
   const { projectId, projectSlug } = project;
+  const gitConfig = gitConfigOf(deps);
   const byRole = new Map<AgentRoleName, RuntimeAgent>();
   for (const a of project.agents) if (a.enabled) byRole.set(a.role, a);
 
@@ -120,7 +135,7 @@ export function buildProjectTeam(deps: TeamDeps, project: RuntimeProject): Proje
         api: api(agent),
         projectId,
         projectSlug,
-        ...(entry.needsGitToken ? { gitToken: deps.GITHUB_TOKEN } : {}),
+        ...(entry.needsGitToken ? { gitToken: deps.GITHUB_TOKEN, gitConfig } : {}),
       }),
     );
     registered.push(entry.role);
@@ -164,6 +179,7 @@ export function buildProjectTeam(deps: TeamDeps, project: RuntimeProject): Proje
           provider: providers.qwen,
           strongProvider: providers.strongProvider,
           gitToken: deps.GITHUB_TOKEN,
+          gitConfig,
           maxIterations: deps.DEV_MAX_ITERATIONS,
           maxDurationMs: deps.AGENT_MAX_DURATION_MS,
         }),

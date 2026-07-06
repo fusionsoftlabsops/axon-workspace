@@ -13,6 +13,7 @@ import { analyzeRepos, getProgress, type GraphifyRepoInput } from './graphify-cl
 import { describeCodeGraph, type RepoRef } from './describe';
 import { seedBrainFromAnalysis } from './seed-brain';
 import { env } from '@/lib/env';
+import { gitConfigFromEnv, getGitProvider } from '@/lib/repo/provider';
 
 /** Build the graphify-svc repo payload + the human-facing repo refs from the
  *  project's linked ProjectRepo rows. Skips repos with no GitHub identity. */
@@ -24,17 +25,20 @@ export async function collectAnalyzableRepos(
     select: { name: true, kind: true, url: true, githubFullName: true, defaultBranch: true },
   });
   const token = env().GITHUB_TOKEN;
+  const gitConfig = gitConfigFromEnv();
+  const provider = getGitProvider(gitConfig);
   const inputs: GraphifyRepoInput[] = [];
   const refs: RepoRef[] = [];
   for (const r of repos) {
-    // graphify-svc needs a GitHub identity to clone.
-    const full = r.githubFullName ?? r.url?.match(/github\.com[/:]+([^/\s]+\/[^/\s.]+)/i)?.[1];
+    // graphify-svc needs a git identity (owner/repo) to clone.
+    const parsed = r.url ? provider.parseRepoRef(r.url) : null;
+    const full = r.githubFullName ?? (parsed ? `${parsed.owner}/${parsed.repo}` : undefined);
     if (!full) continue;
-    // Embed Axon's own token so graphify-svc needs NO GitHub token of its own
+    // Embed Axon's own token so graphify-svc needs NO git token of its own
     // (it uses the authenticated URL as-is over the internal `fusion` network).
     const cloneUrl = token
-      ? `https://x-access-token:${token}@github.com/${full}.git`
-      : (r.url ?? `https://github.com/${full}.git`);
+      ? `https://x-access-token:${token}@${gitConfig.host}/${full}.git`
+      : (r.url ?? `https://${gitConfig.host}/${full}.git`);
     inputs.push({
       name: r.name,
       kind: r.kind,

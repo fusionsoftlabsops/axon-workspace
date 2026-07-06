@@ -8,20 +8,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { env } from '@/lib/env';
-import { GITHUB_API, githubJson, repoSlug } from '@/lib/repo/github';
+import { gitProviderFromEnv } from '@/lib/repo/provider';
 
 export const runtime = 'nodejs';
-
-interface GhPr {
-  number: number;
-  title: string;
-  state: string;
-  merged_at: string | null;
-  html_url: string;
-  created_at: string;
-  user?: { login?: string };
-  head?: { ref?: string };
-}
 
 export async function GET(
   req: NextRequest,
@@ -44,12 +33,16 @@ export async function GET(
   const token = env().GITHUB_TOKEN;
   if (!token) return NextResponse.json({ error: 'GITHUB_TOKEN no configurado' }, { status: 501 });
 
+  const provider = gitProviderFromEnv();
   const repos = await prisma.projectRepo.findMany({ where: { projectId: project.id } });
   const slugs = repos
-    .map((r) => ({ name: r.name, full: repoSlug(r) }))
-    .filter((r): r is { name: string; full: string } => !!r.full);
+    .map((r) => {
+      const ref = provider.resolveRef(r.githubFullName ?? r.url ?? '');
+      return ref ? { name: r.name, full: `${ref.owner}/${ref.repo}` } : null;
+    })
+    .filter((r): r is { name: string; full: string } => !!r);
   if (slugs.length === 0) {
-    return NextResponse.json({ error: 'el proyecto no tiene repos de GitHub vinculados' }, { status: 404 });
+    return NextResponse.json({ error: 'el proyecto no tiene repos git vinculados' }, { status: 404 });
   }
 
   const stateParam = req.nextUrl.searchParams.get('state') ?? 'open';
@@ -58,28 +51,24 @@ export async function GET(
   const prs: Array<Record<string, unknown>> = [];
   for (const r of slugs) {
     try {
-      const list = (await githubJson(
-        `${GITHUB_API}/repos/${r.full}/pulls?state=${state}&per_page=50&sort=updated&direction=desc`,
-        token,
-      )) as GhPr[];
+      const list = await provider.listPrs({ repo: r.full, state, token });
       for (const pr of list) {
-        const headRef = pr.head?.ref ?? '';
-        const m = headRef.match(/^agent\/hu-(\d+)$/);
+        const m = pr.headRef.match(/^agent\/hu-(\d+)$/);
         prs.push({
           repo: r.name,
           number: pr.number,
           title: pr.title,
           state: pr.state,
-          merged: !!pr.merged_at,
-          headRef,
+          merged: pr.merged,
+          headRef: pr.headRef,
           storyNumber: m ? parseInt(m[1]!, 10) : null,
-          author: pr.user?.login ?? null,
-          url: pr.html_url,
-          createdAt: pr.created_at,
+          author: pr.author,
+          url: pr.url,
+          createdAt: pr.createdAt,
         });
       }
     } catch (err) {
-      prs.push({ repo: r.name, error: err instanceof Error ? err.message : 'github error' });
+      prs.push({ repo: r.name, error: err instanceof Error ? err.message : 'git error' });
     }
   }
 

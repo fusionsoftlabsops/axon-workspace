@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireApiToken, tokenAllowsProject } from '@/lib/api-auth';
 import { env } from '@/lib/env';
-import { GITHUB_API, githubJson, githubText, repoSlug } from '@/lib/repo/github';
+import { gitProviderFromEnv } from '@/lib/repo/provider';
 
 export const runtime = 'nodejs';
 
@@ -39,47 +39,39 @@ export async function GET(
   const token = env().GITHUB_TOKEN;
   if (!token) return NextResponse.json({ error: 'GITHUB_TOKEN no configurado' }, { status: 501 });
 
-  // Repo del PR: query ?repo=<name> para desambiguar; default el primero con slug.
+  const provider = gitProviderFromEnv();
+  const refOf = (r: { url: string | null; githubFullName: string | null }) =>
+    provider.resolveRef(r.githubFullName ?? r.url ?? '');
+
+  // Repo del PR: query ?repo=<name> para desambiguar; default el primero con ref.
   const repos = await prisma.projectRepo.findMany({ where: { projectId: project.id } });
   const repoName = req.nextUrl.searchParams.get('repo');
-  const target = repoName ? repos.find((r) => r.name === repoName) : repos.find((r) => repoSlug(r));
-  const full = target ? repoSlug(target) : null;
-  if (!full) return NextResponse.json({ error: 'repo de GitHub no encontrado' }, { status: 404 });
+  const target = repoName ? repos.find((r) => r.name === repoName) : repos.find((r) => refOf(r));
+  const ref = target ? refOf(target) : null;
+  if (!ref) return NextResponse.json({ error: 'repo git no encontrado' }, { status: 404 });
+  const full = `${ref.owner}/${ref.repo}`;
 
   try {
-    const meta = (await githubJson(`${GITHUB_API}/repos/${full}/pulls/${prNumber}`, token)) as {
-      title?: string;
-      state?: string;
-      merged_at?: string | null;
-      additions?: number;
-      deletions?: number;
-      changed_files?: number;
-      head?: { ref?: string };
-      html_url?: string;
-    };
-    const raw = await githubText(
-      `${GITHUB_API}/repos/${full}/pulls/${prNumber}`,
-      token,
-      'application/vnd.github.diff',
-    );
+    const meta = await provider.getPrMeta({ repo: full, number: prNumber, token });
+    const raw = await provider.getPrDiff({ repo: full, number: prNumber, token });
     const truncated = raw.length > MAX_DIFF_CHARS;
     return NextResponse.json({
       repo: target!.name,
       number: prNumber,
-      title: meta.title ?? '',
-      state: meta.state ?? '',
-      merged: !!meta.merged_at,
-      headRef: meta.head?.ref ?? '',
-      additions: meta.additions ?? 0,
-      deletions: meta.deletions ?? 0,
-      changedFiles: meta.changed_files ?? 0,
-      url: meta.html_url ?? '',
+      title: meta.title,
+      state: meta.state,
+      merged: meta.merged,
+      headRef: meta.headRef,
+      additions: meta.additions,
+      deletions: meta.deletions,
+      changedFiles: meta.changedFiles,
+      url: meta.url,
       truncated,
       diff: truncated ? `${raw.slice(0, MAX_DIFF_CHARS)}\n…(diff truncado)` : raw,
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'github error' },
+      { error: err instanceof Error ? err.message : 'git error' },
       { status: 502 },
     );
   }

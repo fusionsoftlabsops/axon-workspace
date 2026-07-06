@@ -72,9 +72,26 @@ const schema = z.object({
   // Default extraction backend for graphify-svc (deepseek|claude|…). Optional —
   // the service has its own default when this is unset.
   GRAPHIFY_BACKEND: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  // GitHub org PAT used to create repos and read collaborator access for the
-  // plan's Repositories section. Optional — if unset, those actions are disabled
-  // and the rest of the app is unaffected.
+  // Git provider (instance-wide). Default 'github' → behaviour identical to the
+  // historical one; 'forgejo' enables Forgejo/Gitea (e.g. git.fusion-soft-lab.com).
+  GIT_PROVIDER: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['github', 'forgejo']).default('github'),
+  ),
+  // REST API base of the provider. GitHub: https://api.github.com; Forgejo/Gitea:
+  // https://<host>/api/v1 (e.g. https://git.fusion-soft-lab.com/api/v1).
+  GIT_API_BASE_URL: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().url().default('https://api.github.com'),
+  ),
+  // Git host used to build/parse repo URLs. GitHub: github.com; Forgejo: the
+  // server domain (e.g. git.fusion-soft-lab.com).
+  GIT_HOST: z.preprocess((v) => (v === '' ? undefined : v), z.string().default('github.com')),
+  // PAT of the configured git provider (kept as GITHUB_TOKEN for name
+  // compatibility): its VALUE is a GitHub token when GIT_PROVIDER=github and a
+  // Forgejo token when GIT_PROVIDER=forgejo. Used to create repos, read
+  // collaborator access and drive the plan's Repositories section. Optional — if
+  // unset, those actions are disabled and the rest of the app is unaffected.
   GITHUB_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   GITHUB_ORG: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // fusion-infra control-plane (the user's PaaS). axon-web runs as an app ON
