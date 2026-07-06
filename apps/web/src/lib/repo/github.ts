@@ -9,6 +9,7 @@
  * keywords en el path. Solo lectura, best-effort: cualquier fallo → sin grounding.
  */
 import type { ImplRepoFile } from '@/lib/ai/planner';
+import { gitProviderFromEnv } from '@/lib/repo/provider';
 
 export const GITHUB_API = 'https://api.github.com';
 const GH_API = GITHUB_API;
@@ -62,16 +63,14 @@ export interface GithubTreeEntry {
   size?: number;
 }
 
-/** Árbol COMPLETO del repo (blobs + dirs) vía git trees API. */
+/** Árbol COMPLETO del repo (blobs + dirs) vía el proveedor git (GitHub o
+ *  Forgejo/Gitea según GIT_PROVIDER). */
 export async function githubRepoTree(fullName: string, branch: string, token: string): Promise<GithubTreeEntry[]> {
-  const resp = (await githubJson(
-    `${GH_API}/repos/${fullName}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
-    token,
-  )) as { tree?: Array<{ path: string; type: string; size?: number }> };
-  return (resp.tree ?? []).filter((t): t is GithubTreeEntry => t.type === 'blob' || t.type === 'tree');
+  return (await gitProviderFromEnv().getTree({ repo: fullName, branch, token })) as GithubTreeEntry[];
 }
 
-/** Contenido de UN archivo vía contents API (base64→utf8, truncado a maxBytes). */
+/** Contenido de UN archivo (base64→utf8, truncado a maxBytes) vía el proveedor
+ *  git configurado. */
 export async function githubFileContent(
   fullName: string,
   branch: string,
@@ -79,16 +78,7 @@ export async function githubFileContent(
   token: string,
   maxBytes = 200_000,
 ): Promise<{ content: string; bytes: number; truncated: boolean }> {
-  const c = (await githubJson(
-    `${GH_API}/repos/${fullName}/contents/${filePath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(branch)}`,
-    token,
-  )) as { content?: string; encoding?: string; size?: number };
-  if (c.encoding !== 'base64' || !c.content) throw new Error('archivo no disponible (¿binario o directorio?)');
-  let content = Buffer.from(c.content, 'base64').toString('utf8');
-  const bytes = Buffer.byteLength(content, 'utf8');
-  const truncated = bytes > maxBytes;
-  if (truncated) content = content.slice(0, maxBytes);
-  return { content, bytes, truncated };
+  return gitProviderFromEnv().getFileContent({ repo: fullName, branch, path: filePath, token, maxBytes });
 }
 
 /** Nodo con la MISMA forma que RepoReader.tree() para el fallback GitHub. */

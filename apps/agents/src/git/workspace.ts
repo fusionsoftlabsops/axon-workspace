@@ -10,6 +10,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { getGitProvider, DEFAULT_GIT_CONFIG, type GitProviderConfig } from './provider.js';
 
 export interface CommandRunner {
   (cmd: string, args: string[], cwd?: string): Promise<{ code: number; stdout: string; stderr: string }>;
@@ -53,8 +54,10 @@ export interface WorkspaceOptions {
   /** p.ej. https://github.com/org/repo (sin token). */
   repoUrl: string;
   branch: string;
-  /** Token de GitHub para clone/push (repos privados). */
+  /** Token del proveedor git para clone/push (repos privados). */
   gitToken?: string;
+  /** Proveedor git (host/API base/shape). Default GitHub. */
+  gitConfig?: GitProviderConfig;
   run?: CommandRunner;
   /** Identidad de los commits del agente. */
   authorName?: string;
@@ -139,48 +142,17 @@ export class GitWorkspace {
   }
 
   /**
-   * Crea el PR vía API REST de GitHub. Devuelve la URL del PR. Si ya existe un
-   * PR abierto para esta rama (re-trabajo de la misma HU), reusa su URL en vez
-   * de fallar con 422.
+   * Crea el PR vía API REST del proveedor git (GitHub o Forgejo/Gitea). Devuelve
+   * la URL del PR. Si ya existe uno abierto para esta rama (re-trabajo de la
+   * misma HU), reusa su URL en vez de fallar (422 en GitHub, 409 en Gitea).
    */
   async openPr(input: { title: string; body: string; head: string; base: string }): Promise<string> {
-    const m = this.opts.repoUrl.match(/github\.com\/([^/]+)\/([^/.]+)/);
-    if (!m) throw new Error('repoUrl no es de GitHub — no se puede abrir PR');
-    const res = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}/pulls`, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${this.opts.gitToken ?? ''}`,
-        accept: 'application/vnd.github+json',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(input),
-      signal: AbortSignal.timeout(30_000),
-    });
-    const data = (await res.json().catch(() => ({}))) as { html_url?: string; message?: string };
-    if (res.ok && data.html_url) return data.html_url;
-    // Ya existe un PR para la rama → reusarlo (el force-push actualizó su HEAD).
-    if (res.status === 422) {
-      const existing = await this.findOpenPr(m[1]!, m[2]!, input.head);
-      if (existing) return existing;
+    const provider = getGitProvider(this.opts.gitConfig ?? DEFAULT_GIT_CONFIG);
+    try {
+      return await provider.openPr({ ...input, repoUrl: this.opts.repoUrl, token: this.opts.gitToken });
+    } catch (err) {
+      throw new Error(redact(err instanceof Error ? err.message : String(err), this.opts.gitToken));
     }
-    throw new Error(`GitHub PR falló (${res.status}): ${redact(data.message ?? '', this.opts.gitToken)}`);
-  }
-
-  /** URL del PR abierto para `head` (rama del agente), o null si no hay. */
-  private async findOpenPr(owner: string, repo: string, head: string): Promise<string | null> {
-    const res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/pulls?head=${owner}:${head}&state=open`,
-      {
-        headers: {
-          authorization: `Bearer ${this.opts.gitToken ?? ''}`,
-          accept: 'application/vnd.github+json',
-        },
-        signal: AbortSignal.timeout(30_000),
-      },
-    );
-    if (!res.ok) return null;
-    const list = (await res.json().catch(() => [])) as Array<{ html_url?: string }>;
-    return list[0]?.html_url ?? null;
   }
 
   async cleanup(): Promise<void> {

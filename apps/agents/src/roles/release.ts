@@ -12,6 +12,7 @@
 import type { AxonApi } from '../api/client.js';
 import type { DomainEventV1 } from '../events.js';
 import type { RoleHandler } from '../router.js';
+import { getGitProvider, DEFAULT_GIT_CONFIG, type GitProviderConfig } from '../git/provider.js';
 import { narrate } from './narrate.js';
 
 export interface ReleaseOptions {
@@ -19,15 +20,18 @@ export interface ReleaseOptions {
   projectId: string;
   projectSlug: string;
   gitToken?: string;
+  /** Proveedor git (host/API base/shape). Default GitHub. */
+  gitConfig?: GitProviderConfig;
   meCacheMs?: number;
   /** Inyectable para tests (default: fetch global). */
   fetchImpl?: typeof fetch;
 }
 
-/** Extrae el número de PR del primer link github .../pull/N en los comentarios. */
+/** Extrae el número de PR del último link .../pull(s)/N en los comentarios
+ *  (GitHub usa `/pull/N`, Forgejo/Gitea `/pulls/N`; se aceptan ambos). */
 export function parsePrNumber(comments: Array<{ body: string }>): number | null {
   for (const c of [...comments].reverse()) {
-    const m = c.body.match(/github\.com\/[^/\s]+\/[^/\s]+\/pull\/(\d+)/i);
+    const m = c.body.match(/\/[^/\s]+\/[^/\s]+\/pulls?\/(\d+)/i);
     if (m) return parseInt(m[1]!, 10);
   }
   return null;
@@ -35,6 +39,7 @@ export function parsePrNumber(comments: Array<{ body: string }>): number | null 
 
 export function createReleaseHandler(opts: ReleaseOptions): RoleHandler {
   const doFetch = opts.fetchImpl ?? fetch;
+  const provider = getGitProvider(opts.gitConfig ?? DEFAULT_GIT_CONFIG, doFetch);
   let meCache: { enabled: boolean; at: number } | null = null;
   const meCacheMs = opts.meCacheMs ?? 60_000;
 
@@ -50,16 +55,8 @@ export function createReleaseHandler(opts: ReleaseOptions): RoleHandler {
   }
 
   async function gh(path: string): Promise<unknown> {
-    const res = await doFetch(`https://api.github.com${path}`, {
-      headers: {
-        authorization: `Bearer ${opts.gitToken}`,
-        accept: 'application/vnd.github+json',
-        'x-github-api-version': '2022-11-28',
-        'user-agent': 'axon-release',
-      },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) throw new Error(`github ${res.status}`);
+    const res = await provider.apiFetch(path, opts.gitToken, { timeoutMs: 20_000 });
+    if (!res.ok) throw new Error(`git ${res.status}`);
     return res.json();
   }
 
@@ -86,7 +83,8 @@ export function createReleaseHandler(opts: ReleaseOptions): RoleHandler {
 
       const { repos } = await opts.api.listRepos(opts.projectSlug);
       const repo = repos.find((r) => r.githubFullName || r.url);
-      const full = repo?.githubFullName ?? repo?.url?.match(/github\.com[/:]([^/]+\/[^/.]+)/i)?.[1];
+      const ref = repo?.url ? provider.parseRepoRef(repo.url) : null;
+      const full = repo?.githubFullName ?? (ref ? `${ref.owner}/${ref.repo}` : undefined);
       if (!full || !opts.gitToken) return;
 
       let verdict: string;
