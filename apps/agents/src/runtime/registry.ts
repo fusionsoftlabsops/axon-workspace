@@ -18,9 +18,9 @@ interface RuntimeResponse {
 }
 
 
-async function fetchRuntime(config: AgentsConfig): Promise<RuntimeProject[]> {
+async function fetchRuntime(config: AgentsConfig, fetchFn: typeof fetch): Promise<RuntimeProject[]> {
   const url = `${config.AXON_API_BASE_URL}/internal/agent-runtime`;
-  const res = await fetch(url, {
+  const res = await fetchFn(url, {
     headers: { authorization: `Bearer ${config.AGENT_RUNTIME_TOKEN}` },
     signal: AbortSignal.timeout(20_000),
   });
@@ -49,11 +49,22 @@ export interface RuntimeRegistry {
   sweepAll(): Promise<number>;
 }
 
-export function createRuntimeRegistry(config: AgentsConfig, router: EventRouter): RuntimeRegistry {
+/** Dependencias inyectables del registry (DIP/testabilidad). */
+export interface RegistryDeps {
+  /** `fetch` a usar contra /internal/agent-runtime (default: global). */
+  fetchFn?: typeof fetch;
+}
+
+export function createRuntimeRegistry(
+  config: AgentsConfig,
+  router: EventRouter,
+  deps: RegistryDeps = {},
+): RuntimeRegistry {
+  const fetchFn = deps.fetchFn ?? fetch;
   let sweeps: Array<{ sweepOnce(): Promise<number> }> = [];
 
   async function refresh() {
-    const projects = await fetchRuntime(config);
+    const projects = await fetchRuntime(config, fetchFn);
     const allHandlers = [];
     const nextSweeps: Array<{ sweepOnce(): Promise<number> }> = [];
     const summary: string[] = [];

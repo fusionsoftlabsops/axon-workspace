@@ -537,23 +537,16 @@ export interface ProvisionTeamResult {
 }
 
 /**
- * Provisiona (o completa) el equipo por defecto de un proyecto: los 9 roles,
- * habilitados, con los modelos estilo-axon. Idempotente y SIN guard de sesión
- * (el caller —API/route o el hook de creación— hace el control de acceso). El
- * worker multi-tenant toma el equipo en su próximo refresco.
+ * Crea el agente de cada rol que falte (con su modelo estilo-axon) y habilita
+ * los apagados. Idempotente y best-effort ante carreras (si otro proceso ya lo
+ * creó, se ignora). No toca tokens — de eso se encarga `resealMissing`.
  */
-export async function provisionDefaultTeam(
+export async function ensureTeam(
   projectId: string,
   slug: string,
-): Promise<ProvisionTeamResult> {
-  const { rotateAgentToken } = await import('@/lib/agents/provision');
-  // Roles que ya tienen su token sellado en el store de runtime.
-  const sealedRoles = new Set(
-    (await prisma.agentRuntimeToken.findMany({ where: { projectId }, select: { role: true } })).map((r) => r.role),
-  );
+): Promise<{ provisioned: number; enabled: number }> {
   let provisioned = 0;
   let enabled = 0;
-  let resealed = 0;
   for (const role of ROLES) {
     const existing = await prisma.agent.findUnique({
       where: { projectId_role: { projectId, role } },
@@ -571,22 +564,56 @@ export async function provisionDefaultTeam(
       } catch {
         /* carrera / ya existe: seguir */
       }
-    } else {
-      if (!existing.enabled) {
-        await prisma.agent.update({ where: { id: existing.id }, data: { enabled: true } });
-        enabled += 1;
-      }
-      // Auto-sanación: un agente preexistente sin token sellado (ej. los de axon,
-      // provisionados antes del store) se rota+sella para que el worker lo sirva.
-      if (!sealedRoles.has(role)) {
-        try {
-          await rotateAgentToken({ projectId, projectSlug: slug, role });
-          resealed += 1;
-        } catch {
-          /* best-effort */
-        }
-      }
+    } else if (!existing.enabled) {
+      await prisma.agent.update({ where: { id: existing.id }, data: { enabled: true } });
+      enabled += 1;
     }
   }
+  return { provisioned, enabled };
+}
+
+/**
+ * Auto-sanación: un agente preexistente sin token sellado en el store de runtime
+ * (ej. los de axon, provisionados antes del store) se rota+sella para que el
+ * worker multi-tenant lo sirva. Los recién provisionados por `ensureTeam` ya
+ * quedan sellados (provisionAgent sella al crear), así que no se re-rotan.
+ */
+export async function resealMissing(projectId: string, slug: string): Promise<{ resealed: number }> {
+  const { rotateAgentToken } = await import('@/lib/agents/provision');
+  // Roles que ya tienen su token sellado en el store de runtime.
+  const sealedRoles = new Set(
+    (await prisma.agentRuntimeToken.findMany({ where: { projectId }, select: { role: true } })).map((r) => r.role),
+  );
+  let resealed = 0;
+  for (const role of ROLES) {
+    if (sealedRoles.has(role)) continue;
+    const existing = await prisma.agent.findUnique({
+      where: { projectId_role: { projectId, role } },
+      select: { id: true },
+    });
+    if (!existing) continue;
+    try {
+      await rotateAgentToken({ projectId, projectSlug: slug, role });
+      resealed += 1;
+    } catch {
+      /* best-effort */
+    }
+  }
+  return { resealed };
+}
+
+/**
+ * Provisiona (o completa) el equipo por defecto de un proyecto: los 9 roles,
+ * habilitados, con los modelos estilo-axon. Idempotente y SIN guard de sesión
+ * (el caller —API/route o el hook de creación— hace el control de acceso). El
+ * worker multi-tenant toma el equipo en su próximo refresco. Orquesta las dos
+ * responsabilidades: asegurar el equipo (SRP) y re-sellar tokens faltantes.
+ */
+export async function provisionDefaultTeam(
+  projectId: string,
+  slug: string,
+): Promise<ProvisionTeamResult> {
+  const { provisioned, enabled } = await ensureTeam(projectId, slug);
+  const { resealed } = await resealMissing(projectId, slug);
   return { provisioned, enabled, resealed, agents: await loadAgents(projectId) };
 }
