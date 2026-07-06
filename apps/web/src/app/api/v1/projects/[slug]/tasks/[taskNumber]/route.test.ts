@@ -164,6 +164,16 @@ describe('PATCH task', () => {
     expect(await res.json()).toEqual({ ok: true });
     expect(h.extract).not.toHaveBeenCalled();
   });
+  it('persiste artefactos generativos (runtime LOCAL): acceptanceCriteria + techDesign', async () => {
+    h.projectFindUnique.mockResolvedValue(project());
+    h.taskFindUnique.mockResolvedValue(task());
+    const res = await PATCH(req({ acceptanceCriteria: '- [ ] hace X', techDesign: '## Diseño' }), ctx());
+    expect(res.status).toBe(200);
+    const data = h.taskUpdate.mock.calls[0]![0].data;
+    expect(data.acceptanceCriteria).toBe('- [ ] hace X');
+    expect(data.techDesign).toBe('## Diseño');
+    expect(data.techDesignAt).toBeInstanceOf(Date);
+  });
   it('200 moves to DONE and fires brain extractor', async () => {
     h.projectFindUnique.mockResolvedValue(project());
     h.taskFindUnique.mockResolvedValue(task());

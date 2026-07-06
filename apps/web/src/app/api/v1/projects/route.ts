@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     select: {
       role: true,
       project: {
-        select: { id: true, slug: true, name: true, teamPreset: true, devExecutor: true, updatedAt: true },
+        select: { id: true, slug: true, name: true, teamPreset: true, devExecutor: true, agentRuntime: true, updatedAt: true },
       },
     },
     orderBy: { project: { updatedAt: 'desc' } },
@@ -79,6 +79,7 @@ export async function GET(req: NextRequest) {
     role: m.role,
     teamPreset: m.project.teamPreset,
     devExecutor: m.project.devExecutor,
+    agentRuntime: m.project.agentRuntime,
     counts: {
       openTasks: openMap.get(m.project.id) ?? 0,
       drafts: draftMap.get(m.project.id) ?? 0,

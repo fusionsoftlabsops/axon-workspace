@@ -18,6 +18,7 @@ describe('task tools', () => {
         'create_task',
         'get_task',
         'list_my_tasks',
+        'set_story_content',
         'submit_qa_review',
         'update_task_status',
       ].sort(),

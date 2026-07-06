@@ -15,6 +15,27 @@ const updateStatusSchema = z.object({
   taskNumber: z.number().int().positive(),
   toState: z.string(),
 });
+const setContentSchema = z
+  .object({
+    projectSlug: z.string(),
+    taskNumber: z.number().int().positive(),
+    description: z.string().optional(),
+    acceptanceCriteria: z.string().optional(),
+    techDesign: z.string().optional(),
+    designSpec: z.string().optional(),
+    marketingKit: z.string().optional(),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  })
+  .refine(
+    (v) =>
+      v.description !== undefined ||
+      v.acceptanceCriteria !== undefined ||
+      v.techDesign !== undefined ||
+      v.designSpec !== undefined ||
+      v.marketingKit !== undefined ||
+      v.priority !== undefined,
+    { message: 'indicá al menos un campo a persistir' },
+  );
 const createSchema = z.object({
   projectSlug: z.string(),
   title: z.string().min(1).max(200),
@@ -115,6 +136,35 @@ export function registerTaskTools(registry: ToolRegistry, api: ApiClient) {
           toState: input.toState,
         }),
       );
+    },
+  });
+
+  registry.register({
+    tool: {
+      name: 'set_story_content',
+      description:
+        'Persiste artefactos generativos de una HU SIN llamar IA del servidor — para el runtime LOCAL, ' +
+        'donde las personas corren en tu Claude Code: PO → description + acceptanceCriteria (+priority); ' +
+        'Arquitecto → techDesign; Diseño → designSpec; Marketing → marketingKit. Pasá solo los campos del rol.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectSlug: { type: 'string' },
+          taskNumber: { type: 'number' },
+          description: { type: 'string', description: 'PO: descripción refinada.' },
+          acceptanceCriteria: { type: 'string', description: 'PO: criterios (checklist markdown o Dado/Cuando/Entonces).' },
+          techDesign: { type: 'string', description: 'Arquitecto (Dax): diseño técnico.' },
+          designSpec: { type: 'string', description: 'Diseño (Aria): spec de UI/UX.' },
+          marketingKit: { type: 'string', description: 'Marketing (Sol): kit go-to-market.' },
+          priority: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] },
+        },
+        required: ['projectSlug', 'taskNumber'],
+      },
+    },
+    handler: async (args) => {
+      const input = setContentSchema.parse(args);
+      const { projectSlug, taskNumber, ...fields } = input;
+      return asText(await api.patch(`/projects/${projectSlug}/tasks/${taskNumber}`, fields));
     },
   });
 
