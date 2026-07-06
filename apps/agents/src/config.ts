@@ -14,24 +14,9 @@ const schema = z.object({
   AXON_API_BASE_URL: z
     .preprocess((v) => (v === '' ? undefined : v), z.string().url().optional())
     .default('http://axon-web:3000/api/v1'),
-  // Tokens de miembro por rol (acuñados con provisionAgentAction). Un rol sin
-  // token queda inactivo aunque el worker esté encendido.
-  AGENT_SM_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_PO_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_DEV_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_QA_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_DESIGN_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_REVIEWER_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_ARCHITECT_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_MARKETING_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_RELEASE_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  // Proyecto que este worker atiende (modo LEGACY single-project: un proyecto
-  // por instancia, tokens de rol por env). Si en cambio se define
-  // AGENT_RUNTIME_TOKEN, el worker corre en modo MULTI-TENANT y atiende a todos.
-  AGENT_PROJECT_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  AGENT_PROJECT_SLUG: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
-  // Modo MULTI-TENANT: token de servicio (scope agents:runtime) con el que el
-  // worker obtiene los equipos de TODOS los proyectos vía /internal/agent-runtime.
+  // Token de servicio (scope agents:runtime) con el que el worker obtiene los
+  // equipos de TODOS los proyectos vía /internal/agent-runtime. Sin él, el
+  // worker no tiene equipos que atender y arranca en modo pasivo/oscuro.
   AGENT_RUNTIME_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
   // Cada cuánto re-consulta el worker el runtime (toma proyectos/agentes nuevos).
   AGENT_RUNTIME_REFRESH_SEC: z.preprocess(
@@ -73,10 +58,6 @@ const schema = z.object({
 
 export type AgentsConfig = z.infer<typeof schema> & {
   enabled: boolean;
-  tokens: {
-    SM?: string; PO?: string; DEV?: string; QA?: string;
-    DESIGN?: string; REVIEWER?: string; ARCHITECT?: string; MARKETING?: string; RELEASE?: string;
-  };
 };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentsConfig {
@@ -89,16 +70,5 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentsConfig {
   return {
     ...parsed.data,
     enabled: v === '1' || v === 'true' || v === 'on',
-    tokens: {
-      SM: parsed.data.AGENT_SM_TOKEN,
-      PO: parsed.data.AGENT_PO_TOKEN,
-      DEV: parsed.data.AGENT_DEV_TOKEN,
-      QA: parsed.data.AGENT_QA_TOKEN,
-      DESIGN: parsed.data.AGENT_DESIGN_TOKEN,
-      REVIEWER: parsed.data.AGENT_REVIEWER_TOKEN,
-      ARCHITECT: parsed.data.AGENT_ARCHITECT_TOKEN,
-      MARKETING: parsed.data.AGENT_MARKETING_TOKEN,
-      RELEASE: parsed.data.AGENT_RELEASE_TOKEN,
-    },
   };
 }

@@ -36,9 +36,9 @@ describe('GET /internal/agent-runtime', () => {
       { projectId: 'p2', role: 'SM', sealed: Buffer.from('sm'), nonce: Buffer.alloc(24), project: { id: 'p2', slug: 'forgeia' } },
     ]);
     h.agentFindMany.mockResolvedValue([
-      { projectId: 'p1', role: 'QA', enabled: true, llmModel: 'claude-opus-4-8', tokenBudget: 500000 },
-      { projectId: 'p1', role: 'DEV', enabled: false, llmModel: 'qwen3-coder-next', tokenBudget: 200000 },
-      { projectId: 'p2', role: 'SM', enabled: true, llmModel: 'claude-sonnet-5', tokenBudget: 300000 },
+      { projectId: 'p1', role: 'QA', enabled: true, llmModel: 'claude-opus-4-8' },
+      { projectId: 'p1', role: 'DEV', enabled: false, llmModel: 'qwen3-coder-next' },
+      { projectId: 'p2', role: 'SM', enabled: true, llmModel: 'claude-sonnet-5' },
     ]);
     const res = await GET(req());
     expect(res.status).toBe(200);

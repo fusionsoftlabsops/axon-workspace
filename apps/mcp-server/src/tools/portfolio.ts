@@ -7,7 +7,7 @@
  *  - post_plan_chat: participar en la planeación (dispara respuesta de agentes).
  */
 import { z } from 'zod';
-import type { ApiClient } from '../api-client.js';
+import { ApiError, type ApiClient } from '../api-client.js';
 import type { ToolRegistry } from '../tool-registry.js';
 
 const listProjectsSchema = z.object({});
@@ -73,8 +73,9 @@ export function registerPortfolioTools(registry: ToolRegistry, api: ApiClient): 
     tool: {
       name: 'get_plan',
       description:
-        'Snapshot de la planeación de un proyecto: estado, idea mejorada, repos sugeridos y resumen del plan ' +
-        'generado (sprints + nº de HUs). El contexto para entender hacia dónde va el producto.',
+        'Snapshot de SOLO LECTURA de la planeación de un proyecto: estado, idea mejorada, repos sugeridos y ' +
+        'resumen del plan ya generado (sprints + nº de HUs). NO dispara generación ni modifica nada; si el ' +
+        'proyecto todavía no tiene plan, devuelve un resultado vacío. Para el hilo de la discusión usá get_plan_chat.',
       inputSchema: {
         type: 'object',
         properties: { projectSlug: { type: 'string' } },
@@ -83,7 +84,19 @@ export function registerPortfolioTools(registry: ToolRegistry, api: ApiClient): 
     },
     handler: async (args) => {
       const input = planSchema.parse(args);
-      return asText(await api.get(`/projects/${input.projectSlug}/plan/chat`));
+      // Solo lectura: el endpoint del plan es un GET puro (no genera ni muta).
+      // Devolvemos SOLO el snapshot, sin el hilo de chat (para eso está get_plan_chat).
+      try {
+        const plan = await api.get<Record<string, unknown>>(`/projects/${input.projectSlug}/plan/chat`);
+        const { messages: _messages, ...snapshot } = plan;
+        return asText(snapshot);
+      } catch (err) {
+        // Proyecto sin plan aún: resultado vacío/explicativo, JAMÁS generamos uno.
+        if (err instanceof ApiError && err.status === 404) {
+          return asText({ plan: null, note: 'El proyecto todavía no tiene un plan generado.' });
+        }
+        throw err;
+      }
     },
   });
 

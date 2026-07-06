@@ -3,14 +3,14 @@
  * agentes tocan la plataforma (misma API que un humano con token, misma
  * auditoría). Un cliente por rol: cada uno lleva SU token.
  */
+import type { AgentRoleName } from '../roles.js';
 
 export interface AgentMe {
   id: string;
-  role: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN' | 'REVIEWER' | 'ARCHITECT' | 'MARKETING';
+  role: AgentRoleName;
   userId: string;
   llmModel: string;
   credentialRef: string | null;
-  tokenBudget: number;
   enabled: boolean;
   /** Ejecutor de desarrollo del proyecto: KAI | CONSOLE | HYBRID. */
   devExecutor?: string;
@@ -18,6 +18,7 @@ export interface AgentMe {
 
 export interface RunHandle {
   id: string;
+  /** Presupuesto de tokens de la corrida (corte duro en runtime, ver tracked.ts). */
   tokenBudget: number;
 }
 
@@ -115,7 +116,7 @@ export class AxonApi {
       title?: string;
       description?: string;
       priority?: string;
-      assignToAgentRole?: 'SM' | 'DEV' | 'QA' | 'PO' | 'DESIGN' | 'REVIEWER' | 'ARCHITECT' | 'MARKETING';
+      assignToAgentRole?: AgentRoleName;
       assignToOwner?: boolean;
     },
   ): Promise<{ ok: boolean }> {

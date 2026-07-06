@@ -1,8 +1,7 @@
 /**
  * Cableado del equipo. `buildProjectTeam` construye los handlers de UN proyecto
  * a partir de sus agentes de runtime (token + modelo por agente); es la unidad
- * que usa tanto el modo LEGACY single-project (`buildTeam`, tokens por env) como
- * el modo MULTI-TENANT (el registry lo llama por cada proyecto).
+ * que el registry MULTI-TENANT llama por cada proyecto.
  *
  * Cada rol se activa solo si tiene lo que necesita (agente habilitado + provider
  * LLM cuando aplica); lo que falte se reporta en `skipped`.
@@ -14,7 +13,7 @@
  * generación server-side en axon-web, que ya respeta su modelo.
  */
 import type { AgentsConfig } from './config.js';
-import { EventRouter, type RoleHandler, type AgentRoleName } from './router.js';
+import type { RoleHandler, AgentRoleName } from './router.js';
 import { AxonApi } from './api/client.js';
 import { createOpenAiProvider } from './runtime/providers/openai.js';
 import { createAnthropicProvider } from './runtime/providers/anthropic.js';
@@ -31,13 +30,12 @@ import { createSmStaleSweep } from './roles/sm-stale.js';
 import { createDevHandler } from './roles/dev.js';
 import { createQaHandler } from './roles/qa.js';
 
-/** Un agente tal como lo entrega /internal/agent-runtime (o el env legacy). */
+/** Un agente tal como lo entrega /internal/agent-runtime. */
 export interface RuntimeAgent {
   role: AgentRoleName;
   token: string;
   llmModel: string;
   enabled: boolean;
-  tokenBudget?: number;
 }
 
 export interface RuntimeProject {
@@ -53,12 +51,6 @@ export interface ProjectTeam {
   staleSweep: { sweepOnce(): Promise<number> } | null;
   registered: string[];
   skipped: Array<{ role: string; reason: string }>;
-}
-
-export interface TeamWiring {
-  registered: string[];
-  skipped: Array<{ role: string; reason: string }>;
-  staleSweep: { sweepOnce(): Promise<number> } | null;
 }
 
 /** Provider Anthropic para un agente, usando SU modelo (si es claude-*) o el default. */
@@ -219,27 +211,4 @@ export function buildProjectTeam(config: AgentsConfig, project: RuntimeProject):
   }
 
   return { projectId, projectSlug, handlers, staleSweep, registered, skipped };
-}
-
-/**
- * Modo LEGACY single-project: arma un RuntimeProject desde los tokens por env y
- * registra sus handlers en el router. Se conserva para despliegues 1-proyecto y
- * para los tests existentes.
- */
-export function buildTeam(config: AgentsConfig, router: EventRouter): TeamWiring {
-  const projectId = config.AGENT_PROJECT_ID;
-  const projectSlug = config.AGENT_PROJECT_SLUG;
-  if (!projectId || !projectSlug) {
-    return { registered: [], skipped: [{ role: '*', reason: 'faltan AGENT_PROJECT_ID / AGENT_PROJECT_SLUG' }], staleSweep: null };
-  }
-
-  const roleModel = (role: AgentRoleName): string =>
-    role === 'DEV' ? config.QWEN_MODEL : config.ANTHROPIC_MODEL;
-  const agents: RuntimeAgent[] = (Object.entries(config.tokens) as Array<[AgentRoleName, string | undefined]>)
-    .filter(([, token]) => !!token)
-    .map(([role, token]) => ({ role, token: token!, llmModel: roleModel(role), enabled: true }));
-
-  const team = buildProjectTeam(config, { projectId, projectSlug, agents });
-  for (const h of team.handlers) router.register(h);
-  return { registered: team.registered, skipped: team.skipped, staleSweep: team.staleSweep };
 }

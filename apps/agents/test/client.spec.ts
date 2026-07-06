@@ -20,7 +20,7 @@ const api = new AxonApi('http://axon-web:3000/api/v1/', 'ad_pk_dev');
 
 describe('AxonApi', () => {
   it('manda el Bearer del rol y parsea JSON (getMe)', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ id: 'ag1', role: 'DEV', enabled: true, tokenBudget: 200000 }));
+    fetchMock.mockResolvedValue(jsonResponse({ id: 'ag1', role: 'DEV', enabled: true }));
     const me = await api.getMe('axon');
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('http://axon-web:3000/api/v1/projects/axon/agents/me');
