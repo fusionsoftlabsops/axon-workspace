@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n/i18n';
 import {
   applyTeamPresetAction,
   setDevExecutorAction,
+  setAgentRuntimeAction,
   verifyAgentsAction,
   type VerifyAgentsResult,
   provisionAgentAction,
@@ -41,6 +42,7 @@ export function AgentsClient({
   initialPreset = null,
   initialRecommendedPreset = null,
   initialDevExecutor = 'KAI',
+  initialAgentRuntime = 'CLOUD',
 }: {
   slug: string;
   canManage: boolean;
@@ -50,6 +52,7 @@ export function AgentsClient({
   initialPreset?: string | null;
   initialRecommendedPreset?: string | null;
   initialDevExecutor?: string;
+  initialAgentRuntime?: string;
 }) {
   const { t } = useI18n();
   const [agents, setAgents] = useState<AgentView[]>(initialAgents);
@@ -61,6 +64,7 @@ export function AgentsClient({
   const [activePreset, setActivePreset] = useState<string | null>(initialPreset);
   const [presetMinted, setPresetMinted] = useState<Array<{ role: string; token: string }>>([]);
   const [devExecutor, setDevExecutor] = useState<string>(initialDevExecutor);
+  const [agentRuntime, setAgentRuntime] = useState<string>(initialAgentRuntime);
   const [verifyResult, setVerifyResult] = useState<VerifyAgentsResult | null>(null);
 
   async function verify() {
@@ -80,6 +84,15 @@ export function AgentsClient({
     setBusy(null);
     if (!res.ok) setError(res.error);
     else setDevExecutor(mode);
+  }
+
+  async function changeRuntime(mode: 'CLOUD' | 'LOCAL') {
+    setBusy(`runtime:${mode}`);
+    setError(null);
+    const res = await setAgentRuntimeAction(slug, mode);
+    setBusy(null);
+    if (!res.ok) setError(res.error);
+    else setAgentRuntime(mode);
   }
 
   const fmtK = (n: number) => `${Math.round(n / 1000)}k`;
@@ -207,6 +220,41 @@ export function AgentsClient({
                 ` · ${t('en vuelo (no tocadas)', 'in flight (untouched)')}: ${verifyResult.skippedRunning.map((n) => `#${n}`).join(', ')}`}
             </p>
           </div>
+        )}
+      </section>
+
+      <section data-testid="agent-runtime">
+        <h3 className={styles.sectionTitle}>{t('Runtime de los agentes', 'Agent runtime')}</h3>
+        <p className={styles.hint}>
+          {t(
+            'Dónde viven los 9 agentes: en la NUBE (worker 24/7) o en tu LOCAL (tu Claude Code, con la skill /axon-runtime — herramientas reales y sin límites de contexto). En LOCAL el worker de nube ignora este proyecto.',
+            'Where the 9 agents live: in the CLOUD (24/7 worker) or LOCAL (your Claude Code, via the /axon-runtime skill — real tools, no context limits). In LOCAL the cloud worker ignores this project.',
+          )}
+        </p>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {([
+            ['CLOUD', '☁️ Nube (24/7)', '☁️ Cloud (24/7)'],
+            ['LOCAL', '💻 Local (tu Claude Code)', '💻 Local (your Claude Code)'],
+          ] as const).map(([mode, es, en]) => (
+            <Button
+              key={mode}
+              size="sm"
+              variant={agentRuntime === mode ? 'primary' : 'secondary'}
+              disabled={!canManage || busy === `runtime:${mode}` || agentRuntime === mode}
+              data-testid={`runtime-${mode}`}
+              onClick={() => void changeRuntime(mode)}
+            >
+              {busy === `runtime:${mode}` ? t('Guardando…', 'Saving…') : t(es, en)}
+            </Button>
+          ))}
+        </div>
+        {agentRuntime === 'LOCAL' && (
+          <p className={styles.hint} style={{ marginTop: '0.4rem' }}>
+            {t(
+              'Corré /axon-runtime en tu Claude Code para que los 9 agentes trabajen este board. Corre solo con tu PC encendida.',
+              'Run /axon-runtime in your Claude Code so the 9 agents work this board. Runs only while your PC is on.',
+            )}
+          </p>
         )}
       </section>
 

@@ -416,6 +416,26 @@ export async function setDevExecutorAction(
   return { ok: true, data: { devExecutor: mode } };
 }
 
+export async function setAgentRuntimeAction(
+  slug: string,
+  runtime: 'CLOUD' | 'LOCAL',
+): Promise<ActionResult<{ agentRuntime: string }>> {
+  if (!['CLOUD', 'LOCAL'].includes(runtime)) return { ok: false, error: 'Runtime inválido' };
+  const ctx = await guard(slug);
+  if (!ctx.ok) return ctx;
+  await prisma.project.update({ where: { id: ctx.projectId }, data: { agentRuntime: runtime } });
+  await audit({
+    actorId: ctx.userId,
+    action: 'agent.update',
+    resourceType: 'project',
+    resourceId: ctx.projectId,
+    projectId: ctx.projectId,
+    payload: { via: 'agent-runtime', runtime },
+  });
+  revalidatePath(`/projects/${slug}/agents`);
+  return { ok: true, data: { agentRuntime: runtime } };
+}
+
 export interface VerifyAgentsResult {
   worker: { reachable: boolean; subscribed: boolean };
   refired: { backlog: number[]; development: number[]; review: number[] };
