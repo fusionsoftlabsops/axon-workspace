@@ -11,7 +11,13 @@ FROM node:22-slim AS base
 WORKDIR /app
 ENV PNPM_HOME=/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+# openssl/ca-certs en el BUILDER: sin el paquete openssl, Prisma no detecta
+# OpenSSL 3 al `generate`/`build` y cae al engine `debian-openssl-1.1.x` (que
+# necesita libssl.so.1.1, ausente) → crash. Con openssl detecta 3.0.x correcto.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
 
 # ---------- Dependencies ----------
 FROM base AS deps
