@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { LoginForm } from './LoginForm';
 import { getServerT } from '@/lib/i18n/server';
+import { isOidcConfigured } from '@/lib/auth/oidc';
 
 export default async function LoginPage({
   searchParams,
@@ -13,7 +14,7 @@ export default async function LoginPage({
       <h1>{t('Iniciar sesión', 'Sign in')}</h1>
       <AwaitedFlash searchParams={searchParams} />
       <Suspense fallback={null}>
-        <LoginForm />
+        <LoginForm ssoEnabled={isOidcConfigured()} />
       </Suspense>
       <p style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: 'var(--color-fg-muted)' }}>
         {t(
