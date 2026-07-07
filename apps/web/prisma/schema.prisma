@@ -129,11 +129,15 @@ model User {
   id                  String  @id @default(cuid())
   email               String  @unique
   name                String
-  passwordHash        String  // argon2id, solo para login (no se reusa como KEK)
-  publicKey           Bytes   // X25519 (32 bytes)
-  encryptedPrivateKey Bytes   // sk_user envuelto con KEK derivado de passphrase
-  encryptedPrivKeyNonce Bytes // nonce del XSalsa20-Poly1305
-  kdfSalt             Bytes   // salt para argon2id (derivación del KEK)
+  // Nullable: los usuarios FEDERADOS (SSO/OIDC) no tienen contraseña local ni
+  // vault E2E hasta que lo inicializan opt-in. passwordHash null ⇒ el login por
+  // Credentials rechaza; publicKey/encryptedPrivateKey/kdfSalt null ⇒ sin vault
+  // (las features de credenciales E2E degradan con gracia). Ver lib/auth/oidc.ts.
+  passwordHash        String? // argon2id, solo para login (no se reusa como KEK)
+  publicKey           Bytes?  // X25519 (32 bytes)
+  encryptedPrivateKey Bytes?  // sk_user envuelto con KEK derivado de passphrase
+  encryptedPrivKeyNonce Bytes? // nonce del XSalsa20-Poly1305
+  kdfSalt             Bytes?  // salt para argon2id (derivación del KEK)
   recoveryHash        String? // SHA-256 (proof) del recovery code normalizado
   encryptedPrivKeyRecovery Bytes? // sk_user envuelto con KEK derivado del recovery code
   recoveryPrivKeyNonce     Bytes? // nonce del XSalsa20-Poly1305 (copia recovery)

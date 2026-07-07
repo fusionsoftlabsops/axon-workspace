@@ -111,6 +111,17 @@ const schema = z.object({
   // canal Redis que consume el worker axon-agents. Opt-in: apagado por defecto,
   // la feature se despliega oscura. See lib/agents/events.ts.
   AGENT_EVENTS_ENABLED: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  // SSO federado por OIDC (IdP = Authentik). Las TRES son opcionales: si falta
+  // alguna, el provider `authentik` NO se agrega y el login queda idéntico al
+  // actual (solo Credentials local). El issuer debe ir SIN barra final salvo la
+  // que trae el slug de la app, p.ej. https://id.fusion-soft-lab.com/application/o/axon/
+  // El callback registrado en el IdP es /api/auth/callback/authentik.
+  AUTH_AUTHENTIK_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  AUTH_AUTHENTIK_SECRET: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+  AUTH_AUTHENTIK_ISSUER: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().url().optional(),
+  ),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });

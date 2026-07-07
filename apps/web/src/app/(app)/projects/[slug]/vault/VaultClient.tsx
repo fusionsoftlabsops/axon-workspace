@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useI18n } from '@/lib/i18n/i18n';
 import { useVaultUnlock } from '@/components/vault/UnlockContext';
 import { UnlockPrompt } from './UnlockPrompt';
+import { InitVaultForm } from './InitVaultForm';
 import { CredentialRow } from './CredentialRow';
 import { NewCredentialForm } from './NewCredentialForm';
 import styles from './vault.module.scss';
@@ -24,10 +25,12 @@ interface Props {
   currentUserId: string;
   isAdmin: boolean;
   canCreate: boolean;
+  /** false para usuarios federados (SSO) que aún no inicializaron su vault. */
+  hasVault?: boolean;
   credentials: CredentialMeta[];
 }
 
-export function VaultClient({ projectSlug, currentUserId, isAdmin, canCreate, credentials }: Props) {
+export function VaultClient({ projectSlug, currentUserId, isAdmin, canCreate, hasVault = true, credentials }: Props) {
   const { t } = useI18n();
   const { vault, lock } = useVaultUnlock();
   const [showNew, setShowNew] = useState(false);
@@ -40,7 +43,9 @@ export function VaultClient({ projectSlug, currentUserId, isAdmin, canCreate, cr
           <p className={styles.subtitle}>
             {vault
               ? t('Vault desbloqueado. Tu private key vive solo en memoria.', 'Vault unlocked. Your private key lives only in memory.')
-              : t('Vault bloqueado. Ingresa tu passphrase para desencriptar.', 'Vault locked. Enter your passphrase to decrypt.')}
+              : hasVault
+                ? t('Vault bloqueado. Ingresa tu passphrase para desencriptar.', 'Vault locked. Enter your passphrase to decrypt.')
+                : t('Aún no tienes vault. Inicialízalo para guardar secretos cifrados.', 'You have no vault yet. Initialize it to store encrypted secrets.')}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -57,7 +62,7 @@ export function VaultClient({ projectSlug, currentUserId, isAdmin, canCreate, cr
         </div>
       </header>
 
-      {!vault && <UnlockPrompt />}
+      {!vault && (hasVault ? <UnlockPrompt /> : <InitVaultForm />)}
 
       {vault && showNew && canCreate && (
         <NewCredentialForm

@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import VaultPage from './page';
 
-const { auth, findProject, findCreds, notFound } = vi.hoisted(() => ({
+const { auth, findProject, findCreds, findUser, notFound } = vi.hoisted(() => ({
   auth: vi.fn(),
   findProject: vi.fn(),
   findCreds: vi.fn(),
+  findUser: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error('NOT_FOUND');
   }),
@@ -17,24 +18,30 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     project: { findUnique: findProject },
     credential: { findMany: findCreds },
+    user: { findUnique: findUser },
   },
 }));
 vi.mock('./VaultClient', () => ({
   VaultClient: (props: {
     isAdmin: boolean;
     canCreate: boolean;
+    hasVault: boolean;
     credentials: unknown[];
   }) => (
     <div data-testid="vault-client">
-      admin:{String(props.isAdmin)} create:{String(props.canCreate)} creds:
-      {props.credentials.length}
+      admin:{String(props.isAdmin)} create:{String(props.canCreate)} vault:
+      {String(props.hasVault)} creds:{props.credentials.length}
     </div>
   ),
 }));
 
 const params = (slug = 'p') => Promise.resolve({ slug });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Por defecto el usuario tiene vault (usuario local); los tests SSO lo pisan.
+  findUser.mockResolvedValue({ publicKey: Buffer.from([1]) });
+});
 
 describe('VaultPage', () => {
   it('returns null when unauthenticated', async () => {
@@ -99,5 +106,14 @@ describe('VaultPage', () => {
     findCreds.mockResolvedValue([]);
     render(await VaultPage({ params: params() }));
     expect(screen.getByTestId('vault-client')).toHaveTextContent('admin:true');
+  });
+
+  it('passes hasVault=false for a federated user without a vault', async () => {
+    auth.mockResolvedValue({ user: { id: 'u1' } });
+    findProject.mockResolvedValue({ id: 'pj', members: [{ role: 'MEMBER' }] });
+    findCreds.mockResolvedValue([]);
+    findUser.mockResolvedValue({ publicKey: null });
+    render(await VaultPage({ params: params() }));
+    expect(screen.getByTestId('vault-client')).toHaveTextContent('vault:false');
   });
 });

@@ -374,11 +374,16 @@ export async function getProjectMemberKeys(
   });
   return {
     ok: true,
-    data: members.map((m) => ({
-      userId: m.user.id,
-      name: m.user.name,
-      email: m.user.email,
-      publicKey: toBase64(new Uint8Array(m.user.publicKey)),
-    })),
+    // Los miembros federados sin vault (publicKey null) se OMITEN: no se les
+    // puede envolver un DEK hasta que inicialicen su vault. Evita generar una
+    // publicKey basura y degrada con gracia el compartir de credenciales.
+    data: members
+      .filter((m) => m.user.publicKey != null)
+      .map((m) => ({
+        userId: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        publicKey: toBase64(new Uint8Array(m.user.publicKey!)),
+      })),
   };
 }

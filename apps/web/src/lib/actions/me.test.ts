@@ -14,6 +14,7 @@ import {
   setGithubLoginAction,
   getSelfKeyMaterial,
   getSelfRecoveryMaterial,
+  getVaultStatus,
 } from './me';
 
 const buf = (n: number) => Buffer.from([n]);
@@ -86,6 +87,17 @@ describe('getSelfKeyMaterial', () => {
     expect(await getSelfKeyMaterial()).toEqual({ ok: false, error: 'Usuario no encontrado' });
   });
 
+  it('degrades gracefully for a federated user without vault (null crypto)', async () => {
+    authMock.mockResolvedValue({ user: { id: 'u1' } });
+    prismaMock.user.findUnique.mockResolvedValue({
+      publicKey: null,
+      encryptedPrivateKey: null,
+      encryptedPrivKeyNonce: null,
+      kdfSalt: null,
+    });
+    expect(await getSelfKeyMaterial()).toEqual({ ok: false, error: 'VAULT_NOT_INITIALIZED' });
+  });
+
   it('returns the base64 key material', async () => {
     authMock.mockResolvedValue({ user: { id: 'u1' } });
     prismaMock.user.findUnique.mockResolvedValue({
@@ -136,5 +148,24 @@ describe('getSelfRecoveryMaterial', () => {
     });
     const res = await getSelfRecoveryMaterial();
     expect(res).toMatchObject({ ok: true, data: { publicKey: 'b64' } });
+  });
+});
+
+describe('getVaultStatus', () => {
+  it('rejects unauthenticated', async () => {
+    authMock.mockResolvedValue(null);
+    expect(await getVaultStatus()).toEqual({ ok: false, error: 'No autenticado' });
+  });
+
+  it('reports hasVault=false for a federated user', async () => {
+    authMock.mockResolvedValue({ user: { id: 'u1' } });
+    prismaMock.user.findUnique.mockResolvedValue({ publicKey: null });
+    expect(await getVaultStatus()).toEqual({ ok: true, hasVault: false });
+  });
+
+  it('reports hasVault=true when a public key is present', async () => {
+    authMock.mockResolvedValue({ user: { id: 'u1' } });
+    prismaMock.user.findUnique.mockResolvedValue({ publicKey: buf(1) });
+    expect(await getVaultStatus()).toEqual({ ok: true, hasVault: true });
   });
 });
