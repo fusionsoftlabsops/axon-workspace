@@ -60,12 +60,6 @@ export const setRecoveryCodeSchema = z.object({
 });
 export type SetRecoveryCodeInput = z.infer<typeof setRecoveryCodeSchema>;
 
-// Master-user creates an invitation for an email (registration is invite-only).
-export const createInvitationSchema = z.object({
-  email: z.string().email(),
-});
-export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
-
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),

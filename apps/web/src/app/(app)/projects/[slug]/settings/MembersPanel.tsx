@@ -8,7 +8,6 @@ import {
   removeMemberAction,
   updateMemberRoleAction,
   setMemberSeniorityAction,
-  resendInvitationAction,
   transferOwnershipAction,
 } from '@/lib/actions/projects';
 import { useI18n } from '@/lib/i18n/i18n';
@@ -23,14 +22,6 @@ interface MemberView {
   joinedAt: string;
 }
 
-interface PendingInvite {
-  id: string;
-  email: string;
-  role: MemberRole | null;
-  seniority: Seniority | null;
-  expiresAt: string;
-}
-
 const ROLES: MemberRole[] = ['ADMIN', 'MEMBER', 'VIEWER'];
 const SENIORITIES: { value: Seniority; label: string }[] = [
   { value: 'JUNIOR', label: 'Junior' },
@@ -43,21 +34,17 @@ export function MembersPanel({
   currentUserId,
   ownerId,
   members,
-  pendingInvites = [],
 }: {
   projectSlug: string;
   currentUserId: string;
   ownerId: string;
   members: MemberView[];
-  pendingInvites?: PendingInvite[];
 }) {
   const { t } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [inviteLink, setInviteLink] = useState<{ link: string; email: string; emailSent: boolean } | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<MemberRole>('MEMBER');
@@ -70,8 +57,6 @@ export function MembersPanel({
     e.preventDefault();
     setError(null);
     setNotice(null);
-    setInviteLink(null);
-    setCopied(false);
     startTransition(async () => {
       const r = await inviteMemberAction(projectSlug, {
         email,
@@ -82,48 +67,13 @@ export function MembersPanel({
         setError(r.error);
         return;
       }
-      const invitedEmail = email;
       setEmail('');
       setSeniority('');
-      if (r.data?.pending && r.data.token) {
-        setInviteLink({
-          link: `${window.location.origin}/signup?token=${r.data.token}`,
-          email: r.data.email ?? invitedEmail,
-          emailSent: !!r.data.emailSent,
-        });
-      } else if (r.data && !r.data.pending) {
-        // Existing account — added directly.
-        setNotice(
-          r.data.emailSent
-            ? t('Agregado y notificado por email.', 'Added and notified by email.')
-            : t('Agregado al proyecto.', 'Added to the project.'),
-        );
-      }
-      router.refresh();
-    });
-  }
-
-  function resend(invitationId: string) {
-    setError(null);
-    setNotice(null);
-    startTransition(async () => {
-      const r = await resendInvitationAction(projectSlug, invitationId);
-      if (!r.ok) {
-        setError(r.error);
-        return;
-      }
       setNotice(
         r.data?.emailSent
-          ? t('Invitación reenviada por email.', 'Invitation resent by email.')
-          : t('No se pudo enviar el email; copia el enlace nuevo.', 'Could not send email; copy the new link.'),
+          ? t('Agregado y notificado por email.', 'Added and notified by email.')
+          : t('Agregado al proyecto.', 'Added to the project.'),
       );
-      if (r.data && !r.data.emailSent) {
-        setInviteLink({
-          link: `${window.location.origin}/signup?token=${r.data.token}`,
-          email: r.data.email,
-          emailSent: false,
-        });
-      }
       router.refresh();
     });
   }
@@ -285,98 +235,6 @@ export function MembersPanel({
         >
           {error}
         </p>
-      )}
-
-      {inviteLink && (
-        <div
-          style={{
-            padding: '0.75rem 1rem',
-            background: 'rgba(99,102,241,0.08)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '8px',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
-            {t(
-              `Invitación creada para ${inviteLink.email}. Aún no tiene cuenta: al registrarse con este enlace se unirá al proyecto.`,
-              `Invitation created for ${inviteLink.email}. They don't have an account yet — signing up with this link joins them to the project.`,
-            )}
-            {inviteLink.emailSent
-              ? ' ' + t('Le enviamos el enlace por email.', 'We emailed them the link.')
-              : ' ' + t('Comparte este enlace:', 'Share this link:')}
-          </p>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <input
-              readOnly
-              value={inviteLink.link}
-              onFocus={(e) => e.currentTarget.select()}
-              style={{
-                flex: 1,
-                padding: '0.45rem 0.6rem',
-                border: '1px solid var(--color-border)',
-                borderRadius: '4px',
-                background: 'var(--color-bg)',
-                color: 'var(--color-fg)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '0.8rem',
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard?.writeText(inviteLink.link).then(() => setCopied(true));
-              }}
-              style={{
-                padding: '0.45rem 0.8rem',
-                border: '1px solid var(--color-border)',
-                borderRadius: '4px',
-                background: 'transparent',
-                color: 'var(--color-fg)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {copied ? t('¡Copiado!', 'Copied!') : t('Copiar', 'Copy')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {pendingInvites.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.5rem' }}>
-            {t('Invitaciones pendientes', 'Pending invitations')}
-          </h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              {pendingInvites.map((inv) => (
-                <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                  <td style={{ padding: '0.5rem' }}>{inv.email}</td>
-                  <td style={{ padding: '0.5rem', color: 'var(--color-fg-muted)' }}>
-                    {inv.role ?? '—'}
-                    {inv.seniority ? ` · ${inv.seniority}` : ''}
-                  </td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>
-                    <button
-                      type="button"
-                      onClick={() => resend(inv.id)}
-                      disabled={pending}
-                      style={{
-                        padding: '0.3rem 0.75rem',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '4px',
-                        background: 'transparent',
-                        color: 'var(--color-fg)',
-                      }}
-                    >
-                      {t('Reenviar', 'Resend')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>

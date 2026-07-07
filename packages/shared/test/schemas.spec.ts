@@ -3,7 +3,6 @@ import {
   signupSchema,
   resetPassphraseSchema,
   setRecoveryCodeSchema,
-  createInvitationSchema,
   loginSchema,
   createProjectSchema,
   memberRoleSchema,
@@ -114,15 +113,6 @@ describe('setRecoveryCodeSchema', () => {
   });
   it('rejects empty fields', () => {
     expect(setRecoveryCodeSchema.safeParse({ ...valid, recoveryHash: '' }).success).toBe(false);
-  });
-});
-
-describe('createInvitationSchema', () => {
-  it('accepts a valid email', () => {
-    expect(createInvitationSchema.safeParse({ email: 'a@b.com' }).success).toBe(true);
-  });
-  it('rejects an invalid email', () => {
-    expect(createInvitationSchema.safeParse({ email: 'nope' }).success).toBe(false);
   });
 });
 

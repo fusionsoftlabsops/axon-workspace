@@ -9,8 +9,6 @@ import { audit } from '@/lib/audit';
 import { assertProjectMember } from '@/lib/auth/membership';
 import { ensureMcpServiceMembership } from '@/lib/mcp-service';
 import { ensureProjectFolder, isStorageConfigured } from '@/lib/storage';
-import { randomBytes } from 'node:crypto';
-import { hashInviteToken } from '@/lib/invite-token';
 import { env } from '@/lib/env';
 import { sendMail } from '@/lib/mailer';
 import {
@@ -124,11 +122,19 @@ export async function createProjectAction(
   return { ok: true, data: { slug: data.slug } };
 }
 
-/** Invite an existing user (by email) to a project with a specific role. */
+/**
+ * Add an EXISTING user (by email) to a project with a specific role.
+ *
+ * El onboarding es SOLO por SSO (Authentik): ya no generamos enlaces de registro
+ * `/signup`. La persona debe iniciar sesión al menos una vez por SSO para tener
+ * cuenta; recién entonces puede agregarse a un proyecto. El auto-alta de nuevos
+ * usuarios se resuelve por el mapeo de grupos de Authentik → membresías (ver
+ * lib/auth/oidc.ts::mapGroupsToMemberships), que reemplaza a las invitaciones.
+ */
 export async function inviteMemberAction(
   projectSlug: string,
   input: InviteMemberInput,
-): Promise<ActionResult<{ pending: boolean; token?: string; email?: string; emailSent?: boolean }>> {
+): Promise<ActionResult<{ email: string; emailSent: boolean }>> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: 'No autenticado' };
 
@@ -154,36 +160,14 @@ export async function inviteMemberAction(
   const seniority = parsed.data.seniority ?? null;
   const invitee = await prisma.user.findUnique({ where: { email } });
 
-  // Not registered yet → create a project-scoped registration invite. On signup
-  // with the link, the new account auto-joins this project with the chosen role.
+  // Sin cuenta todavía: no hay signup propio. Que inicie sesión una vez por SSO
+  // (o que un grupo de Authentik lo auto-una) y luego se lo puede agregar.
   if (!invitee) {
-    await prisma.invitation.deleteMany({ where: { email, acceptedAt: null, projectId: project.id } });
-    const token = randomBytes(24).toString('base64url');
-    const expiresAt = new Date(Date.now() + 7 * 86_400_000);
-    await prisma.invitation.create({
-      data: {
-        email,
-        tokenHash: hashInviteToken(token),
-        invitedById: session.user.id,
-        expiresAt,
-        projectId: project.id,
-        projectRole: parsed.data.role,
-        seniority,
-      },
-    });
-
-    const emailSent = await sendProjectInviteEmail(email, project.name, token);
-
-    await audit({
-      actorId: session.user.id,
-      action: 'member.invite',
-      resourceType: 'project',
-      resourceId: project.id,
-      projectId: project.id,
-      payload: { email, role: parsed.data.role, seniority, emailSent, pending: true },
-    });
-    revalidatePath(`/projects/${projectSlug}/settings`);
-    return { ok: true, data: { pending: true, token, email, emailSent } };
+    return {
+      ok: false,
+      error:
+        'Esa persona todavía no tiene cuenta. Pídele que inicie sesión una vez por SSO y luego agrégala.',
+    };
   }
 
   try {
@@ -202,9 +186,7 @@ export async function inviteMemberAction(
     throw err;
   }
 
-  // Existing accounts are added directly (no signup needed) — but they still
-  // deserve a heads-up. Previously this path sent NO email, so already-registered
-  // collaborators were added silently with no notification.
+  // Heads-up al colaborador de que fue agregado al proyecto (best-effort).
   const emailSent = await sendProjectAddedEmail(email, project.name, projectSlug);
 
   await audit({
@@ -217,26 +199,7 @@ export async function inviteMemberAction(
   });
 
   revalidatePath(`/projects/${projectSlug}/settings`);
-  return { ok: true, data: { pending: false, email, emailSent } };
-}
-
-/** Email a registration invite link for a project (new, unregistered email). */
-async function sendProjectInviteEmail(
-  email: string,
-  projectName: string,
-  token: string,
-): Promise<boolean> {
-  const base = env().AUTH_URL?.replace(/\/+$/, '');
-  if (!base) return false;
-  const link = `${base}/signup?token=${token}`;
-  return sendMail({
-    to: email,
-    subject: `Invitación a ${projectName} en Axon`,
-    html:
-      `<p>Te invitaron a colaborar en <b>${projectName}</b> en Axon.</p>` +
-      `<p>Creá tu cuenta con este enlace (válido 7 días, un solo uso): <a href="${link}">${link}</a></p>`,
-    text: `Te invitaron a colaborar en ${projectName} en Axon. Creá tu cuenta (válido 7 días): ${link}`,
-  });
+  return { ok: true, data: { email, emailSent } };
 }
 
 /** Notify an already-registered user that they were added to a project. */
@@ -256,54 +219,6 @@ async function sendProjectAddedEmail(
       `<p>Entrá al proyecto: <a href="${link}">${link}</a></p>`,
     text: `Te agregaron como colaborador en ${projectName} en Axon. Entrá: ${link}`,
   });
-}
-
-/**
- * Resend a pending project invitation email. Rotates the token (so the previous
- * link is invalidated) and renews the 7-day expiry. OWNER/ADMIN only.
- */
-export async function resendInvitationAction(
-  projectSlug: string,
-  invitationId: string,
-): Promise<ActionResult<{ emailSent: boolean; token: string; email: string }>> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: 'No autenticado' };
-
-  const project = await prisma.project.findUnique({
-    where: { slug: projectSlug },
-    select: { id: true, name: true, members: { where: { userId: session.user.id }, select: { role: true } } },
-  });
-  if (!project) return { ok: false, error: 'Proyecto no encontrado' };
-  const myRole = project.members[0]?.role;
-  if (myRole !== 'OWNER' && myRole !== 'ADMIN') {
-    return { ok: false, error: 'Sin permisos para reenviar invitaciones' };
-  }
-
-  const invite = await prisma.invitation.findFirst({
-    where: { id: invitationId, projectId: project.id, acceptedAt: null },
-    select: { id: true, email: true },
-  });
-  if (!invite) return { ok: false, error: 'Invitación no encontrada o ya aceptada' };
-
-  const token = randomBytes(24).toString('base64url');
-  await prisma.invitation.update({
-    where: { id: invite.id },
-    data: { tokenHash: hashInviteToken(token), expiresAt: new Date(Date.now() + 7 * 86_400_000) },
-  });
-
-  const emailSent = await sendProjectInviteEmail(invite.email, project.name, token);
-
-  await audit({
-    actorId: session.user.id,
-    action: 'member.invite_resend',
-    resourceType: 'project',
-    resourceId: project.id,
-    projectId: project.id,
-    payload: { email: invite.email, emailSent },
-  });
-
-  revalidatePath(`/projects/${projectSlug}/settings`);
-  return { ok: true, data: { emailSent, token, email: invite.email } };
 }
 
 /**
