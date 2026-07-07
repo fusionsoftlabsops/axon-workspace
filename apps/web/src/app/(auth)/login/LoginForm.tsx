@@ -109,7 +109,12 @@ export function LoginForm({ ssoEnabled = false }: { ssoEnabled?: boolean }) {
         <button
           type="submit"
           className={styles.submit}
-          style={{ background: 'transparent', border: '1px solid var(--color-border, #4b5563)' }}
+          style={{
+            background: 'transparent',
+            color: 'var(--color-fg)',
+            border: '1px solid var(--color-border)',
+            width: '100%',
+          }}
         >
           {t('Iniciar sesión con SSO', 'Sign in with SSO')}
         </button>
