@@ -42,6 +42,7 @@ export type AuditAction =
   | 'auth.totp_disable'
   | 'auth.password_reset_request'
   | 'auth.password_reset'
+  | 'vault.initialized'
   | 'vault.passphrase_reset'
   | 'vault.recovery_code_regenerated'
   | 'invitation.create'

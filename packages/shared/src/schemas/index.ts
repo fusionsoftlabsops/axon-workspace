@@ -22,6 +22,23 @@ export const signupSchema = z.object({
 });
 export type SignupInput = z.infer<typeof signupSchema>;
 
+// Initialize the E2E vault for a user that doesn't have one yet (typically a
+// federated/SSO user). Same zero-knowledge material as signup, minus the
+// account fields (token/email/name/password): the client generates the keypair,
+// derives the KEK from the passphrase and seals the private key; the server
+// never sees the passphrase. See lib/actions/vault.ts::initVaultAction.
+export const initVaultSchema = z.object({
+  publicKey: z.string().min(1), // base64url
+  encryptedPrivateKey: z.string().min(1), // base64url
+  encryptedPrivKeyNonce: z.string().min(1), // base64url
+  kdfSalt: z.string().min(1), // base64url
+  recoveryHash: z.string().min(1), // sha256 hex proof
+  encryptedPrivKeyRecovery: z.string().min(1), // base64url
+  recoveryPrivKeyNonce: z.string().min(1), // base64url
+  recoveryKdfSalt: z.string().min(1), // base64url
+});
+export type InitVaultInput = z.infer<typeof initVaultSchema>;
+
 // Reset the vault passphrase using the recovery code. The client decrypts the
 // private key with the code, re-seals it under a NEW passphrase, and sends the
 // new passphrase blob + the sha256 proof of the code (verified server-side).

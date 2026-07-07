@@ -59,6 +59,17 @@ export async function getSelfKeyMaterial(): Promise<
   });
   if (!user) return { ok: false, error: 'Usuario no encontrado' };
 
+  // Usuario federado sin vault: degradar con gracia (no crashear). El cliente
+  // muestra el flujo para inicializar el vault (ver initVaultAction).
+  if (
+    !user.publicKey ||
+    !user.encryptedPrivateKey ||
+    !user.encryptedPrivKeyNonce ||
+    !user.kdfSalt
+  ) {
+    return { ok: false, error: 'VAULT_NOT_INITIALIZED' };
+  }
+
   return {
     ok: true,
     data: {
@@ -68,6 +79,21 @@ export async function getSelfKeyMaterial(): Promise<
       kdfSalt: toBase64(new Uint8Array(user.kdfSalt)),
     },
   };
+}
+
+/**
+ * ¿El usuario actual tiene el vault E2E inicializado? Los usuarios federados
+ * (SSO) arrancan sin vault (publicKey null) y pueden inicializarlo opt-in.
+ */
+export async function getVaultStatus(): Promise<
+  { ok: true; hasVault: boolean } | { ok: false; error: string }
+> {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) return { ok: false, error: 'No autenticado' };
+  const user = await prisma.user.findUnique({ where: { id }, select: { publicKey: true } });
+  if (!user) return { ok: false, error: 'Usuario no encontrado' };
+  return { ok: true, hasVault: Boolean(user.publicKey) };
 }
 
 export interface SelfRecoveryMaterial {
@@ -99,7 +125,12 @@ export async function getSelfRecoveryMaterial(): Promise<
     },
   });
   if (!user) return { ok: false, error: 'Usuario no encontrado' };
-  if (!user.encryptedPrivKeyRecovery || !user.recoveryPrivKeyNonce || !user.recoveryKdfSalt) {
+  if (
+    !user.publicKey ||
+    !user.encryptedPrivKeyRecovery ||
+    !user.recoveryPrivKeyNonce ||
+    !user.recoveryKdfSalt
+  ) {
     return { ok: false, error: 'Esta cuenta no tiene código de recuperación configurado' };
   }
 

@@ -12,6 +12,7 @@ const { useVaultUnlock, lock } = vi.hoisted(() => {
 });
 vi.mock('@/components/vault/UnlockContext', () => ({ useVaultUnlock }));
 vi.mock('./UnlockPrompt', () => ({ UnlockPrompt: () => <div data-testid="unlock-prompt" /> }));
+vi.mock('./InitVaultForm', () => ({ InitVaultForm: () => <div data-testid="init-vault" /> }));
 vi.mock('./CredentialRow', () => ({
   CredentialRow: ({ credential }: { credential: CredentialMeta }) => (
     <li data-testid="cred-row">{credential.name}</li>
@@ -81,6 +82,17 @@ describe('VaultClient', () => {
     // onCreated closes the form
     await user.click(screen.getByRole('button', { name: 'done' }));
     expect(screen.queryByTestId('new-form')).not.toBeInTheDocument();
+  });
+
+  it('federated without vault: shows InitVaultForm instead of UnlockPrompt', () => {
+    render(
+      <VaultClient projectSlug="p" currentUserId="u1" isAdmin canCreate hasVault={false} credentials={[]} />,
+    );
+    expect(screen.getByTestId('init-vault')).toBeInTheDocument();
+    expect(screen.queryByTestId('unlock-prompt')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('You have no vault yet. Initialize it to store encrypted secrets.'),
+    ).toBeInTheDocument();
   });
 
   it('unlocked but cannot create: no new button', () => {

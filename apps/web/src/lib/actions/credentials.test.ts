@@ -236,4 +236,13 @@ describe('getProjectMemberKeys', () => {
     const res = await getProjectMemberKeys('slug');
     expect(res).toEqual({ ok: true, data: [{ userId: 'u2', name: 'N', email: 'e', publicKey: 'b64' }] });
   });
+
+  it('omits federated members without a vault (null publicKey)', async () => {
+    prismaMock.projectMember.findMany.mockResolvedValue([
+      { user: { id: 'u2', name: 'N', email: 'e', publicKey: Buffer.from([1]) } },
+      { user: { id: 'u3', name: 'Fed', email: 'f', publicKey: null } },
+    ]);
+    const res = await getProjectMemberKeys('slug');
+    expect(res).toEqual({ ok: true, data: [{ userId: 'u2', name: 'N', email: 'e', publicKey: 'b64' }] });
+  });
 });

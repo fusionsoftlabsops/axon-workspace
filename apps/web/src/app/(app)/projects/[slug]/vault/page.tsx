@@ -25,6 +25,11 @@ export default async function VaultPage({
   const role = project.members[0]!.role;
   const isAdmin = role === 'OWNER' || role === 'ADMIN';
 
+  // Los usuarios federados (SSO) arrancan sin vault: la UI ofrece inicializarlo
+  // en vez de pedir una passphrase que no existe.
+  const me = await prisma.user.findUnique({ where: { id: userId }, select: { publicKey: true } });
+  const hasVault = Boolean(me?.publicKey);
+
   // List ONLY the credentials this user has access to.
   const credentials = await prisma.credential.findMany({
     where: {
@@ -51,6 +56,7 @@ export default async function VaultPage({
       projectSlug={slug}
       currentUserId={userId}
       isAdmin={isAdmin}
+      hasVault={hasVault}
       canCreate={role !== 'VIEWER'}
       credentials={credentials.map((c) => ({
         id: c.id,
