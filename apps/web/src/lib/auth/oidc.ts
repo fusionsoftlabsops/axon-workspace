@@ -115,7 +115,7 @@ export interface FederatedProfile {
  * Enlaza por email o aprovisiona JIT un usuario federado, y sincroniza sus
  * membresías desde `groups`. Devuelve la identidad de DB (id + isMasterUser)
  * para propagarla al JWT. Zero-knowledge intacto: NO se crea material de vault
- * (passwordHash/publicKey/… quedan null hasta que el usuario lo inicialice).
+ * (publicKey/… quedan null hasta que el usuario lo inicialice).
  */
 export async function upsertFederatedUser(
   profile: FederatedProfile,
@@ -134,8 +134,8 @@ export async function upsertFederatedUser(
       data: {
         email,
         name: profile.name?.trim() || email,
-        // passwordHash / publicKey / encryptedPrivateKey / encryptedPrivKeyNonce /
-        // kdfSalt quedan null: es un usuario federado sin login local ni vault.
+        // publicKey / encryptedPrivateKey / encryptedPrivKeyNonce / kdfSalt quedan
+        // null: es un usuario federado sin vault E2E inicializado.
       },
       select: { id: true, isMasterUser: true },
     });

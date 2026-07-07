@@ -1,18 +1,15 @@
 /**
- * Full Auth.js config including the Credentials provider. This module imports
- * Prisma and password/TOTP verification, so it must run on the Node runtime
- * (not the edge). The middleware uses `auth.config.ts` instead.
+ * Full Auth.js config. El único método de login es SSO federado por OIDC
+ * (provider `authentik`). Este módulo importa Prisma para el aprovisionamiento
+ * JIT del usuario federado, así que corre en el runtime Node (no edge). El
+ * middleware usa `auth.config.ts` en su lugar.
  *
- * Además del login local (Credentials), agrega SSO federado por OIDC (provider
- * `authentik`) SOLO cuando están las env `AUTH_AUTHENTIK_*`. Sin ellas el
- * comportamiento es idéntico al anterior. El enlace por email + aprovisionamiento
- * JIT + mapeo de grupos vive en `lib/auth/oidc.ts` y se dispara en `signIn`.
+ * El enlace por email + aprovisionamiento JIT + mapeo de grupos vive en
+ * `lib/auth/oidc.ts` y se dispara en el callback `signIn`.
  */
 import NextAuth, { type DefaultSession } from 'next-auth';
 import type { Provider } from 'next-auth/providers';
-import Credentials from 'next-auth/providers/credentials';
 import { authConfig } from '@/auth.config';
-import { authorizeCredentials } from '@/lib/auth/credentials-authorize';
 import { authentikProvider, extractGroups, upsertFederatedUser } from '@/lib/auth/oidc';
 
 declare module 'next-auth' {
@@ -28,20 +25,10 @@ declare module 'next-auth' {
   }
 }
 
-// Login local (password + TOTP): SIEMPRE presente.
-const providers: Provider[] = [
-  Credentials({
-    credentials: {
-      email: { label: 'Email', type: 'email' },
-      password: { label: 'Password', type: 'password' },
-      totp: { label: 'TOTP', type: 'text' },
-    },
-    authorize: (raw) => authorizeCredentials(raw),
-  }),
-];
-
-// SSO federado (OIDC / Authentik): opt-in por env. Si faltan las credenciales,
-// `authentikProvider()` devuelve null y el provider no se agrega.
+// SSO federado (OIDC / Authentik): único método de login. Opt-in por env; si
+// faltan las credenciales `authentikProvider()` devuelve null y no se agrega
+// ningún provider (no hay login local de reemplazo).
+const providers: Provider[] = [];
 const oidc = authentikProvider();
 if (oidc) providers.push(oidc);
 

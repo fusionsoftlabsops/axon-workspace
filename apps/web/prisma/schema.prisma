@@ -129,11 +129,10 @@ model User {
   id                  String  @id @default(cuid())
   email               String  @unique
   name                String
-  // Nullable: los usuarios FEDERADOS (SSO/OIDC) no tienen contraseña local ni
-  // vault E2E hasta que lo inicializan opt-in. passwordHash null ⇒ el login por
-  // Credentials rechaza; publicKey/encryptedPrivateKey/kdfSalt null ⇒ sin vault
-  // (las features de credenciales E2E degradan con gracia). Ver lib/auth/oidc.ts.
-  passwordHash        String? // argon2id, solo para login (no se reusa como KEK)
+  // El login es SOLO por SSO (OIDC / Authentik): no hay contraseña local ni 2FA
+  // propio (los gestiona el IdP). El vault E2E es independiente del login y opt-in:
+  // publicKey/encryptedPrivateKey/kdfSalt null ⇒ sin vault (las features de
+  // credenciales E2E degradan con gracia). Ver lib/auth/oidc.ts.
   publicKey           Bytes?  // X25519 (32 bytes)
   encryptedPrivateKey Bytes?  // sk_user envuelto con KEK derivado de passphrase
   encryptedPrivKeyNonce Bytes? // nonce del XSalsa20-Poly1305
@@ -142,8 +141,6 @@ model User {
   encryptedPrivKeyRecovery Bytes? // sk_user envuelto con KEK derivado del recovery code
   recoveryPrivKeyNonce     Bytes? // nonce del XSalsa20-Poly1305 (copia recovery)
   recoveryKdfSalt          Bytes? // salt argon2id para la copia recovery
-  totpSecretEncrypted Bytes?  // TOTP secret envuelto con KEK
-  totpNonce           Bytes?
   isMasterUser        Boolean @default(false)
   githubLogin         String? // handle de GitHub (para verificar acceso a repos)
   createdAt           DateTime @default(now())
@@ -170,7 +167,6 @@ model User {
   uploadedFiles    ProjectFile[]    @relation("FileUploader")
   authoredPlans    ProjectPlan[]    @relation("PlanAuthor")
   invitesSent      Invitation[]     @relation("InvitedBy")
-  passwordResets   PasswordResetToken[]
   agentIdentities  Agent[]
 
   @@index([email])
@@ -199,22 +195,6 @@ model Invitation {
   invitedBy   User @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([email])
-}
-
-// Login-password reset (separate from the E2E vault: this only restores server
-// authentication; the vault stays protected by its own passphrase / recovery
-// code). The recipient presents the token (only its sha256 is stored), one use.
-model PasswordResetToken {
-  id        String    @id @default(cuid())
-  userId    String
-  tokenHash String    @unique // sha256 hex of the plaintext token
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
 }
 
 // Auth.js v5 session storage (when using DB strategy).
