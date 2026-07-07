@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { loginAction } from '@/lib/actions/auth';
+import { loginAction, ssoLoginAction } from '@/lib/actions/auth';
 import { PasswordInput } from '../signup/PasswordInput';
 import styles from '../signup/SignupForm.module.scss';
 import { useI18n } from '@/lib/i18n/i18n';
 
-export function LoginForm() {
+export function LoginForm({ ssoEnabled = false }: { ssoEnabled?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/projects';
@@ -42,6 +42,7 @@ export function LoginForm() {
   }
 
   return (
+    <>
     <form className={styles.form} onSubmit={submit}>
       <label>
         <span>Email</span>
@@ -102,5 +103,18 @@ export function LoginForm() {
         </p>
       )}
     </form>
+
+    {ssoEnabled && !needsTotp && (
+      <form action={ssoLoginAction} style={{ marginTop: '1rem' }}>
+        <button
+          type="submit"
+          className={styles.submit}
+          style={{ background: 'transparent', border: '1px solid var(--color-border, #4b5563)' }}
+        >
+          {t('Iniciar sesión con SSO', 'Sign in with SSO')}
+        </button>
+      </form>
+    )}
+    </>
   );
 }
