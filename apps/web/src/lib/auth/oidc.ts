@@ -14,7 +14,6 @@
  */
 import Authentik from 'next-auth/providers/authentik';
 import { prisma } from '@/lib/db';
-import { env } from '@/lib/env';
 
 /** Config de provider que devuelve el factory de Authentik. */
 type AuthentikConfig = ReturnType<typeof Authentik>;
@@ -42,19 +41,29 @@ export function buildAuthentikProvider(cfg: OidcConfig): AuthentikConfig | null 
   });
 }
 
-/** ¿Está configurado el SSO OIDC? (las tres env presentes). */
+/**
+ * ¿Está configurado el SSO OIDC? (las tres env presentes).
+ *
+ * Lee `process.env` DIRECTO (no el `env()` validado) a propósito: esto se evalúa
+ * a nivel de módulo al armar la lista de providers de NextAuth, incluido durante
+ * `next build` (page-data collection), donde DATABASE_URL/AUTH_SECRET no existen
+ * y `env()` tiraría. Solo necesitamos las tres AUTH_AUTHENTIK_*, sin validar el
+ * schema completo.
+ */
 export function isOidcConfigured(): boolean {
-  const e = env();
-  return Boolean(e.AUTH_AUTHENTIK_ID && e.AUTH_AUTHENTIK_SECRET && e.AUTH_AUTHENTIK_ISSUER);
+  return Boolean(
+    process.env.AUTH_AUTHENTIK_ID &&
+      process.env.AUTH_AUTHENTIK_SECRET &&
+      process.env.AUTH_AUTHENTIK_ISSUER,
+  );
 }
 
 /** Provider Authentik a partir de las env, o null si falta configuración. */
 export function authentikProvider(): AuthentikConfig | null {
-  const e = env();
   return buildAuthentikProvider({
-    id: e.AUTH_AUTHENTIK_ID,
-    secret: e.AUTH_AUTHENTIK_SECRET,
-    issuer: e.AUTH_AUTHENTIK_ISSUER,
+    id: process.env.AUTH_AUTHENTIK_ID,
+    secret: process.env.AUTH_AUTHENTIK_SECRET,
+    issuer: process.env.AUTH_AUTHENTIK_ISSUER,
   });
 }
 
