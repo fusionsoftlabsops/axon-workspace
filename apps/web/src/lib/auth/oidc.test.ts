@@ -1,16 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { prismaMock, envMock } = vi.hoisted(() => ({
+const { prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findUnique: vi.fn(), create: vi.fn() },
     project: { findMany: vi.fn() },
     projectMember: { createMany: vi.fn() },
   },
-  envMock: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({ prisma: prismaMock }));
-vi.mock('@/lib/env', () => ({ env: envMock }));
 
 import {
   buildAuthentikProvider,
@@ -42,18 +40,23 @@ describe('buildAuthentikProvider', () => {
 });
 
 describe('isOidcConfigured / authentikProvider (env-gated)', () => {
+  const OLD_ENV = { ...process.env };
+  afterEach(() => {
+    process.env = { ...OLD_ENV };
+  });
+
   it('is disabled when env is absent', () => {
-    envMock.mockReturnValue({});
+    delete process.env.AUTH_AUTHENTIK_ID;
+    delete process.env.AUTH_AUTHENTIK_SECRET;
+    delete process.env.AUTH_AUTHENTIK_ISSUER;
     expect(isOidcConfigured()).toBe(false);
     expect(authentikProvider()).toBeNull();
   });
 
   it('is enabled only with all three env vars', () => {
-    envMock.mockReturnValue({
-      AUTH_AUTHENTIK_ID: 'a',
-      AUTH_AUTHENTIK_SECRET: 'b',
-      AUTH_AUTHENTIK_ISSUER: 'https://id/application/o/axon/',
-    });
+    process.env.AUTH_AUTHENTIK_ID = 'a';
+    process.env.AUTH_AUTHENTIK_SECRET = 'b';
+    process.env.AUTH_AUTHENTIK_ISSUER = 'https://id/application/o/axon/';
     expect(isOidcConfigured()).toBe(true);
     expect(authentikProvider()!.id).toBe('authentik');
   });
