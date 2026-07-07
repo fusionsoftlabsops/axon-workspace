@@ -39,16 +39,9 @@ export default async function HomePage() {
 
         <div className={styles.actions}>
           <Link href="/login" className={styles.primary}>
-            {t('Iniciar sesión', 'Sign in')}
-          </Link>
-          <Link href="/signup" className={styles.secondary}>
-            {t('Crear cuenta', 'Create account')}
+            {t('Iniciar sesión con SSO', 'Sign in with SSO')}
           </Link>
         </div>
-
-        <p className={styles.recover}>
-          <Link href="/forgot-password">{t('¿Olvidaste tu contraseña?', 'Forgot your password?')}</Link>
-        </p>
 
         <div className={styles.pillars}>
           <article className={styles.pillar} style={{ '--index': 0 } as React.CSSProperties}>

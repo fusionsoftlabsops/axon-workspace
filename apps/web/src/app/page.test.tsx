@@ -14,9 +14,9 @@ describe('HomePage', () => {
   it('renders the hero, CTAs and the three pillars', async () => {
     render(await HomePage());
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
-    expect(screen.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/signup');
-    expect(screen.getByRole('link', { name: /Forgot your password/i })).toHaveAttribute('href', '/forgot-password');
+    expect(screen.getByRole('link', { name: 'Sign in with SSO' })).toHaveAttribute('href', '/login');
+    expect(screen.queryByRole('link', { name: 'Create account' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Forgot your password/i })).not.toBeInTheDocument();
     expect(screen.getByText('Kanban tasks')).toBeInTheDocument();
     expect(screen.getByText('Zero-knowledge vault')).toBeInTheDocument();
     expect(screen.getByText('Brain + MCP')).toBeInTheDocument();

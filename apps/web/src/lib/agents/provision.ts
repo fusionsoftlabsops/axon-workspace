@@ -55,7 +55,6 @@ export async function ensureAgentUser(tx: Tx, role: AgentRole): Promise<{ id: st
     create: {
       email: agentEmail(role),
       name: AGENT_DISPLAY_NAMES[role],
-      passwordHash: '$argon2id$disabled$agent-service-account-no-login',
       publicKey: DUMMY_PUBKEY,
       encryptedPrivateKey: Buffer.from(`agent-${role.toLowerCase()}-no-vault-access`),
       encryptedPrivKeyNonce: DUMMY_NONCE,

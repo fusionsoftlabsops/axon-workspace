@@ -44,11 +44,12 @@ describe('agentEmail / ensureAgentUser', () => {
     expect(agentEmail('SM')).toBe('agent-sm@agents.axon.local');
   });
 
-  it('upserts the service user with disabled login and dummy key material', async () => {
+  it('upserts the service user with dummy key material (sin login)', async () => {
     await ensureAgentUser(txMock as never, 'QA');
     const arg = txMock.user.upsert.mock.calls[0]![0];
     expect(arg.where).toEqual({ email: 'agent-qa@agents.axon.local' });
-    expect(arg.create.passwordHash).toContain('disabled');
+    expect(arg.create.passwordHash).toBeUndefined();
+    expect(arg.create.publicKey).toBeDefined();
     expect(arg.update).toEqual({});
   });
 });
