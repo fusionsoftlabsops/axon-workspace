@@ -35,20 +35,13 @@ export default async function ProjectSettingsPage({
     notFound();
   }
 
-  // Pending project invitations (unregistered invitees that haven't signed up yet).
-  const pendingInvites = await prisma.invitation.findMany({
-    where: { projectId: project.id, acceptedAt: null },
-    select: { id: true, email: true, projectRole: true, seniority: true, expiresAt: true, createdAt: true },
-    orderBy: { createdAt: 'desc' },
-  });
-
   return (
     <div style={{ maxWidth: '900px', padding: '2rem 1.5rem' }}>
       <h2>{t('Miembros', 'Members')}</h2>
       <p style={{ color: 'var(--color-fg-muted)' }}>
         {t(
-          'Invita por email. Si ya tiene cuenta se agrega al instante; si no, se crea una invitación con enlace para que se registre y se una automáticamente.',
-          'Invite by email. If they already have an account they are added instantly; if not, an invitation link is created so they can sign up and join automatically.',
+          'Agrega por email a personas que ya tengan cuenta (el alta es por SSO). Si aún no iniciaron sesión por SSO, pídeles que lo hagan una vez y luego agrégalas.',
+          'Add people by email once they have an account (sign-up is via SSO). If they haven’t signed in via SSO yet, ask them to do so once and then add them.',
         )}
       </p>
       <MembersPanel
@@ -63,13 +56,6 @@ export default async function ProjectSettingsPage({
           name: m.user.name,
           email: m.user.email,
           joinedAt: m.joinedAt.toISOString(),
-        }))}
-        pendingInvites={pendingInvites.map((i) => ({
-          id: i.id,
-          email: i.email,
-          role: i.projectRole,
-          seniority: i.seniority,
-          expiresAt: i.expiresAt.toISOString(),
         }))}
       />
 

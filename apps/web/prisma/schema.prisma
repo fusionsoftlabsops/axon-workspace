@@ -166,33 +166,7 @@ model User {
   storyDrafts      StoryDraft[]
   uploadedFiles    ProjectFile[]    @relation("FileUploader")
   authoredPlans    ProjectPlan[]    @relation("PlanAuthor")
-  invitesSent      Invitation[]     @relation("InvitedBy")
   agentIdentities  Agent[]
-
-  @@index([email])
-}
-
-// Invite-only onboarding: a master user invites an email; the recipient
-// registers by presenting the token (only its sha256 is stored). Public
-// self-signup is disabled — a valid, unexpired, unaccepted invite is required.
-model Invitation {
-  id          String    @id @default(cuid())
-  email       String
-  tokenHash   String    @unique // sha256 hex of the plaintext token
-  invitedById String
-  expiresAt   DateTime
-  acceptedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  // When set, accepting this invite (on signup) also joins the user to the
-  // project with the given role — lets a project OWNER/ADMIN invite someone who
-  // doesn't have an account yet.
-  projectId   String?
-  projectRole MemberRole?
-  // Optional seniority captured at invite time (for AI time estimation). Carried
-  // onto the ProjectMember when the invitee signs up and auto-joins the project.
-  seniority   Seniority?
-
-  invitedBy   User @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
 
   @@index([email])
 }

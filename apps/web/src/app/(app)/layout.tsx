@@ -25,7 +25,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <Link href="/settings/tokens">API tokens</Link>
           <Link href="/settings/llm-credentials">LLM keys</Link>
           <Link href="/settings/github">GitHub</Link>
-          {session.user.isMasterUser && <Link href="/settings/invitations">{t('Invitaciones', 'Invitations')}</Link>}
         </nav>
         <div className={styles.user}>
           <ThemeToggle />

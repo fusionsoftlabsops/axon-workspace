@@ -8,7 +8,6 @@ const h = vi.hoisted(() => ({
   removeMemberAction: vi.fn(),
   updateMemberRoleAction: vi.fn(),
   setMemberSeniorityAction: vi.fn(),
-  resendInvitationAction: vi.fn(),
   transferOwnershipAction: vi.fn(),
 }));
 
@@ -18,7 +17,6 @@ vi.mock('@/lib/actions/projects', () => ({
   removeMemberAction: h.removeMemberAction,
   updateMemberRoleAction: h.updateMemberRoleAction,
   setMemberSeniorityAction: h.setMemberSeniorityAction,
-  resendInvitationAction: h.resendInvitationAction,
   transferOwnershipAction: h.transferOwnershipAction,
 }));
 
@@ -66,42 +64,23 @@ describe('MembersPanel', () => {
 
   it('invites a member who already has an account', async () => {
     const user = userEvent.setup();
-    h.inviteMemberAction.mockResolvedValue({ ok: true, data: { pending: false } });
+    h.inviteMemberAction.mockResolvedValue({ ok: true, data: { email: 'new@x.com', emailSent: false } });
     render(<MembersPanel {...props()} />);
     await user.type(screen.getByPlaceholderText(/email@domain/i), 'new@x.com');
     await user.selectOptions(screen.getAllByRole('combobox')[0], 'VIEWER');
     await user.click(screen.getByRole('button', { name: 'Invite' }));
     expect(h.inviteMemberAction).toHaveBeenCalledWith('p', { email: 'new@x.com', role: 'VIEWER' });
+    expect(await screen.findByText(/Added to the project/i)).toBeInTheDocument();
     expect(router.refresh).toHaveBeenCalled();
   });
 
-  it('shows the invite link for a pending invitation and copies it', async () => {
+  it('shows an error when inviting an email without an account', async () => {
     const user = userEvent.setup();
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    h.inviteMemberAction.mockResolvedValue({
-      ok: true,
-      data: { pending: true, token: 'tok', email: 'new@x.com', emailSent: false },
-    });
+    h.inviteMemberAction.mockResolvedValue({ ok: false, error: 'Esa persona todavía no tiene cuenta.' });
     render(<MembersPanel {...props()} />);
     await user.type(screen.getByPlaceholderText(/email@domain/i), 'new@x.com');
     await user.click(screen.getByRole('button', { name: 'Invite' }));
-    expect(await screen.findByText(/Share this link/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Copy' }));
-    expect(writeText).toHaveBeenCalled();
-    expect(await screen.findByText('Copied!')).toBeInTheDocument();
-  });
-
-  it('shows the emailed-link note when the invite email was sent', async () => {
-    const user = userEvent.setup();
-    h.inviteMemberAction.mockResolvedValue({
-      ok: true,
-      data: { pending: true, token: 'tok', email: 'new@x.com', emailSent: true },
-    });
-    render(<MembersPanel {...props()} />);
-    await user.type(screen.getByPlaceholderText(/email@domain/i), 'new@x.com');
-    await user.click(screen.getByRole('button', { name: 'Invite' }));
-    expect(await screen.findByText(/We emailed them the link/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no tiene cuenta/i)).toBeInTheDocument();
   });
 
   it('shows an error when inviting fails', async () => {
@@ -183,7 +162,7 @@ describe('MembersPanel', () => {
 
   it('invites with an explicit seniority', async () => {
     const user = userEvent.setup();
-    h.inviteMemberAction.mockResolvedValue({ ok: true, data: { pending: false, email: 'new@x.com', emailSent: true } });
+    h.inviteMemberAction.mockResolvedValue({ ok: true, data: { email: 'new@x.com', emailSent: true } });
     render(<MembersPanel {...props()} />);
     await user.type(screen.getByPlaceholderText(/email@domain/i), 'new@x.com');
     // form-level selects: [0] role, [1] seniority
@@ -191,22 +170,6 @@ describe('MembersPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Invite' }));
     expect(h.inviteMemberAction).toHaveBeenCalledWith('p', expect.objectContaining({ email: 'new@x.com', seniority: 'SENIOR' }));
     expect(await screen.findByText(/notified by email/i)).toBeInTheDocument();
-  });
-
-  it('lists and resends a pending invitation', async () => {
-    const user = userEvent.setup();
-    h.resendInvitationAction.mockResolvedValue({ ok: true, data: { emailSent: true, token: 'tok', email: 'p@x.com' } });
-    render(
-      <MembersPanel
-        {...props({
-          pendingInvites: [{ id: 'inv1', email: 'p@x.com', role: 'MEMBER', seniority: 'JUNIOR', expiresAt: '2030-01-01' }],
-        })}
-      />,
-    );
-    expect(screen.getByText('p@x.com')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Resend' }));
-    expect(h.resendInvitationAction).toHaveBeenCalledWith('p', 'inv1');
-    expect(await screen.findByText(/resent by email/i)).toBeInTheDocument();
   });
 
   it('lets the owner transfer ownership and hides it for non-owners', async () => {
