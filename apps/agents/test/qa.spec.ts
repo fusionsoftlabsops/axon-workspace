@@ -188,3 +188,43 @@ describe('createQaHandler — git_diff + aprendizaje', () => {
     expect(caps[0]).toMatchObject({ scope: 'LOCAL' });
   });
 });
+
+describe('createQaHandler — comentario en el PR real', () => {
+  it('con un PR linkeado en los comentarios, comenta el veredicto también en el PR real', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => ({}) });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({
+        title: 'HU',
+        comments: [{ body: 'PR: https://github.com/o/r/pull/9' }],
+      }),
+    });
+    await createQaHandler({ ...OPTS, api: a, provider: provider('{"decision":"approve","comment":"ok"}'), gitToken: 'ghp_x' }).handle(
+      evt(),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/repos/o/r/issues/9/comments',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const sent = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body) as { body: string };
+    expect(sent.body).toContain('QA');
+  });
+
+  it('sin PR linkeado en los comentarios, no llama a la API git', async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const a = api(); // fixture default: "https://github.com/pr/9" no matchea owner/repo/pull/N
+    await createQaHandler({ ...OPTS, api: a, provider: provider('{"decision":"approve","comment":"ok"}') }).handle(evt());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('si comentar en el PR falla, el veredicto ya persistido en Axon no se ve afectado', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const a = api({
+      getTask: vi.fn().mockResolvedValue({ title: 'HU', comments: [{ body: 'PR: https://github.com/o/r/pull/9' }] }),
+    });
+    await createQaHandler({ ...OPTS, api: a, provider: provider('{"decision":"approve","comment":"ok"}') }).handle(evt());
+    expect(a.qaDecision).toHaveBeenCalledWith('axon', 16, { decision: 'approve', comment: 'ok' });
+  });
+});

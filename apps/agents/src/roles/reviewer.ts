@@ -18,6 +18,8 @@ import { runTrackedLoop } from '../runtime/tracked.js';
 import { contextTools } from '../tools/context.js';
 import { repoTools } from '../tools/repo.js';
 import { GitWorkspace, type CommandRunner } from '../git/workspace.js';
+import { getGitProvider, DEFAULT_GIT_CONFIG, type GitProviderConfig } from '../git/provider.js';
+import { parsePrNumber } from '../git/pr-ref.js';
 import { gitDiffTool } from './qa.js';
 import { narrate } from './narrate.js';
 
@@ -27,6 +29,8 @@ export interface ReviewerOptions {
   projectSlug: string;
   provider: LlmProvider;
   gitToken?: string;
+  /** Proveedor git (host/API base/shape). Default GitHub. */
+  gitConfig?: GitProviderConfig;
   run?: CommandRunner;
   meCacheMs?: number;
   maxIterations?: number;
@@ -135,6 +139,24 @@ export function createReviewerHandler(opts: ReviewerOptions): RoleHandler {
         const sev = review.severity === 'blocker' ? '🛑 blocker' : review.severity === 'concerns' ? '⚠️ observaciones' : '✅ ok';
         const body = review.comment?.trim() || 'Sin observaciones de calidad.';
         await opts.api.comment(opts.projectSlug, n, `🔎 **Code Review (${sev})**\n\n${body}`);
+
+        // Best-effort: además del comentario en Axon, dejarlo también en el PR real
+        // si hay uno linkeado en los comentarios — nunca rompe el flujo si falla.
+        try {
+          const pr = parsePrNumber(story.comments ?? []);
+          if (pr) {
+            const gitProvider = getGitProvider(opts.gitConfig ?? DEFAULT_GIT_CONFIG);
+            await gitProvider.postIssueComment({
+              repoUrl: repo.url,
+              number: pr,
+              body: `🔎 **Code Review (${sev})**\n\n${body}`,
+              token: opts.gitToken,
+            });
+          }
+        } catch {
+          /* comentar en el PR es advisory: no bloquea nada si falla */
+        }
+
         await narrate(
           opts.api,
           opts.projectSlug,

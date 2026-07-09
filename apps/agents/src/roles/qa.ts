@@ -17,6 +17,8 @@ import { runTrackedLoop } from '../runtime/tracked.js';
 import { contextTools } from '../tools/context.js';
 import { repoTools } from '../tools/repo.js';
 import { GitWorkspace, type CommandRunner } from '../git/workspace.js';
+import { getGitProvider, DEFAULT_GIT_CONFIG, type GitProviderConfig } from '../git/provider.js';
+import { parsePrNumber } from '../git/pr-ref.js';
 import { narrate } from './narrate.js';
 
 export interface QaOptions {
@@ -25,6 +27,8 @@ export interface QaOptions {
   projectSlug: string;
   provider: LlmProvider;
   gitToken?: string;
+  /** Proveedor git (host/API base/shape). Default GitHub. */
+  gitConfig?: GitProviderConfig;
   run?: CommandRunner;
   meCacheMs?: number;
   maxIterations?: number;
@@ -186,6 +190,28 @@ export function createQaHandler(opts: QaOptions): RoleHandler {
           decision: verdict.decision,
           comment: verdict.comment?.trim() || (verdict.decision === 'reject' ? 'Revisión adversarial: criterios sin evidencia en el código.' : undefined),
         });
+
+        // Best-effort: además del veredicto en Axon, dejarlo también en el PR real
+        // si hay uno linkeado en los comentarios — nunca rompe el veredicto ya persistido.
+        try {
+          const pr = parsePrNumber(story.comments ?? []);
+          if (pr && repo?.url) {
+            const gitProvider = getGitProvider(opts.gitConfig ?? DEFAULT_GIT_CONFIG);
+            await gitProvider.postIssueComment({
+              repoUrl: repo.url,
+              number: pr,
+              body: `🤖 **QA** (${verdict.decision}): ${
+                verdict.comment?.trim() ||
+                (verdict.decision === 'reject'
+                  ? 'Revisión adversarial: criterios sin evidencia en el código.'
+                  : 'Aprobada.')
+              }`,
+              token: opts.gitToken,
+            });
+          }
+        } catch {
+          /* comentar en el PR es advisory: no bloquea nada si falla */
+        }
 
         // Aprendizaje: veredicto → cerebro PERSONAL del QA; un rechazo además
         // deja un GOTCHA en el cerebro COMPARTIDO (el equipo aprende qué faltó).

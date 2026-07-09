@@ -204,6 +204,7 @@ export function buildProjectTeam(deps: TeamDeps, project: RuntimeProject): Proje
           projectSlug,
           provider,
           gitToken: deps.GITHUB_TOKEN,
+          gitConfig,
           maxDurationMs: deps.AGENT_MAX_DURATION_MS,
         }),
       );
@@ -227,6 +228,7 @@ export function buildProjectTeam(deps: TeamDeps, project: RuntimeProject): Proje
           projectSlug,
           provider,
           gitToken: deps.GITHUB_TOKEN,
+          gitConfig,
           maxDurationMs: deps.AGENT_MAX_DURATION_MS,
         }),
       );

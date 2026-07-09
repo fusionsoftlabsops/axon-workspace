@@ -57,6 +57,8 @@ export interface GitProvider {
   openPr(input: OpenPrInput): Promise<string>;
   /** URL del PR abierto para `head`, o null. */
   findOpenPr(input: { repoUrl: string; head: string; token?: string }): Promise<string | null>;
+  /** Comenta en el PR/issue `number` (ambos proveedores exponen el PR como issue para comentarios). */
+  postIssueComment(input: { repoUrl: string; number: number; body: string; token?: string }): Promise<void>;
 }
 
 const PROVIDER_LABEL: Record<GitProviderKind, string> = { github: 'GitHub', forgejo: 'Forgejo' };
@@ -127,6 +129,16 @@ abstract class BaseGitProvider implements GitProvider {
     if (!res.ok) return null;
     const list = (await res.json().catch(() => [])) as Array<{ html_url?: string }>;
     return list[0]?.html_url ?? null;
+  }
+
+  async postIssueComment(input: { repoUrl: string; number: number; body: string; token?: string }): Promise<void> {
+    const ref = this.parseRepoRef(input.repoUrl);
+    if (!ref) throw new Error(`repoUrl no es de ${PROVIDER_LABEL[this.config.provider]} — no se puede comentar`);
+    const res = await this.apiFetch(`/repos/${ref.owner}/${ref.repo}/issues/${input.number}/comments`, input.token, {
+      method: 'POST',
+      body: JSON.stringify({ body: input.body }),
+    });
+    if (!res.ok) throw new Error(`comentario en PR falló (${res.status})`);
   }
 }
 

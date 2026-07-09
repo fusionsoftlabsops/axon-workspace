@@ -13,7 +13,10 @@ import type { AxonApi } from '../api/client.js';
 import type { DomainEventV1 } from '../events.js';
 import type { RoleHandler } from '../router.js';
 import { getGitProvider, DEFAULT_GIT_CONFIG, type GitProviderConfig } from '../git/provider.js';
+import { parsePrNumber } from '../git/pr-ref.js';
 import { narrate } from './narrate.js';
+
+export { parsePrNumber };
 
 export interface ReleaseOptions {
   api: AxonApi;
@@ -25,16 +28,6 @@ export interface ReleaseOptions {
   meCacheMs?: number;
   /** Inyectable para tests (default: fetch global). */
   fetchImpl?: typeof fetch;
-}
-
-/** Extrae el número de PR del último link .../pull(s)/N en los comentarios
- *  (GitHub usa `/pull/N`, Forgejo/Gitea `/pulls/N`; se aceptan ambos). */
-export function parsePrNumber(comments: Array<{ body: string }>): number | null {
-  for (const c of [...comments].reverse()) {
-    const m = c.body.match(/\/[^/\s]+\/[^/\s]+\/pulls?\/(\d+)/i);
-    if (m) return parseInt(m[1]!, 10);
-  }
-  return null;
 }
 
 export function createReleaseHandler(opts: ReleaseOptions): RoleHandler {
