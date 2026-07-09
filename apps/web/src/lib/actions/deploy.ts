@@ -362,6 +362,11 @@ export async function deployRepoAction(
   if (!repo) return { ok: false, error: 'Repo no encontrado' };
   if (!repo.url) return { ok: false, error: 'El repo no tiene URL de GitHub para desplegar' };
 
+  // Los deploys salen de main → son PRODUCCIÓN: NODE_ENV=production va por
+  // defecto (overrideable), para que ningún proyecto nuevo llegue a prod en
+  // modo dev (secretos laxos, hot-reload, logs verbosos) por olvidarlo.
+  const envWithDefaults = { NODE_ENV: 'production', ...(input.env ?? {}) };
+
   try {
     const existing = await prisma.deployment.findFirst({
       where: { deployTargetId: target.id, projectRepoId: repo.id },
@@ -389,7 +394,7 @@ export async function deployRepoAction(
           dockerfilePath: input.dockerfilePath || 'Dockerfile',
           exposedPort: input.exposedPort,
           gitToken: repo.private ? env().GITHUB_TOKEN : undefined,
-          env: input.env,
+          env: envWithDefaults,
         },
         target.fusionTeamId,
       );

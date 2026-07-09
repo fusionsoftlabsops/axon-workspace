@@ -484,7 +484,8 @@ describe('deployRepoAction', () => {
         dockerfilePath: 'Dockerfile',
         exposedPort: 8080,
         gitToken: 'ghp_secret',
-        env: { K: 'v' },
+        // main = producción: NODE_ENV se inyecta por defecto junto al env pedido.
+        env: { NODE_ENV: 'production', K: 'v' },
       }),
       't1',
     );
@@ -500,6 +501,23 @@ describe('deployRepoAction', () => {
     await deploy.deployRepoAction('slug', 'r1', { exposedPort: 80, dockerfilePath: 'docker/Dockerfile.prod' });
     expect(fusionMock.createApp).toHaveBeenCalledWith(
       expect.objectContaining({ dockerfilePath: 'docker/Dockerfile.prod', gitToken: undefined, branch: 'main' }),
+      't1',
+    );
+  });
+
+  it('defaults NODE_ENV=production but lets an explicit value override it', async () => {
+    prismaMock.deployment.findFirst.mockResolvedValue(null);
+    fusionMock.createApp.mockResolvedValue({ id: 'a1', name: 'slug-api', hostname: 'h' });
+    fusionMock.deployApp.mockResolvedValue({ deploymentId: 'd1' });
+    await deploy.deployRepoAction('slug', 'r1', { exposedPort: 80 });
+    expect(fusionMock.createApp).toHaveBeenCalledWith(
+      expect.objectContaining({ env: { NODE_ENV: 'production' } }),
+      't1',
+    );
+    fusionMock.createApp.mockClear();
+    await deploy.deployRepoAction('slug', 'r1', { exposedPort: 80, env: { NODE_ENV: 'staging' } });
+    expect(fusionMock.createApp).toHaveBeenCalledWith(
+      expect.objectContaining({ env: { NODE_ENV: 'staging' } }),
       't1',
     );
   });
